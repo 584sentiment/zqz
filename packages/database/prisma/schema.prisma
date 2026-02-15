@@ -116,7 +116,7 @@ model Experience {
   current         Boolean  @default(false)
 
   description     String?  @db.Text
-  highlights      String[] @db.Text[]
+  highlights      String[]
 
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
@@ -137,7 +137,7 @@ model Project {
 
   description     String   @db.Text
   techStack       String[] @map("tech_stack")
-  achievements    String[] @db.Text[]
+  achievements    String[]
   link            String?
 
   createdAt       DateTime @default(now()) @map("created_at")
@@ -284,7 +284,7 @@ model QuestionBank {
   difficulty      String   // easy, medium, hard
 
   question        String   @db.Text
-  keypoints       String[] @db.Text[]
+  keypoints       String[]
 
   usageCount      Int      @default(0) @map("usage_count")
 

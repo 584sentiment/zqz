@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AI 技能发掘对话 - ZhiQiuZhi</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#0d968b",
+                        "background-light": "#f6f8f8",
+                        "background-dark": "#102220",
+                        // Derived neutrals
+                        "neutral-50": "#f4fcfb", // Very light tint of primary
+                        "neutral-100": "#ccfbf7",
+                        "neutral-200": "#99f6ee",
+                        "neutral-800": "#115e59", // Dark shade
+                        "neutral-900": "#134e4a",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 20px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background-color: #334155;
+        }.bubble-left {
+            border-top-left-radius: 0;
+        }
+        .bubble-right {
+            border-bottom-right-radius: 0;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-gray-800 dark:text-gray-100 h-screen flex flex-col overflow-hidden">
+<header class="bg-white dark:bg-[#152e2b] border-b border-gray-200 dark:border-primary/20 px-6 py-4 flex items-center justify-between shrink-0">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center text-primary">
+<span class="material-icons">work_outline</span>
+</div>
+<div>
+<h1 class="font-bold text-lg leading-tight">智求职 <span class="text-xs font-normal text-gray-500 dark:text-gray-400 block">AI 职业助手</span></h1>
+</div>
+</div>
+<div class="hidden md:flex flex-col w-1/3 max-w-md">
+<div class="flex justify-between text-xs font-medium mb-2 text-gray-500 dark:text-gray-400">
+<span class="text-primary">第一步：工作经历</span>
+<span>第四步</span>
+</div>
+<div class="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+<div class="h-full bg-primary w-1/4 rounded-full"></div>
+</div>
+</div>
+<button class="text-sm font-medium text-gray-500 hover:text-primary dark:text-gray-400 dark:hover:text-primary transition-colors flex items-center gap-1">
+<span class="material-icons text-base">save_as</span>
+            保存并稍后继续
+        </button>
+</header>
+<main class="flex-1 flex overflow-hidden">
+<section class="flex-1 flex flex-col relative max-w-4xl mx-auto w-full lg:border-r border-gray-200 dark:border-primary/10">
+<div class="flex-1 overflow-y-auto p-6 space-y-6">
+<div class="flex justify-center">
+<span class="text-xs font-medium text-gray-400 bg-gray-100 dark:bg-primary/10 px-3 py-1 rounded-full">今天, 上午 10:23</span>
+</div>
+<div class="flex gap-4 max-w-2xl">
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-1">
+<span class="material-icons text-primary text-xl">smart_toy</span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="text-xs font-medium text-gray-500 ml-1">智求职 AI</span>
+<div class="bg-white dark:bg-[#1a3835] border border-gray-100 dark:border-primary/10 p-4 rounded-2xl bubble-left shadow-sm text-gray-800 dark:text-gray-200">
+<p>你好！我是来帮你发掘潜在职业优势的助手。为了打造完美的简历，我们先从你最近的一份工作开始吧。</p>
+<p class="mt-2">能否描述一个你在其中需要领导团队或管理复杂交付成果的重要项目？</p>
+</div>
+</div>
+</div>
+<div class="flex gap-4 max-w-2xl ml-auto flex-row-reverse">
+<div class="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center shrink-0 mt-1 overflow-hidden">
+<img alt="User Avatar" class="w-full h-full object-cover" data-alt="Portrait of a smiling young professional user" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBMABMai-Eeq_eww96tLnswH6d1WGk72BJjDC8kqJAfONj8TEFHUQUp37N5VSn6_eva2lgD5iwF23Diwoh12pgZyoAYwaLo2hAM1YVDLHZjbWwzOSSHUbD-MaIsHJeEhTKgUwTtA1CVMrdN5noX6Dw1wwqwsJd26MI0I6lndIwl5uEPLjY7fCd7FNfHTri3e3eyCdbjtbnH2idWWj5M-t54BAoR1Z2CQ9prRNYoICdStcE1Vyh2Iv7o9tykIbVgQcZu_we8dT0KaDTf"/>
+</div>
+<div class="flex flex-col gap-1 items-end">
+<span class="text-xs font-medium text-gray-500 mr-1">你</span>
+<div class="bg-primary text-white p-4 rounded-2xl bubble-right shadow-md">
+<p>好的。去年我在 TechCorp 担任项目经理。我带领了一个由 5 名开发人员和 2 名设计师组成的跨职能团队，采用敏捷开发方法，上线了一个全新的基于 React 的客户门户网站。</p>
+</div>
+</div>
+</div>
+<div class="flex gap-4 max-w-2xl">
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-1">
+<span class="material-icons text-primary text-xl">smart_toy</span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="text-xs font-medium text-gray-500 ml-1">智求职 AI</span>
+<div class="bg-white dark:bg-[#1a3835] border border-gray-100 dark:border-primary/10 p-4 rounded-2xl bubble-left shadow-sm text-gray-800 dark:text-gray-200">
+<p>这是一个很棒的开始！领导跨职能团队展现了很强的协调能力。具体关于“基于 React 的客户门户网站”，你是参与了技术架构的设计，还是主要负责时间表和资源的管理？</p>
+</div>
+</div>
+</div>
+<div class="flex gap-4 max-w-2xl ml-auto flex-row-reverse opacity-50">
+<div class="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center shrink-0 mt-1 overflow-hidden">
+<img alt="User Avatar" class="w-full h-full object-cover" data-alt="Portrait of a smiling young professional user" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD4M22mFBIVVaP9Mx5tMhHaCWPdFB5rP2kRjuJZ1D6C2h9U25EbkaYTv64e9P8t6tf0B8aUMzYxn4Xx8fOgfSyhbPB0Nx5aR91QC-MSbGJxDmdYPDnTUmzYe7VjU_KUK1nM-vjG49LnOR2KvvzpRxzNgKaVFwmQ7XMFtUKgmauV9J7gAEN1mhdo7mUvdtEi8SthLbGkTROi3Rp0NZEKqd4qqCkq-Ecg-QhqqbZtgNBvbi1Lfkff2me-JigoduysbGMdyj2ZFTHqCn-6"/>
+</div>
+<div class="flex flex-col gap-1 items-end">
+<span class="text-xs font-medium text-gray-500 mr-1">正在输入...</span>
+<div class="bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 p-4 rounded-2xl bubble-right">
+<div class="flex space-x-1">
+<div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+<div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+<div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="p-4 bg-white dark:bg-[#152e2b] border-t border-gray-200 dark:border-primary/10 z-10">
+<div class="flex gap-2 mb-3 overflow-x-auto pb-2 scrollbar-hide">
+<button class="whitespace-nowrap px-3 py-1.5 bg-primary/5 hover:bg-primary/10 border border-primary/20 rounded-full text-xs text-primary font-medium transition-colors">
+                        "我管理了产品路线图..."
+                    </button>
+<button class="whitespace-nowrap px-3 py-1.5 bg-primary/5 hover:bg-primary/10 border border-primary/20 rounded-full text-xs text-primary font-medium transition-colors">
+                        "我负责与利益相关者沟通..."
+                    </button>
+<button class="whitespace-nowrap px-3 py-1.5 bg-primary/5 hover:bg-primary/10 border border-primary/20 rounded-full text-xs text-primary font-medium transition-colors">
+                        "完全是技术性的..."
+                    </button>
+</div>
+<div class="relative flex items-end gap-2 bg-gray-50 dark:bg-[#102220] p-2 rounded-xl border border-gray-200 dark:border-primary/20 focus-within:ring-2 focus-within:ring-primary/50 focus-within:border-primary transition-all shadow-sm">
+<button class="p-2 text-gray-400 hover:text-primary transition-colors rounded-lg">
+<span class="material-icons">mic</span>
+</button>
+<textarea class="w-full bg-transparent border-0 focus:ring-0 p-2 text-gray-700 dark:text-gray-200 placeholder-gray-400 resize-none max-h-32" oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'" placeholder="输入你的回答..." rows="1"></textarea>
+<button class="p-2 bg-primary hover:bg-teal-700 text-white rounded-lg shadow-md transition-all transform active:scale-95 flex items-center justify-center">
+<span class="material-icons text-xl">arrow_upward</span>
+</button>
+</div>
+<div class="text-center mt-2">
+<p class="text-[10px] text-gray-400">AI 可能会犯错。请核实重要信息。</p>
+</div>
+</div>
+</section>
+<aside class="hidden lg:flex flex-col w-96 bg-gray-50 dark:bg-[#0c1a18] border-l border-gray-200 dark:border-primary/10 p-6 overflow-y-auto">
+<div class="sticky top-0 z-10 bg-gray-50 dark:bg-[#0c1a18] pb-4">
+<div class="flex items-center justify-between mb-1">
+<h2 class="text-lg font-semibold text-gray-800 dark:text-white flex items-center gap-2">
+<span class="material-icons text-primary">auto_awesome</span>
+                        已识别技能
+                    </h2>
+<span class="bg-primary text-white text-xs px-2 py-0.5 rounded-full font-bold">6</span>
+</div>
+<p class="text-xs text-gray-500 dark:text-gray-400">根据对话实时提取的技能。</p>
+</div>
+<div class="mb-6">
+<div class="flex items-center justify-between mb-3">
+<h3 class="text-xs font-bold uppercase tracking-wider text-primary">专业与技术</h3>
+<div class="h-px bg-primary/20 flex-1 ml-3"></div>
+</div>
+<div class="flex flex-wrap gap-2">
+<div class="group flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary-800 dark:text-primary px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-primary/20 transition-all cursor-default">
+                        项目管理
+                        <button class="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity">
+<span class="material-icons text-[14px]">close</span>
+</button>
+</div>
+<div class="group flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary-800 dark:text-primary px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-primary/20 transition-all cursor-default animate-[pulse_2s_ease-in-out]">
+                        敏捷开发
+                        <button class="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity">
+<span class="material-icons text-[14px]">close</span>
+</button>
+</div>
+<div class="group flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary-800 dark:text-primary px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-primary/20 transition-all cursor-default">
+                        React.js
+                        <button class="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity">
+<span class="material-icons text-[14px]">close</span>
+</button>
+</div>
+</div>
+</div>
+<div class="mb-6">
+<div class="flex items-center justify-between mb-3">
+<h3 class="text-xs font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400">通用能力</h3>
+<div class="h-px bg-orange-200 dark:bg-orange-900/30 flex-1 ml-3"></div>
+</div>
+<div class="flex flex-wrap gap-2">
+<div class="group flex items-center gap-1.5 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/30 text-orange-700 dark:text-orange-300 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-all cursor-default">
+                        领导力
+                        <button class="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity">
+<span class="material-icons text-[14px]">close</span>
+</button>
+</div>
+<div class="group flex items-center gap-1.5 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/30 text-orange-700 dark:text-orange-300 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-all cursor-default">
+                        跨职能团队
+                         <button class="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity">
+<span class="material-icons text-[14px]">close</span>
+</button>
+</div>
+</div>
+</div>
+<div class="mb-6">
+<div class="flex items-center justify-between mb-3">
+<h3 class="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">可迁移能力</h3>
+<div class="h-px bg-emerald-200 dark:bg-emerald-900/30 flex-1 ml-3"></div>
+</div>
+<div class="flex flex-wrap gap-2">
+<div class="group flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 text-emerald-700 dark:text-emerald-300 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all cursor-default">
+                        战略规划
+                        <button class="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity">
+<span class="material-icons text-[14px]">close</span>
+</button>
+</div>
+</div>
+</div>
+<div class="mt-auto bg-white dark:bg-[#152e2b] rounded-xl border border-gray-200 dark:border-primary/20 p-4 shadow-sm">
+<h4 class="text-sm font-semibold mb-2">技能强度分析</h4>
+<div class="flex items-end justify-between h-24 gap-2 px-2">
+<div class="w-full bg-primary/20 rounded-t-sm h-[60%] relative group">
+<div class="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 text-[10px] bg-gray-800 text-white px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">60%</div>
+</div>
+<div class="w-full bg-primary/40 rounded-t-sm h-[85%] relative group">
+<div class="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 text-[10px] bg-gray-800 text-white px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">85%</div>
+</div>
+<div class="w-full bg-primary/60 rounded-t-sm h-[40%] relative group">
+<div class="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 text-[10px] bg-gray-800 text-white px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">40%</div>
+</div>
+<div class="w-full bg-primary rounded-t-sm h-[75%] relative group">
+<div class="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 text-[10px] bg-gray-800 text-white px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">75%</div>
+</div>
+<div class="w-full bg-primary/30 rounded-t-sm h-[50%] relative group">
+<div class="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 text-[10px] bg-gray-800 text-white px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">50%</div>
+</div>
+</div>
+<div class="flex justify-between text-[10px] text-gray-400 mt-2 px-1">
+<span>管理</span>
+<span>敏捷</span>
+<span>代码</span>
+<span>领导</span>
+<span>规划</span>
+</div>
+</div>
+</aside>
+</main>
+
+</body></html>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>智求职 - 面试评估报告</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#0d968b",
+                        "primary-dark": "#0a756c",
+                        "background-light": "#f6f8f8",
+                        "background-dark": "#102220",
+                        "surface-light": "#ffffff",
+                        "surface-dark": "#162e2b",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .radial-progress {
+            position: relative;
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            background: conic-gradient(var(--tw-text-opacity, 1) #0d968b calc(var(--value) * 1%), #e5e7eb 0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .radial-progress::before {
+            content: '';
+            position: absolute;
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            background-color: white;
+        }
+        .dark .radial-progress::before {
+            background-color: #162e2b;
+        }::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-800 dark:text-slate-100 min-h-screen font-display antialiased transition-colors duration-200">
+<nav class="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between h-16">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-emerald-400 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-primary/30">
+                        Z
+                    </div>
+<span class="font-bold text-xl tracking-tight text-slate-900 dark:text-white">智求职</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-500 hover:text-primary transition-colors">
+<span class="material-icons">notifications</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden ring-2 ring-primary/20">
+<img alt="User Profile" class="h-full w-full object-cover" data-alt="User profile avatar image" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCpp2Yz03ZJYHSANvNb3DNMRSvh576NKHd-sKX6UvMjKJjcBuc1kqSHQF0yMH05TtPTPpuqqxEq_iN_hHAlpCXjgdO0WSrE4hFO8gtcpGCJlDoQ1_JvFajI9uRHkywzXOlUoTEERmKnH3JxPblTMZmY7sg0LJ8WxnfBHjV1TOeiO2y5DnSkfrhTcnTVDS7AAX7Q_5_vRpD_-YDqplZQ9n0tylc3FEBqZJU4bLJwb478BFydc50HsppAU_iWQC22aLMlOy5W9zZjyh-G"/>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+<header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div>
+<nav aria-label="Breadcrumb" class="flex text-sm text-slate-500 dark:text-slate-400 mb-1">
+<ol class="flex items-center space-x-2">
+<li><a class="hover:text-primary transition-colors" href="#">面试记录</a></li>
+<li><span class="text-slate-300 dark:text-slate-600">/</span></li>
+<li><span class="text-slate-900 dark:text-white font-medium">报告 #INT-2023-084</span></li>
+</ol>
+</nav>
+<h1 class="text-3xl font-bold text-slate-900 dark:text-white">高级前端工程师面试评估</h1>
+<p class="text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
+<span class="material-icons text-sm">calendar_today</span> 2023年10月24日 • 模拟面试
+                </p>
+</div>
+<div class="flex gap-3">
+<button class="inline-flex items-center px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-surface-dark hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all">
+<span class="material-icons text-sm mr-2">share</span> 分享
+                </button>
+<button class="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all shadow-primary/20 hover:shadow-primary/40">
+<span class="material-icons text-sm mr-2">download</span> 导出 PDF
+                </button>
+</div>
+</header>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<div class="bg-white dark:bg-surface-dark rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 p-8 flex flex-col items-center justify-center text-center relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-icons text-9xl text-primary transform rotate-12">analytics</span>
+</div>
+<h2 class="text-lg font-medium text-slate-500 dark:text-slate-400 mb-6 uppercase tracking-wider text-xs">综合评分</h2>
+<div class="radial-progress mb-6" style="--value:78">
+<div class="relative z-10 flex flex-col items-center">
+<span class="text-5xl font-bold text-primary dark:text-primary">78</span>
+<span class="text-xs text-slate-400 uppercase font-medium mt-1">总分 100</span>
+</div>
+</div>
+<div class="space-y-2">
+<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary/10 text-primary border border-primary/20">
+                        表现良好
+                    </span>
+<p class="text-slate-600 dark:text-slate-300 text-sm max-w-xs mx-auto leading-relaxed">
+                        具备扎实的技术基础。若能在系统设计方面增加更多深度，将有机会达到“卓越”等级。
+                    </p>
+</div>
+</div>
+<div class="lg:col-span-2 bg-white dark:bg-surface-dark rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 p-8">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-lg font-bold text-slate-900 dark:text-white">各项能力拆解</h3>
+<button class="text-sm text-primary hover:text-primary-dark font-medium flex items-center">
+                        查看基准 <span class="material-icons text-sm ml-1">arrow_forward</span>
+</button>
+</div>
+<div class="space-y-6">
+<div>
+<div class="flex justify-between mb-2">
+<span class="text-sm font-medium text-slate-700 dark:text-slate-200 flex items-center gap-2">
+<span class="material-icons text-base text-blue-500">code</span> 技术熟练度
+                            </span>
+<span class="text-sm font-bold text-slate-900 dark:text-white">85%</span>
+</div>
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+<div class="bg-primary h-2.5 rounded-full" style="width: 85%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between mb-2">
+<span class="text-sm font-medium text-slate-700 dark:text-slate-200 flex items-center gap-2">
+<span class="material-icons text-base text-purple-500">folder_special</span> 项目经验
+                            </span>
+<span class="text-sm font-bold text-slate-900 dark:text-white">70%</span>
+</div>
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+<div class="bg-purple-500 h-2.5 rounded-full" style="width: 70%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between mb-2">
+<span class="text-sm font-medium text-slate-700 dark:text-slate-200 flex items-center gap-2">
+<span class="material-icons text-base text-green-500">record_voice_over</span> 沟通表达
+                            </span>
+<span class="text-sm font-bold text-slate-900 dark:text-white">90%</span>
+</div>
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+<div class="bg-green-500 h-2.5 rounded-full" style="width: 90%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between mb-2">
+<span class="text-sm font-medium text-slate-700 dark:text-slate-200 flex items-center gap-2">
+<span class="material-icons text-base text-orange-500">psychology</span> 逻辑思维
+                            </span>
+<span class="text-sm font-bold text-slate-900 dark:text-white">65%</span>
+</div>
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+<div class="bg-orange-500 h-2.5 rounded-full" style="width: 65%"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<section>
+<h3 class="text-xl font-bold text-slate-900 dark:text-white mb-4">核心洞察与改进</h3>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-white dark:bg-surface-dark rounded-xl p-6 border-l-4 border-indigo-500 shadow-sm flex flex-col">
+<div class="flex items-start justify-between mb-4">
+<div class="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+<span class="material-icons text-indigo-500">star</span>
+</div>
+<span class="text-xs font-semibold uppercase text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded">方法论</span>
+</div>
+<h4 class="font-bold text-lg text-slate-900 dark:text-white mb-2">STAR 法则应用</h4>
+<p class="text-sm text-slate-600 dark:text-slate-300 flex-grow">你在 3 个行为问题中有 2 个有效地构建了回答。但在关于“冲突处理”的问题中，“结果(Result)”部分的描述较为模糊。</p>
+</div>
+<div class="bg-white dark:bg-surface-dark rounded-xl p-6 border-l-4 border-rose-500 shadow-sm flex flex-col">
+<div class="flex items-start justify-between mb-4">
+<div class="p-2 bg-rose-50 dark:bg-rose-900/20 rounded-lg">
+<span class="material-icons text-rose-500">architecture</span>
+</div>
+<span class="text-xs font-semibold uppercase text-rose-500 bg-rose-50 dark:bg-rose-900/20 px-2 py-1 rounded">深度</span>
+</div>
+<h4 class="font-bold text-lg text-slate-900 dark:text-white mb-2">技术深度</h4>
+<p class="text-sm text-slate-600 dark:text-slate-300 flex-grow">虽然你的代码语法正确，但在系统设计部分缺少对<i>权衡 (Trade-offs)</i> 的深入解释。</p>
+</div>
+<div class="bg-white dark:bg-surface-dark rounded-xl p-6 border-l-4 border-primary shadow-sm flex flex-col">
+<div class="flex items-start justify-between mb-4">
+<div class="p-2 bg-primary/10 rounded-lg">
+<span class="material-icons text-primary">graphic_eq</span>
+</div>
+<span class="text-xs font-semibold uppercase text-primary bg-primary/10 px-2 py-1 rounded">表达</span>
+</div>
+<h4 class="font-bold text-lg text-slate-900 dark:text-white mb-2">语言习惯</h4>
+<p class="text-sm text-slate-600 dark:text-slate-300 flex-grow">语速控制得很好（140字/分钟）。检测到15处填充词（如“那个”、“呃”）。尝试用停顿来代替填补沉默。</p>
+</div>
+</div>
+</section>
+<section>
+<div class="flex justify-between items-end mb-4">
+<h3 class="text-xl font-bold text-slate-900 dark:text-white">详细问答分析</h3>
+<span class="text-sm text-slate-500">显示 3 / 5 个问题</span>
+</div>
+<div class="space-y-4">
+<div class="bg-white dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+<div class="p-5 flex justify-between items-start cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-bold text-sm">1</div>
+<div>
+<h4 class="font-bold text-slate-900 dark:text-white">请谈谈你遇到的一个棘手的 Bug 以及你是如何解决它的。</h4>
+<div class="flex gap-2 mt-2">
+<span class="text-xs font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">行为面试</span>
+<span class="text-xs font-medium px-2 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">优秀回答</span>
+</div>
+</div>
+</div>
+<span class="material-icons text-slate-400 transform rotate-180">expand_more</span>
+</div>
+<div class="px-5 pb-6 pt-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-surface-dark">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+<div>
+<h5 class="text-xs uppercase font-bold text-slate-400 mb-2 tracking-wider">你的回答</h5>
+<div class="relative pl-4 border-l-2 border-slate-300 dark:border-slate-700">
+<p class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed italic">
+                                        "在上一个项目中，仪表盘出现了内存泄漏。用户反馈使用30分钟后应用变慢。我使用了 Chrome DevTools 的 Performance 面板... <span class="bg-yellow-100 dark:bg-yellow-900/30 px-1 rounded mx-1 text-slate-900 dark:text-white not-italic font-medium" title="Good specific tool mention">发现了分离的 DOM 节点</span> ...这是由未卸载的事件监听器引起的。我通过在 useEffect 钩子中添加清理函数修复了这个问题。"
+                                    </p>
+<div class="mt-3 flex items-center gap-2">
+<button class="flex items-center gap-1 text-xs text-primary font-medium hover:underline">
+<span class="material-icons text-sm">play_circle</span> 播放录音 (0:45)
+                                        </button>
+</div>
+</div>
+</div>
+<div>
+<h5 class="text-xs uppercase font-bold text-slate-400 mb-2 tracking-wider">AI 差距分析</h5>
+<div class="bg-primary/5 border border-primary/10 rounded-lg p-4">
+<div class="flex items-start gap-3 mb-3">
+<span class="material-icons text-primary text-sm mt-0.5">check_circle</span>
+<p class="text-sm text-slate-700 dark:text-slate-200"><span class="font-semibold text-primary">优势:</span> 清晰的问题-行动-结果 (PAR) 结构。具体提到了工具 (Chrome DevTools)。</p>
+</div>
+<div class="flex items-start gap-3">
+<span class="material-icons text-orange-500 text-sm mt-0.5">lightbulb</span>
+<p class="text-sm text-slate-700 dark:text-slate-200"><span class="font-semibold text-orange-600 dark:text-orange-400">建议:</span> 你可以提及如何确保这种情况不再发生（例如，添加 Lint 规则或自动化测试）。</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-white dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+<div class="p-5 flex justify-between items-start cursor-pointer">
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-bold text-sm">2</div>
+<div>
+<h4 class="font-bold text-slate-900 dark:text-white">设计一个像 Bit.ly 这样的短链接服务。</h4>
+<div class="flex gap-2 mt-2">
+<span class="text-xs font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">系统设计</span>
+<span class="text-xs font-medium px-2 py-0.5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400">待改进</span>
+</div>
+</div>
+</div>
+<span class="material-icons text-slate-400">expand_more</span>
+</div>
+</div>
+<div class="bg-white dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+<div class="p-5 flex justify-between items-start cursor-pointer">
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-bold text-sm">3</div>
+<div>
+<h4 class="font-bold text-slate-900 dark:text-white">解释 JavaScript 中事件循环 (Event Loop) 的概念。</h4>
+<div class="flex gap-2 mt-2">
+<span class="text-xs font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">技术基础</span>
+<span class="text-xs font-medium px-2 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">良好</span>
+</div>
+</div>
+</div>
+<span class="material-icons text-slate-400">expand_more</span>
+</div>
+</div>
+</div>
+<div class="text-center mt-6">
+<button class="text-sm text-slate-500 hover:text-primary font-medium">显示所有问题</button>
+</div>
+</section>
+<section class="pb-10">
+<h3 class="text-xl font-bold text-slate-900 dark:text-white mb-4">下一步建议</h3>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<a class="group block p-6 bg-gradient-to-br from-white to-slate-50 dark:from-surface-dark dark:to-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-primary/50 dark:hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/10" href="#">
+<div class="flex items-center justify-between mb-4">
+<div class="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+<span class="material-icons">replay</span>
+</div>
+<span class="material-icons text-slate-300 group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</div>
+<h4 class="font-bold text-slate-900 dark:text-white mb-1">重修系统设计模块</h4>
+<p class="text-sm text-slate-500 dark:text-slate-400">重点关注数据库分片和负载均衡的概念。</p>
+</a>
+<a class="group block p-6 bg-gradient-to-br from-white to-slate-50 dark:from-surface-dark dark:to-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-primary/50 dark:hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/10" href="#">
+<div class="flex items-center justify-between mb-4">
+<div class="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+<span class="material-icons">school</span>
+</div>
+<span class="material-icons text-slate-300 group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</div>
+<h4 class="font-bold text-slate-900 dark:text-white mb-1">预约 1:1 教练辅导</h4>
+<p class="text-sm text-slate-500 dark:text-slate-400">安排 30 分钟与资深工程师的辅导，完善你的 STAR 故事。</p>
+</a>
+<a class="group block p-6 bg-gradient-to-br from-white to-slate-50 dark:from-surface-dark dark:to-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-primary/50 dark:hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/10" href="#">
+<div class="flex items-center justify-between mb-4">
+<div class="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+<span class="material-icons">work_outline</span>
+</div>
+<span class="material-icons text-slate-300 group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</div>
+<h4 class="font-bold text-slate-900 dark:text-white mb-1">查看职位匹配</h4>
+<p class="text-sm text-slate-500 dark:text-slate-400">我们发现了 5 个符合您当前技术评分的职位。</p>
+</a>
+</div>
+</section>
+</main>
+<footer class="bg-white dark:bg-surface-dark border-t border-slate-200 dark:border-slate-800 mt-auto">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="flex flex-col md:flex-row justify-between items-center gap-4">
+<p class="text-sm text-slate-500">© 2023 智求职. 保留所有权利。</p>
+<div class="flex gap-6">
+<a class="text-sm text-slate-500 hover:text-primary transition-colors" href="#">隐私政策</a>
+<a class="text-sm text-slate-500 hover:text-primary transition-colors" href="#">服务条款</a>
+<a class="text-sm text-slate-500 hover:text-primary transition-colors" href="#">帮助中心</a>
+</div>
+</div>
+</div>
+</footer>
+
+</body></html>

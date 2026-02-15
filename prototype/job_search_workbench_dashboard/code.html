@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>智求职 - 求职工作台</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+            extend: {
+                colors: {
+                "primary": "#0d968b",
+                "background-light": "#f6f8f8",
+                "background-dark": "#102220",
+                },
+                fontFamily: {
+                "display": ["Inter", "sans-serif"]
+                },
+                borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+            },
+            },
+        }
+    </script>
+<style>
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-gray-800 dark:text-gray-100 min-h-screen">
+<nav class="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-50">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between h-16">
+<div class="flex items-center gap-8">
+<div class="flex-shrink-0 flex items-center gap-2">
+<div class="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+<span class="material-icons-round text-primary">work_outline</span>
+</div>
+<span class="font-bold text-xl tracking-tight text-gray-900 dark:text-white">智求职 <span class="text-xs font-normal text-gray-500 ml-1">ZhiQiuZhi</span></span>
+</div>
+<div class="hidden md:flex items-center space-x-6">
+<a class="text-primary font-medium text-sm" href="#">首页</a>
+<a class="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white font-medium text-sm transition" href="#">简历管理</a>
+<a class="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white font-medium text-sm transition" href="#">模拟面试</a>
+</div>
+</div>
+<div class="flex-1 flex items-center justify-center px-2 lg:ml-6 lg:justify-end">
+<div class="max-w-xs w-full relative hidden lg:block">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-icons-round text-gray-400 text-xl">search</span>
+</div>
+<input class="block w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg leading-5 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm transition duration-150 ease-in-out" placeholder="搜索职位、公司..." type="search"/>
+</div>
+</div>
+<div class="flex items-center ml-4 space-x-4">
+<button class="p-1 rounded-full text-gray-400 hover:text-primary hover:bg-primary/5 focus:outline-none transition">
+<span class="material-icons-round">notifications</span>
+</button>
+<div class="flex items-center gap-3 border-l border-gray-100 dark:border-gray-800 pl-4">
+<div class="text-right hidden sm:block">
+<p class="text-sm font-medium text-gray-900 dark:text-white">陈亚力</p>
+<p class="text-xs text-gray-500">高级会员</p>
+</div>
+<img alt="User Avatar" class="h-9 w-9 rounded-full object-cover border-2 border-white dark:border-gray-700 shadow-sm" data-alt="Portrait of a young professional man smiling" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDovdXUaGDuGM2gLzJ-6YjeaJAJi4QpJ3s1bmojl1cE3VvFnpA1qFtcaiDiUqZ_KwQbmTLPHKt6XLngOVaP5-9PmrPxBSIRAbXMO29eWlh13ZRuJujBisyxJA0mHMyPt4QKGK2qDlKhdKsZ2byZNBda1pkc4u4pj7ZxEP8Ny6xvn8d3s4A4ozJ94AH8bMoNUJh3RN9SOyC3rAr-XFe1T-_p1Nm822_5Huo5eDVAHtOEOa3hcMCY_XZKiytO8quDgHJZhAOf9MC-atcd"/>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6"> 
+<div class="lg:col-span-8 flex flex-col gap-6">
+<div class="bg-primary rounded-xl p-6 shadow-lg shadow-primary/20 relative overflow-hidden text-white">
+<div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
+<div class="absolute left-1/2 -bottom-10 w-32 h-32 bg-teal-400/20 rounded-full blur-xl"></div>
+<div class="relative z-10">
+<div class="flex justify-between items-start mb-6">
+<div>
+<h2 class="text-lg font-medium opacity-90">当前申请</h2>
+<p class="text-xs opacity-70 mt-1">更新于 2 分钟前</p>
+</div>
+<button class="bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1.5 rounded-lg transition backdrop-blur-sm">
+                            查看全部
+                        </button>
+</div>
+<div class="flex flex-col md:flex-row items-end md:items-center gap-8">
+<div class="flex items-baseline">
+<span class="text-5xl font-bold tracking-tight">12</span>
+<span class="ml-2 text-sm opacity-80">活跃申请</span>
+</div>
+<div class="flex-1 w-full grid grid-cols-2 sm:grid-cols-4 gap-4">
+<div class="bg-white/10 rounded-lg p-3 backdrop-blur-sm border border-white/10">
+<div class="flex items-center gap-2 mb-1">
+<div class="w-2 h-2 rounded-full bg-yellow-400"></div>
+<span class="text-xs font-medium opacity-80">待回复</span>
+</div>
+<span class="text-xl font-semibold">5</span>
+</div>
+<div class="bg-white/10 rounded-lg p-3 backdrop-blur-sm border border-white/10">
+<div class="flex items-center gap-2 mb-1">
+<div class="w-2 h-2 rounded-full bg-blue-300"></div>
+<span class="text-xs font-medium opacity-80">面试中</span>
+</div>
+<span class="text-xl font-semibold">3</span>
+</div>
+<div class="bg-white/10 rounded-lg p-3 backdrop-blur-sm border border-white/10">
+<div class="flex items-center gap-2 mb-1">
+<div class="w-2 h-2 rounded-full bg-green-300"></div>
+<span class="text-xs font-medium opacity-80">已通过</span>
+</div>
+<span class="text-xl font-semibold">2</span>
+</div>
+<div class="bg-white/10 rounded-lg p-3 backdrop-blur-sm border border-white/10">
+<div class="flex items-center gap-2 mb-1">
+<div class="w-2 h-2 rounded-full bg-red-300"></div>
+<span class="text-xs font-medium opacity-80">已拒绝</span>
+</div>
+<span class="text-xl font-semibold">2</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div>
+<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">快捷操作</h3>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+<div class="group bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 hover:-translate-y-1 hover:shadow-md transition-all duration-300 cursor-pointer">
+<div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-3 group-hover:bg-primary group-hover:text-white transition-colors text-primary">
+<span class="material-icons-round">add_link</span>
+</div>
+<h4 class="font-semibold text-gray-900 dark:text-white">导入职位</h4>
+<p class="text-xs text-gray-500 mt-1">粘贴链接进行分析</p>
+</div>
+<div class="group bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 hover:-translate-y-1 hover:shadow-md transition-all duration-300 cursor-pointer">
+<div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-3 group-hover:bg-primary group-hover:text-white transition-colors text-primary">
+<span class="material-icons-round">description</span>
+</div>
+<h4 class="font-semibold text-gray-900 dark:text-white">定制简历</h4>
+<p class="text-xs text-gray-500 mt-1">针对职位优化内容</p>
+</div>
+<div class="group bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 hover:-translate-y-1 hover:shadow-md transition-all duration-300 cursor-pointer">
+<div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-3 group-hover:bg-primary group-hover:text-white transition-colors text-primary">
+<span class="material-icons-round">psychology</span>
+</div>
+<h4 class="font-semibold text-gray-900 dark:text-white">面试准备</h4>
+<p class="text-xs text-gray-500 mt-1">获取 AI 问答题库</p>
+</div>
+<div class="group bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 hover:-translate-y-1 hover:shadow-md transition-all duration-300 cursor-pointer">
+<div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-3 group-hover:bg-primary group-hover:text-white transition-colors text-primary">
+<span class="material-icons-round">videocam</span>
+</div>
+<h4 class="font-semibold text-gray-900 dark:text-white">模拟面试</h4>
+<p class="text-xs text-gray-500 mt-1">视频仿真练习</p>
+</div>
+</div>
+</div>
+<div>
+<div class="flex justify-between items-center mb-4">
+<h3 class="text-lg font-semibold text-gray-900 dark:text-white">为你推荐</h3>
+<a class="text-sm text-primary hover:text-teal-700 font-medium" href="#">查看全部</a>
+</div>
+<div class="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+<div class="min-w-[280px] w-[280px] bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start mb-3">
+<div class="w-10 h-10 rounded-lg bg-gray-50 dark:bg-gray-700 flex items-center justify-center p-1.5 border border-gray-100 dark:border-gray-600">
+<img alt="Google Logo" class="w-full h-full object-contain" data-alt="Google company logo icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuClFdffqaCtk6aRVG7rp-0ufURcYcFzDTfbXCIYSqu7uHiAzdARnzqL9j8ls38kQK7jTPgmty88VMlxK7l4Ciye6lxjz3UZmSfvMrPkAeSzTpcZXTNNIrQiG-XKX52EIZe7SjdvA4YMoZ-1GBO25CoWKdIn2ndthEm2O23w09K0YjNPu08yzkITo73VQq-zRJ9_YGMG_bPoHY0_uMEcl-aADC15WJfcZfgde4eggX14eRrVg3zq11XLOXdDxJEPpC_8pJuEcacPhwg_"/>
+</div>
+<div class="relative w-10 h-10 flex items-center justify-center">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-gray-200" cx="20" cy="20" fill="transparent" r="16" stroke="currentColor" stroke-width="3"></circle>
+<circle class="text-primary" cx="20" cy="20" fill="transparent" r="16" stroke="currentColor" stroke-dasharray="100" stroke-dashoffset="8" stroke-linecap="round" stroke-width="3"></circle>
+</svg>
+<span class="absolute text-[10px] font-bold text-primary">92%</span>
+</div>
+</div>
+<h4 class="font-semibold text-gray-900 dark:text-white">高级 UX 设计师</h4>
+<p class="text-sm text-gray-500">谷歌 (Google) • 上海</p>
+<div class="mt-3 flex flex-wrap gap-2">
+<span class="px-2 py-0.5 rounded text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">全职</span>
+<span class="px-2 py-0.5 rounded text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">远程</span>
+</div>
+</div>
+<div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
+<span class="font-semibold text-gray-900 dark:text-white">¥30k-50k<span class="text-xs text-gray-400 font-normal">/月</span></span>
+<button class="text-xs font-medium text-white bg-primary hover:bg-teal-700 px-3 py-1.5 rounded transition">申请</button>
+</div>
+</div>
+<div class="min-w-[280px] w-[280px] bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start mb-3">
+<div class="w-10 h-10 rounded-lg bg-orange-50 dark:bg-gray-700 flex items-center justify-center p-1.5 border border-orange-100 dark:border-gray-600">
+<img alt="Amazon Logo" class="w-full h-full object-contain" data-alt="Amazon company logo icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAlSxb9ynvYnzLIadZpNCOyxvfrTplksXluxMAIr_FRoyft9ZypQpvgqsoSs5G32IiM47m_k_btI2jNVIqZ5Sbng-867owTrw-Rg_Swm33HLydnXqfnZ6aR-1VqhBH8c94feBTjO_sKCUnEKDvlYLV706WAoExkLsZQLmLDdoyShfrN218YXh1JF2BvL3JAX_vvmsNAX2oD6j5lh8077qjvErkvSFs6efCnC6_ORMEGKWoEGsGClIyHo6yC12vhg6QE-3x0fdydja0L"/>
+</div>
+<div class="relative w-10 h-10 flex items-center justify-center">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-gray-200" cx="20" cy="20" fill="transparent" r="16" stroke="currentColor" stroke-width="3"></circle>
+<circle class="text-yellow-500" cx="20" cy="20" fill="transparent" r="16" stroke="currentColor" stroke-dasharray="100" stroke-dashoffset="25" stroke-linecap="round" stroke-width="3"></circle>
+</svg>
+<span class="absolute text-[10px] font-bold text-yellow-600">75%</span>
+</div>
+</div>
+<h4 class="font-semibold text-gray-900 dark:text-white">产品经理</h4>
+<p class="text-sm text-gray-500">亚马逊 (Amazon) • 北京</p>
+<div class="mt-3 flex flex-wrap gap-2">
+<span class="px-2 py-0.5 rounded text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">现场办公</span>
+</div>
+</div>
+<div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
+<span class="font-semibold text-gray-900 dark:text-white">¥40k-65k<span class="text-xs text-gray-400 font-normal">/月</span></span>
+<button class="text-xs font-medium text-white bg-primary hover:bg-teal-700 px-3 py-1.5 rounded transition">申请</button>
+</div>
+</div>
+<div class="min-w-[280px] w-[280px] bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start mb-3">
+<div class="w-10 h-10 rounded-lg bg-blue-50 dark:bg-gray-700 flex items-center justify-center p-1.5 border border-blue-100 dark:border-gray-600">
+<span class="material-icons-round text-blue-500">campaign</span>
+</div>
+<div class="relative w-10 h-10 flex items-center justify-center">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-gray-200" cx="20" cy="20" fill="transparent" r="16" stroke="currentColor" stroke-width="3"></circle>
+<circle class="text-primary" cx="20" cy="20" fill="transparent" r="16" stroke="currentColor" stroke-dasharray="100" stroke-dashoffset="15" stroke-linecap="round" stroke-width="3"></circle>
+</svg>
+<span class="absolute text-[10px] font-bold text-primary">85%</span>
+</div>
+</div>
+<h4 class="font-semibold text-gray-900 dark:text-white">市场主管</h4>
+<p class="text-sm text-gray-500">字节跳动 • 深圳</p>
+<div class="mt-3 flex flex-wrap gap-2">
+<span class="px-2 py-0.5 rounded text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">全职</span>
+</div>
+</div>
+<div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
+<span class="font-semibold text-gray-900 dark:text-white">¥25k-40k<span class="text-xs text-gray-400 font-normal">/月</span></span>
+<button class="text-xs font-medium text-white bg-primary hover:bg-teal-700 px-3 py-1.5 rounded transition">申请</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="lg:col-span-4 flex flex-col gap-6">
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 h-full">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-lg font-semibold text-gray-900 dark:text-white">最近活动</h3>
+<button class="text-gray-400 hover:text-primary transition">
+<span class="material-icons-round text-sm">more_horiz</span>
+</button>
+</div>
+<div class="relative pl-2">
+<div class="absolute left-2 top-2 bottom-4 w-0.5 bg-gray-100 dark:bg-gray-700"></div>
+<div class="relative flex gap-4 mb-6">
+<div class="absolute left-[-4px] top-1.5 w-3 h-3 rounded-full bg-primary border-2 border-white dark:border-gray-800 z-10"></div>
+<div class="flex-1">
+<p class="text-sm font-medium text-gray-900 dark:text-white">已生成简历：<span class="text-primary">字节跳动</span></p>
+<p class="text-xs text-gray-500 mt-1">今天, 上午 10:00</p>
+</div>
+</div>
+<div class="relative flex gap-4 mb-6">
+<div class="absolute left-[-4px] top-1.5 w-3 h-3 rounded-full bg-primary/40 border-2 border-white dark:border-gray-800 z-10"></div>
+<div class="flex-1">
+<p class="text-sm font-medium text-gray-900 dark:text-white">完成模拟面试</p>
+<p class="text-xs text-gray-500 mt-1">评分: 85/100 • 昨天, 下午 4:00</p>
+<div class="mt-2 inline-flex items-center text-xs text-primary bg-primary/5 px-2 py-1 rounded">
+<span class="material-icons-round text-[14px] mr-1">play_arrow</span> 查看录像
+                            </div>
+</div>
+</div>
+<div class="relative flex gap-4 mb-6">
+<div class="absolute left-[-4px] top-1.5 w-3 h-3 rounded-full bg-gray-300 border-2 border-white dark:border-gray-800 z-10"></div>
+<div class="flex-1">
+<p class="text-sm font-medium text-gray-900 dark:text-white">申请已发送至 <span class="font-semibold">腾讯 (Tencent)</span></p>
+<p class="text-xs text-gray-500 mt-1">9月14日, 下午 2:30</p>
+</div>
+</div>
+<div class="relative flex gap-4 mb-6">
+<div class="absolute left-[-4px] top-1.5 w-3 h-3 rounded-full bg-gray-300 border-2 border-white dark:border-gray-800 z-10"></div>
+<div class="flex-1">
+<p class="text-sm font-medium text-gray-900 dark:text-white">已导入职位: 产品负责人</p>
+<p class="text-xs text-gray-500 mt-1">9月13日, 上午 11:15</p>
+</div>
+</div>
+<div class="relative flex gap-4">
+<div class="absolute left-[-4px] top-1.5 w-3 h-3 rounded-full bg-gray-300 border-2 border-white dark:border-gray-800 z-10"></div>
+<div class="flex-1">
+<p class="text-sm font-medium text-gray-900 dark:text-white">个人资料已更新</p>
+<p class="text-xs text-gray-500 mt-1">9月12日, 上午 9:00</p>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-5 text-white shadow-lg relative overflow-hidden">
+<div class="relative z-10">
+<div class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center mb-3">
+<span class="material-icons-round text-yellow-400">star</span>
+</div>
+<h4 class="font-bold mb-1">升级专业版</h4>
+<p class="text-sm text-gray-300 mb-3">解锁无限 AI 简历修改和模拟面试次数。</p>
+<button class="w-full bg-white text-gray-900 text-sm font-medium py-2 rounded-lg hover:bg-gray-100 transition">查看方案</button>
+</div>
+<div class="absolute top-[-20px] right-[-20px] w-24 h-24 bg-primary/20 rounded-full blur-xl"></div>
+</div>
+</div>
+</div>
+</main>
+
+</body></html>

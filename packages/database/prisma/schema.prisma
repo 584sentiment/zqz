@@ -1,0 +1,367 @@
+// Prisma Schema for AI Job Assistant Platform
+// 基于 docs/database-design-ai-job-assistant.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============== 用户相关 ==============
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  phone          String?  @unique
+  passwordHash   String
+  nickname       String?
+  avatarUrl      String?  @map("avatar_url")
+
+  // 邮箱验证
+  emailVerified  Boolean  @default(false) @map("email_verified")
+  emailVerifiedAt DateTime? @map("email_verified_at")
+
+  // OAuth
+  oauthProvider  String?  @map("oauth_provider")
+  oauthId        String?  @map("oauth_id")
+
+  // 软删除
+  deletedAt      DateTime? @map("deleted_at")
+
+  // 关系
+  profile        Profile?
+  subscription   Subscription?
+  jobs           Job[]
+  resumes        Resume[]
+  interviews     Interview[]
+  skillSessions  SkillDiscoverySession[]
+  usageLogs      UsageLog[]
+
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([email])
+  @@index([oauthProvider, oauthId])
+  @@map("users")
+}
+
+model Profile {
+  id              String   @id @default(cuid())
+  userId          String   @unique @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 基本信息
+  name            String
+  gender          String?
+  birthDate       DateTime? @map("birth_date")
+  location        String?
+
+  // 求职意向
+  educationLevel  String?  @map("education_level")
+  workYears       Int?     @map("work_years")
+  selfIntro       String?  @map("self_intro") @db.Text
+  careerGoals     String?  @map("career_goals") @db.Text
+
+  // 期望
+  targetRoles     Json     @default("[]") @map("target_roles")
+  targetLocations Json     @default("[]") @map("target_locations")
+  expectedSalary  Json?    @map("expected_salary")
+
+  // 关系
+  skills          Skill[]
+  experiences     Experience[]
+  projects        Project[]
+  educations      Education[]
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("profiles")
+}
+
+model Skill {
+  id              String   @id @default(cuid())
+  profileId       String   @map("profile_id")
+  profile         Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  name            String
+  category        String   // technical, soft, language
+  level           Int      // 1-5
+  verified        Boolean  @default(false)
+
+  // 证明/经历
+  evidence        String?  @db.Text
+  years           Int?
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([profileId, category])
+  @@map("skills")
+}
+
+model Experience {
+  id              String   @id @default(cuid())
+  profileId       String   @map("profile_id")
+  profile         Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  company         String
+  position        String
+  location        String?
+  startDate       DateTime @map("start_date")
+  endDate         DateTime? @map("end_date")
+  current         Boolean  @default(false)
+
+  description     String?  @db.Text
+  highlights      String[] @db.Text[]
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([profileId])
+  @@map("experiences")
+}
+
+model Project {
+  id              String   @id @default(cuid())
+  profileId       String   @map("profile_id")
+  profile         Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  name            String
+  role            String
+  startDate       DateTime @map("start_date")
+  endDate         DateTime? @map("end_date")
+
+  description     String   @db.Text
+  techStack       String[] @map("tech_stack")
+  achievements    String[] @db.Text[]
+  link            String?
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([profileId])
+  @@map("projects")
+}
+
+model Education {
+  id              String   @id @default(cuid())
+  profileId       String   @map("profile_id")
+  profile         Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  school          String
+  degree          String
+  major           String
+  startDate       DateTime @map("start_date")
+  endDate         DateTime? @map("end_date")
+
+  gpa             Decimal? @db.Decimal(3, 2)
+  description     String?  @db.Text
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([profileId])
+  @@map("educations")
+}
+
+// ============== 岗位相关 ==============
+
+model Job {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title           String?
+  company         String?
+  location        String?
+
+  sourceType      String   @map("source_type") // screenshot, link, text
+  sourceUrl       String?  @map("source_url")
+  sourceFileKey   String?  @map("source_file_key")
+
+  description     String?  @db.Text
+  requirements    Json?
+
+  matchScore      Decimal? @map("match_score") @db.Decimal(5, 2)
+  matchedSkills   String[] @default([]) @map("matched_skills")
+
+  status          String   @default("active") // active, archived, applied
+  notes           String?  @db.Text
+
+  // 关系
+  resumes         Resume[]
+  skillSessions   SkillDiscoverySession[]
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  @@index([userId, status])
+  @@index([createdAt(sort: Desc)])
+  @@map("jobs")
+}
+
+// ============== 简历相关 ==============
+
+model Resume {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId           String?  @map("job_id")
+  job             Job?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  name            String
+  templateId      String   @map("template_id")
+  language        String   @default("zh")
+
+  content         Json?
+  fileUrl         String?  @map("file_url")
+
+  status          String   @default("draft") // draft, generating, completed, failed
+  matchScore      Decimal? @map("match_score") @db.Decimal(5, 2)
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([jobId])
+  @@map("resumes")
+}
+
+model ResumeTemplate {
+  id              String   @id
+
+  name            String
+  category        String   // professional, creative, simple, executive
+  thumbnail       String
+  preview         String
+  description     String?  @db.Text
+
+  config          Json
+  isPremium       Boolean  @default(false) @map("is_premium")
+  isActive        Boolean  @default(true) @map("is_active")
+
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@map("resume_templates")
+}
+
+// ============== 面试相关 ==============
+
+model Interview {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type            String   // mock, preparation
+  status          String   @default("pending") // pending, in_progress, completed, aborted
+
+  jobContext      Json?    @map("job_context")
+  questions       Json
+
+  // 模拟面试相关
+  transcript      Json?
+  report          Json?
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, status])
+  @@map("interviews")
+}
+
+model QuestionBank {
+  id              String   @id @default(cuid())
+
+  category        String   // behavioral, technical, hr
+  position        String?  // 职位类型
+  difficulty      String   // easy, medium, hard
+
+  question        String   @db.Text
+  keypoints       String[] @db.Text[]
+
+  usageCount      Int      @default(0) @map("usage_count")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([category, position])
+  @@index([usageCount(sort: Desc)])
+  @@map("question_banks")
+}
+
+// ============== 订阅相关 ==============
+
+model Subscription {
+  id              String   @id @default(cuid())
+  userId          String   @unique @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plan            String   @default("free") // free, basic, pro
+
+  // 配额
+  aiQuota         Int      @default(10) @map("ai_quota")
+  resumeQuota     Int      @default(3) @map("resume_quota")
+  interviewQuota  Int      @default(1) @map("interview_quota")
+
+  // 周期
+  startDate       DateTime @default(now()) @map("start_date")
+  endDate         DateTime? @map("end_date")
+
+  autoRenew       Boolean  @default(false) @map("auto_renew")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([plan])
+  @@map("subscriptions")
+}
+
+// ============== 技能发掘会话 ==============
+
+model SkillDiscoverySession {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId           String?  @map("job_id")
+  job             Job?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  status          String   @default("active") // active, completed
+
+  discoveredSkills String[] @default([]) @map("discovered_skills")
+  messagesCount   Int      @default(0) @map("messages_count")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, status])
+  @@map("skill_discovery_sessions")
+}
+
+// ============== 系统相关 ==============
+
+model UsageLog {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  action          String   // resume_generate, ai_chat, etc.
+  resource        String?
+
+  costTokens      Int?     @map("cost_tokens")
+  costCny         Decimal? @map("cost_cny") @db.Decimal(10, 4)
+
+  metadata        Json?
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([action])
+  @@map("usage_logs")
+}

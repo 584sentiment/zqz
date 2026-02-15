@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>智求职 - 新用户引导完成</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#f27f0d",
+                        "primary-hover": "#d9720b",
+                        "primary-light": "#fff3e6",
+                        "background-light": "#f8f7f5",
+                        "background-dark": "#221910",
+                        "surface-light": "#ffffff",
+                        "surface-dark": "#2d241b",
+                        "text-main-light": "#1f2937",
+                        "text-main-dark": "#e5e7eb",
+                        "text-sub-light": "#6b7280",
+                        "text-sub-dark": "#9ca3af",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                    animation: {
+                        'fade-in-up': 'fadeInUp 0.5s ease-out forwards',
+                        'check-bounce': 'checkBounce 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.3s forwards',
+                    },
+                    keyframes: {
+                        fadeInUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        checkBounce: {
+                            '0%': { transform: 'scale(0)' },
+                            '100%': { transform: 'scale(1)' },
+                        }
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-main-light dark:text-text-main-dark min-h-screen flex flex-col font-display antialiased selection:bg-primary/20 selection:text-primary transition-colors duration-300">
+<header class="w-full px-6 py-4 flex items-center justify-between border-b border-gray-200 dark:border-white/10 bg-surface-light dark:bg-surface-dark sticky top-0 z-10">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-lg shadow-md shadow-primary/20">
+            智
+        </div>
+<span class="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">智求职 <span class="text-xs font-normal text-gray-500 dark:text-gray-400 ml-1 opacity-70 border-l border-gray-300 dark:border-gray-600 pl-2">智能求职助手</span></span>
+</div>
+<div class="text-sm text-text-sub-light dark:text-text-sub-dark">
+<a class="hover:text-primary transition-colors" href="#">帮助中心</a>
+</div>
+</header>
+<main class="flex-grow flex flex-col items-center justify-start pt-8 pb-12 px-4 sm:px-6 w-full max-w-7xl mx-auto">
+<div class="w-full max-w-4xl mb-12">
+<div class="relative flex justify-between items-center w-full">
+<div class="absolute top-1/2 left-0 w-full h-1 bg-gray-200 dark:bg-gray-700 -z-10 rounded-full"></div>
+<div class="absolute top-1/2 left-0 h-1 bg-primary -z-0 rounded-full transition-all duration-700 ease-out w-full"></div>
+<div class="flex flex-col items-center gap-2 group">
+<div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold shadow-sm ring-4 ring-background-light dark:ring-background-dark">
+<span class="material-icons text-base">check</span>
+</div>
+<span class="text-xs font-medium text-primary hidden sm:block">欢迎</span>
+</div>
+<div class="flex flex-col items-center gap-2 group">
+<div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold shadow-sm ring-4 ring-background-light dark:ring-background-dark">
+<span class="material-icons text-base">check</span>
+</div>
+<span class="text-xs font-medium text-primary hidden sm:block">意向</span>
+</div>
+<div class="flex flex-col items-center gap-2 group">
+<div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold shadow-sm ring-4 ring-background-light dark:ring-background-dark">
+<span class="material-icons text-base">check</span>
+</div>
+<span class="text-xs font-medium text-primary hidden sm:block">导入岗位</span>
+</div>
+<div class="flex flex-col items-center gap-2 group">
+<div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold shadow-sm ring-4 ring-background-light dark:ring-background-dark">
+<span class="material-icons text-base">check</span>
+</div>
+<span class="text-xs font-medium text-primary hidden sm:block">简历</span>
+</div>
+<div class="flex flex-col items-center gap-2 group">
+<div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold shadow-lg ring-4 ring-background-light dark:ring-background-dark scale-110 transition-transform">
+                    5
+                </div>
+<span class="text-xs font-bold text-primary hidden sm:block">完成</span>
+</div>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark w-full max-w-2xl rounded-2xl shadow-xl border border-gray-100 dark:border-white/5 p-8 sm:p-12 text-center animate-fade-in-up relative overflow-hidden">
+<div class="absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none dark:bg-primary/5"></div>
+<div class="relative w-48 h-48 mx-auto mb-8 flex items-center justify-center">
+<div class="w-full h-full bg-gradient-to-tr from-primary/20 to-orange-100 dark:to-orange-900/20 rounded-full flex items-center justify-center relative animate-pulse">
+<span class="material-icons text-7xl text-primary drop-shadow-md transform -rotate-12">rocket_launch</span>
+</div>
+<div class="absolute top-2 right-4 w-8 h-8 bg-green-400/20 rounded-full flex items-center justify-center animate-bounce" style="animation-delay: 0.2s">
+<span class="material-icons text-green-600 text-sm">check</span>
+</div>
+<div class="absolute bottom-4 left-2 w-10 h-10 bg-blue-400/20 rounded-full flex items-center justify-center animate-bounce" style="animation-delay: 0.5s">
+<span class="material-icons text-blue-600 text-base">description</span>
+</div>
+<img alt="Celebration" class="absolute inset-0 w-full h-full object-cover rounded-full opacity-10 mix-blend-overlay pointer-events-none" data-alt="Abstract celebratory confetti pattern texture overlay" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKGeJ1xpRbhOBaZtCw0aFD6TgGzb8ZLcD6awm_1jnB7y92_qR59NUtecPE5Y2f7EFmbCTmZpgjT4N6odwPkeggPe8sJmXNGMTk5QIoNcnzZtRfutQvQ-BR_-IGtkhJzuWqgMASdflRDBXs-m_OF_g0jCB4IXU-SNPJJ77s1gq5656NC_3iVwplNrei4dsqG0qDaxMqraUGvN2904o1aC9WFnpn--kkzeFoyzs2ikdfgoX_GoJ8py5Z9kMXomjlZy8TpHcQuW1B50ze"/>
+</div>
+<h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-3">一切准备就绪！</h1>
+<p class="text-text-sub-light dark:text-text-sub-dark mb-10 max-w-md mx-auto text-lg leading-relaxed">
+            智求职已分析您的输入，您的个性化求职助手已准备就绪。
+        </p>
+<div class="bg-background-light dark:bg-background-dark/50 rounded-xl p-6 mb-10 text-left border border-gray-100 dark:border-white/5">
+<h3 class="text-xs font-bold uppercase tracking-wider text-text-sub-light dark:text-text-sub-dark mb-4 pl-1">配置摘要</h3>
+<div class="space-y-4">
+<div class="flex items-center justify-between group">
+<div class="flex items-center gap-4">
+<div class="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center animate-check-bounce">
+<span class="material-icons text-sm">check</span>
+</div>
+<span class="font-medium text-gray-700 dark:text-gray-200">职业意向已建立</span>
+</div>
+<span class="text-xs text-green-600 dark:text-green-400 font-medium bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded">已完成</span>
+</div>
+<div class="flex items-center justify-between group">
+<div class="flex items-center gap-4">
+<div class="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center animate-check-bounce" style="animation-delay: 0.4s">
+<span class="material-icons text-sm">check</span>
+</div>
+<span class="font-medium text-gray-700 dark:text-gray-200">目标岗位已导入</span>
+</div>
+<span class="text-xs text-green-600 dark:text-green-400 font-medium bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded">已完成</span>
+</div>
+<div class="flex items-center justify-between group">
+<div class="flex items-center gap-4">
+<div class="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-900/30 text-primary flex items-center justify-center animate-check-bounce" style="animation-delay: 0.5s">
+<span class="material-icons text-sm">priority_high</span>
+</div>
+<div>
+<span class="font-medium text-gray-700 dark:text-gray-200">简历档案</span>
+<span class="text-xs text-text-sub-light dark:text-text-sub-dark ml-2">(80% 完成)</span>
+</div>
+</div>
+<span class="text-xs text-primary font-medium bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded border border-orange-100 dark:border-transparent">建议操作</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col sm:flex-row gap-4 justify-center items-center w-full">
+<button class="w-full sm:w-auto px-8 py-3.5 bg-primary hover:bg-primary-hover text-white rounded-lg font-semibold shadow-lg shadow-primary/30 transition-all transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:focus:ring-offset-surface-dark flex items-center justify-center gap-2 group">
+<span>进入工作台</span>
+<span class="material-icons text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+<button class="w-full sm:w-auto px-8 py-3.5 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-200 hover:text-primary dark:hover:text-primary hover:border-primary/30 dark:hover:border-primary/30 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 dark:focus:ring-gray-700">
+                完善档案
+            </button>
+</div>
+<p class="mt-6 text-xs text-text-sub-light dark:text-text-sub-dark opacity-70">
+            您稍后可以在设置中随时更新偏好。
+        </p>
+</div>
+</main>
+<footer class="w-full py-6 text-center text-sm text-text-sub-light dark:text-text-sub-dark border-t border-gray-200 dark:border-white/5 bg-surface-light dark:bg-surface-dark">
+<div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+<p>© 2023 智求职. 保留所有权利。</p>
+<div class="flex gap-6">
+<a class="hover:text-primary transition-colors" href="#">隐私政策</a>
+<a class="hover:text-primary transition-colors" href="#">服务条款</a>
+</div>
+</div>
+</footer>
+<script>
+    // Simple script to demonstrate dark mode toggling based on system preference (optional)
+    // In a real app, this would be handled by user settings or framework logic
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark');
+    }
+</script>
+
+</body></html>

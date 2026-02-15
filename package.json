@@ -1,0 +1,34 @@
+{
+  "name": "ai-job-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI 求职辅助平台 - 智能简历生成与面试准备",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:web\" \"npm run dev:api\"",
+    "dev:web": "npm run dev -w apps/web",
+    "dev:api": "npm run dev -w apps/api",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "db:generate": "npm run generate -w packages/database",
+    "db:push": "npm run db:push -w packages/database",
+    "db:migrate": "npm run migrate -w packages/database",
+    "db:studio": "npm run studio -w packages/database"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "concurrently": "^8.2.2",
+    "prettier": "^3.2.4",
+    "turbo": "^1.12.0",
+    "typescript": "^5.3.3"
+  },
+  "packageManager": "npm@10.2.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

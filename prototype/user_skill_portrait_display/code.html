@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>智求职 - 用户技能画像</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#0d968b",
+              "primary-dark": "#0a756c",
+              "secondary": "#f97316", 
+              "background-light": "#f6f8f8",
+              "background-dark": "#102220",
+              "card-light": "#ffffff",
+              "card-dark": "#162e2b",
+            },
+            fontFamily: {
+              "display": ["Inter", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+        }
+        .radar-chart-bg {
+            fill: none;
+            stroke: #e2e8f0;
+            stroke-width: 1;
+        }
+        .dark .radar-chart-bg {
+            stroke: #2d4a46;
+        }
+        .radar-area {
+            fill: rgba(13, 150, 139, 0.2);
+            stroke: #0d968b;
+            stroke-width: 2;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-800 dark:text-slate-100 font-display min-h-screen flex flex-col transition-colors duration-200">
+<nav class="sticky top-0 z-50 bg-white/80 dark:bg-card-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-primary/20">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between h-16">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-lg">智</div>
+<span class="font-bold text-xl tracking-tight text-slate-900 dark:text-white">智求职</span>
+</div>
+<div class="hidden md:flex items-center space-x-8">
+<a class="text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-primary px-3 py-2 rounded-md text-sm font-medium transition-colors" href="#">仪表盘</a>
+<a class="text-primary dark:text-primary bg-primary/10 px-3 py-2 rounded-md text-sm font-medium" href="#">技能画像</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-primary px-3 py-2 rounded-md text-sm font-medium transition-colors" href="#">职位</a>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2">
+<img alt="User Profile" class="h-8 w-8 rounded-full border border-slate-200 dark:border-primary/30" data-alt="User avatar placeholder with initials" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC7MqX2OoLIRHnWsXYeDwCfshgpgdauzG65gEQT9lzuE_cRZaNzKPgOixfvB85jpiLmV8QREsBAy8dRnFJX6HiJ-9RG7fbLvtD745GXrdYfqO8hNvUzRdO51mPkKL8lsAQrpwIzKmkLd9uQt2J9GmMFZy8VZ1t_ITQ6cprzwbZY3AljxKp7zAQ7j3E6MyYBkKKoXYUlLZD0h5swUSNAMvayW3i3dyEa7E9xPY9YNeGgbZTKo_4fn6BfaF1Q6ipXbv1712uELxwPRoSS"/>
+<span class="hidden sm:block text-sm font-medium text-slate-700 dark:text-slate-200">Alex Chen</span>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<main class="flex-grow py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-8">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<h1 class="text-2xl font-bold text-slate-900 dark:text-white">用户技能画像</h1>
+<p class="mt-1 text-slate-500 dark:text-slate-400">基于您的简历和模拟面试表现的AI分析报告。</p>
+</div>
+<div class="text-right hidden md:block">
+<span class="text-xs text-slate-400 uppercase tracking-wide font-semibold">上次更新</span>
+<p class="text-sm font-medium text-slate-700 dark:text-slate-300">今天, 10:42 AM</p>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<div class="bg-card-light dark:bg-card-dark rounded-xl shadow-sm border border-slate-100 dark:border-primary/10 overflow-hidden flex flex-col h-full">
+<div class="px-6 py-5 border-b border-slate-100 dark:border-primary/10 flex justify-between items-center bg-slate-50/50 dark:bg-primary/5">
+<h2 class="text-lg font-semibold text-slate-800 dark:text-white flex items-center gap-2">
+<span class="material-icons-round text-primary">code</span>
+                        专业技能
+                    </h2>
+<span class="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full font-medium">硬技能</span>
+</div>
+<div class="p-6 space-y-6 flex-1 overflow-y-auto">
+<div class="space-y-2 group">
+<div class="flex justify-between items-end">
+<span class="font-medium text-slate-700 dark:text-slate-200">React &amp; React Native</span>
+<span class="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">4 年</span>
+</div>
+<div class="relative pt-1">
+<div class="flex mb-2 items-center justify-between">
+<div></div>
+<div class="text-right">
+<span class="text-xs font-semibold inline-block text-primary">85%</span>
+</div>
+</div>
+<div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-slate-100 dark:bg-slate-700">
+<div class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary transition-all duration-1000 group-hover:bg-primary-dark" style="width:85%"></div>
+</div>
+</div>
+</div>
+<div class="space-y-2 group">
+<div class="flex justify-between items-end">
+<span class="font-medium text-slate-700 dark:text-slate-200">TypeScript</span>
+<span class="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">3 年</span>
+</div>
+<div class="relative pt-1">
+<div class="flex mb-2 items-center justify-between">
+<div></div>
+<div class="text-right">
+<span class="text-xs font-semibold inline-block text-primary">78%</span>
+</div>
+</div>
+<div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-slate-100 dark:bg-slate-700">
+<div class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary transition-all duration-1000 group-hover:bg-primary-dark" style="width:78%"></div>
+</div>
+</div>
+</div>
+<div class="space-y-2 group">
+<div class="flex justify-between items-end">
+<span class="font-medium text-slate-700 dark:text-slate-200">UI/UX 设计</span>
+<span class="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">3 年</span>
+</div>
+<div class="relative pt-1">
+<div class="flex mb-2 items-center justify-between">
+<div></div>
+<div class="text-right">
+<span class="text-xs font-semibold inline-block text-primary">70%</span>
+</div>
+</div>
+<div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-slate-100 dark:bg-slate-700">
+<div class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary transition-all duration-1000 group-hover:bg-primary-dark" style="width:70%"></div>
+</div>
+</div>
+</div>
+<div class="space-y-2 group">
+<div class="flex justify-between items-end">
+<span class="font-medium text-slate-700 dark:text-slate-200">Node.js</span>
+<span class="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">2 年</span>
+</div>
+<div class="relative pt-1">
+<div class="flex mb-2 items-center justify-between">
+<div></div>
+<div class="text-right">
+<span class="text-xs font-semibold inline-block text-primary">60%</span>
+</div>
+</div>
+<div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-slate-100 dark:bg-slate-700">
+<div class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary transition-all duration-1000 group-hover:bg-primary-dark" style="width:60%"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-card-light dark:bg-card-dark rounded-xl shadow-sm border border-slate-100 dark:border-primary/10 overflow-hidden flex flex-col h-full">
+<div class="px-6 py-5 border-b border-slate-100 dark:border-primary/10 flex justify-between items-center bg-slate-50/50 dark:bg-primary/5">
+<h2 class="text-lg font-semibold text-slate-800 dark:text-white flex items-center gap-2">
+<span class="material-icons-round text-primary">psychology</span>
+                        通用能力
+                    </h2>
+<span class="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full font-medium">软技能</span>
+</div>
+<div class="p-6 flex flex-col items-center justify-center flex-1">
+<div class="relative w-64 h-64 mb-6">
+<svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+<circle class="radar-chart-bg dark:stroke-slate-700" cx="50" cy="50" r="40"></circle>
+<circle class="radar-chart-bg dark:stroke-slate-700" cx="50" cy="50" r="30"></circle>
+<circle class="radar-chart-bg dark:stroke-slate-700" cx="50" cy="50" r="20"></circle>
+<circle class="radar-chart-bg dark:stroke-slate-700" cx="50" cy="50" r="10"></circle>
+<line class="radar-chart-bg dark:stroke-slate-700" x1="50" x2="50" y1="50" y2="10"></line>
+<line class="radar-chart-bg dark:stroke-slate-700" x1="50" x2="90" y1="50" y2="50"></line>
+<line class="radar-chart-bg dark:stroke-slate-700" x1="50" x2="50" y1="50" y2="90"></line>
+<line class="radar-chart-bg dark:stroke-slate-700" x1="50" x2="10" y1="50" y2="50"></line>
+<line class="radar-chart-bg dark:stroke-slate-700" x1="50" x2="22" y1="50" y2="22"></line>
+<line class="radar-chart-bg dark:stroke-slate-700" x1="50" x2="78" y1="50" y2="22"></line>
+<line class="radar-chart-bg dark:stroke-slate-700" x1="50" x2="78" y1="50" y2="78"></line>
+<line class="radar-chart-bg dark:stroke-slate-700" x1="50" x2="22" y1="50" y2="78"></line>
+<polygon class="radar-area" points="50,15 75,25 85,50 70,80 50,85 25,75 20,50 30,25"></polygon>
+</svg>
+<span class="absolute top-0 left-1/2 -translate-x-1/2 -mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-wide">沟通</span>
+<span class="absolute bottom-0 left-1/2 -translate-x-1/2 -mb-4 text-[10px] font-bold text-slate-500 uppercase tracking-wide">管理</span>
+<span class="absolute top-1/2 right-0 -mr-6 -mt-2 text-[10px] font-bold text-slate-500 uppercase tracking-wide">战略</span>
+<span class="absolute top-1/2 left-0 -ml-6 -mt-2 text-[10px] font-bold text-slate-500 uppercase tracking-wide">执行</span>
+</div>
+<div class="w-full space-y-3 mt-auto">
+<div class="flex justify-between items-center text-sm">
+<span class="text-slate-600 dark:text-slate-300">沟通能力</span>
+<div class="flex text-yellow-400">
+<span class="material-icons-round text-sm">star</span>
+<span class="material-icons-round text-sm">star</span>
+<span class="material-icons-round text-sm">star</span>
+<span class="material-icons-round text-sm">star</span>
+<span class="material-icons-round text-sm text-slate-200 dark:text-slate-700">star</span>
+</div>
+</div>
+<div class="flex justify-between items-center text-sm">
+<span class="text-slate-600 dark:text-slate-300">项目管理</span>
+<div class="flex text-yellow-400">
+<span class="material-icons-round text-sm">star</span>
+<span class="material-icons-round text-sm">star</span>
+<span class="material-icons-round text-sm">star</span>
+<span class="material-icons-round text-sm text-slate-200 dark:text-slate-700">star</span>
+<span class="material-icons-round text-sm text-slate-200 dark:text-slate-700">star</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-card-light dark:bg-card-dark rounded-xl shadow-sm border border-slate-100 dark:border-primary/10 overflow-hidden flex flex-col h-full">
+<div class="px-6 py-5 border-b border-slate-100 dark:border-primary/10 flex justify-between items-center bg-slate-50/50 dark:bg-primary/5">
+<h2 class="text-lg font-semibold text-slate-800 dark:text-white flex items-center gap-2">
+<span class="material-icons-round text-primary">tag</span>
+                        亮点关键词
+                    </h2>
+<span class="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full font-medium">核心基因</span>
+</div>
+<div class="p-6 flex-1 flex flex-wrap content-center justify-center gap-3">
+<span class="px-3 py-1.5 rounded-full bg-primary text-white text-lg font-bold shadow-md">全栈开发</span>
+<span class="px-2 py-1 rounded-full bg-primary/10 text-primary-dark dark:text-primary text-sm font-medium">敏捷开发</span>
+<span class="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 text-xs font-normal">远程协作</span>
+<span class="px-4 py-2 rounded-full bg-primary/80 text-white text-base font-semibold">React 专家</span>
+<span class="px-2 py-1 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs">JIRA</span>
+<span class="px-3 py-1.5 rounded-full bg-primary/20 text-primary-dark dark:text-primary text-sm font-medium">导师</span>
+<span class="px-4 py-2 rounded-full border border-primary text-primary text-base font-medium">问题解决</span>
+<span class="px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium">CI/CD</span>
+<span class="px-3 py-1.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-white text-sm font-semibold">用户中心</span>
+<span class="px-2 py-1 rounded-full bg-primary/5 text-primary text-xs">Figma</span>
+<span class="px-4 py-2 rounded-full bg-primary text-white text-xl font-bold shadow-lg">前端</span>
+<span class="px-3 py-1 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 text-xs italic">双语</span>
+</div>
+</div>
+</div>
+<div class="bg-card-light dark:bg-card-dark rounded-xl shadow-lg border border-slate-100 dark:border-primary/10 overflow-hidden relative">
+<div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary/40 via-primary to-primary/40"></div>
+<div class="p-6 md:p-8">
+<div class="flex flex-col lg:flex-row gap-8 items-center lg:items-start">
+<div class="flex flex-col sm:flex-row items-center gap-6 lg:w-1/3 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-primary/10 pb-6 lg:pb-0 pr-0 lg:pr-6 w-full">
+<div class="relative w-32 h-32 flex-shrink-0">
+<svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+<path class="text-slate-100 dark:text-slate-700" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3"></path>
+<path class="text-primary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="82, 100" stroke-width="3"></path>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center text-primary">
+<span class="text-3xl font-bold">82%</span>
+<span class="text-[10px] text-slate-400 uppercase font-semibold">匹配度</span>
+</div>
+</div>
+<div class="text-center sm:text-left">
+<span class="inline-block px-2 py-1 mb-2 text-xs font-semibold tracking-wide text-primary bg-primary/10 rounded-full">目标职位</span>
+<h3 class="text-xl font-bold text-slate-900 dark:text-white">高级前端工程师</h3>
+<p class="text-sm text-slate-500 dark:text-slate-400">@ TechCorp Inc.</p>
+<p class="mt-2 text-xs text-slate-400 max-w-[200px]">基于职位描述解析 #JD-8821</p>
+</div>
+</div>
+<div class="flex-1 w-full">
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+<div>
+<h4 class="text-sm font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+                                    已具备
+                                </h4>
+<ul class="space-y-2">
+<li class="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+<span class="material-icons-round text-primary text-base">check_circle</span>
+                                        React.js 生态
+                                    </li>
+<li class="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+<span class="material-icons-round text-primary text-base">check_circle</span>
+                                        TypeScript 精通
+                                    </li>
+<li class="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+<span class="material-icons-round text-primary text-base">check_circle</span>
+                                        RESTful APIs
+                                    </li>
+<li class="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+<span class="material-icons-round text-primary text-base">check_circle</span>
+                                        响应式设计
+                                    </li>
+</ul>
+</div>
+<div>
+<h4 class="text-sm font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-yellow-500"></span>
+                                    需加强
+                                </h4>
+<ul class="space-y-2">
+<li class="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300 bg-yellow-50 dark:bg-yellow-900/10 p-1.5 rounded-md border border-yellow-100 dark:border-yellow-900/30">
+<span class="material-icons-round text-yellow-500 text-base">warning</span>
+                                        GraphQL 集成
+                                    </li>
+<li class="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300 bg-yellow-50 dark:bg-yellow-900/10 p-1.5 rounded-md border border-yellow-100 dark:border-yellow-900/30">
+<span class="material-icons-round text-yellow-500 text-base">warning</span>
+                                        团队领导力
+                                    </li>
+</ul>
+</div>
+<div>
+<h4 class="text-sm font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                                    未体现
+                                </h4>
+<ul class="space-y-2">
+<li class="flex items-start gap-2 text-sm text-slate-500 dark:text-slate-400">
+<span class="material-icons-round text-slate-300 dark:text-slate-600 text-base">help</span>
+                                        云基础设施 (AWS)
+                                    </li>
+<li class="flex items-start gap-2 text-sm text-slate-500 dark:text-slate-400">
+<span class="material-icons-round text-slate-300 dark:text-slate-600 text-base">help</span>
+                                        微服务架构
+                                    </li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<div class="fixed bottom-6 left-0 right-0 px-4 flex justify-center z-40">
+<button class="bg-secondary hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-full shadow-xl shadow-secondary/30 transform transition-transform hover:-translate-y-1 active:translate-y-0 flex items-center gap-3 text-lg">
+<span class="material-icons-round">auto_awesome</span>
+            开始生成简历
+        </button>
+</div>
+<div class="fixed top-0 left-0 w-full h-full pointer-events-none z-[-1] overflow-hidden">
+<div class="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl"></div>
+<div class="absolute bottom-[-10%] left-[-5%] w-[400px] h-[400px] bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl"></div>
+</div>
+
+</body></html>

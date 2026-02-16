@@ -351,6 +351,18 @@ export default function ResumeDetailPage() {
                       保存
                     </Button>
                   )}
+                  <Button
+                    variant="outline"
+                    onClick={handleGenerate}
+                    disabled={isGenerating}
+                  >
+                    {isGenerating ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 mr-2" />
+                    )}
+                    重新生成
+                  </Button>
                   <Button variant="outline" onClick={handleExportPdf} disabled={isExporting}>
                     {isExporting ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />

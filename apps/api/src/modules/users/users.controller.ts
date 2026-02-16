@@ -13,6 +13,8 @@ import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { CreateEducationDto, UpdateEducationDto } from './dto/education.dto';
+import { CreateExperienceDto, UpdateExperienceDto } from './dto/experience.dto';
+import { CreateProjectDto, UpdateProjectDto } from './dto/project.dto';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
@@ -69,5 +71,83 @@ export class UsersController {
     @Param('id') id: string,
   ) {
     return this.usersService.deleteEducation(req.user.id, id);
+  }
+
+  // 工作经历
+  @Get('me/experiences')
+  async getExperiences(@Request() req: { user: { id: string } }) {
+    return this.usersService.getExperiences(req.user.id);
+  }
+
+  @Post('me/experiences')
+  async createExperience(
+    @Request() req: { user: { id: string } },
+    @Body() dto: CreateExperienceDto,
+  ) {
+    return this.usersService.createExperience(req.user.id, dto);
+  }
+
+  @Get('me/experiences/:id')
+  async getExperience(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+  ) {
+    return this.usersService.getExperience(req.user.id, id);
+  }
+
+  @Patch('me/experiences/:id')
+  async updateExperience(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() dto: UpdateExperienceDto,
+  ) {
+    return this.usersService.updateExperience(req.user.id, id, dto);
+  }
+
+  @Delete('me/experiences/:id')
+  async deleteExperience(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+  ) {
+    return this.usersService.deleteExperience(req.user.id, id);
+  }
+
+  // 项目经历
+  @Get('me/projects')
+  async getProjects(@Request() req: { user: { id: string } }) {
+    return this.usersService.getProjects(req.user.id);
+  }
+
+  @Post('me/projects')
+  async createProject(
+    @Request() req: { user: { id: string } },
+    @Body() dto: CreateProjectDto,
+  ) {
+    return this.usersService.createProject(req.user.id, dto);
+  }
+
+  @Get('me/projects/:id')
+  async getProject(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+  ) {
+    return this.usersService.getProject(req.user.id, id);
+  }
+
+  @Patch('me/projects/:id')
+  async updateProject(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() dto: UpdateProjectDto,
+  ) {
+    return this.usersService.updateProject(req.user.id, id, dto);
+  }
+
+  @Delete('me/projects/:id')
+  async deleteProject(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+  ) {
+    return this.usersService.deleteProject(req.user.id, id);
   }
 }

@@ -39,7 +39,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const data = await apiClient.get('/users/me');
+        const response = await apiClient.get<{
+          id: string;
+          email: string;
+          nickname?: string;
+          avatarUrl?: string;
+          emailVerified: boolean;
+          profile?: { name?: string };
+        }>('/users/me');
+        const data = response.data;
         // 更新 auth store 中的用户信息
         setUser({
           id: data.id,

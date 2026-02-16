@@ -1,16 +1,17 @@
 // AI 服务封装
 
 import { getAIManager } from '../providers';
-import { getPromptTemplate, fillPromptTemplate } from '../prompts';
+import { getPromptTemplate } from '../prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { PromptTemplate } from '@langchain/core/prompts';
+import { HumanMessage, SystemMessage, AIMessage, BaseMessage } from '@langchain/core/messages';
 
 /**
  * 岗位解析服务
  */
 export class JobParsingService {
   async parse(jobDescription: string): Promise<Record<string, unknown>> {
-    const llm = getAIManager().getProvider('openai');
+    const llm = getAIManager().getProvider('deepseek');
     const prompt = PromptTemplate.fromTemplate(getPromptTemplate('jobParsing'));
 
     const chain = prompt.pipe(llm).pipe(new StringOutputParser());
@@ -35,7 +36,7 @@ export class JobParsingService {
  */
 export class ResumeGenerationService {
   async generate(userProfile: string, jobDescription: string): Promise<Record<string, unknown>> {
-    const llm = getAIManager().getProvider('openai');
+    const llm = getAIManager().getProvider('deepseek');
     const prompt = PromptTemplate.fromTemplate(getPromptTemplate('resumeGeneration'));
 
     const chain = prompt.pipe(llm).pipe(new StringOutputParser());
@@ -66,13 +67,17 @@ export class SkillDiscoveryService {
     discoveredSkills: string[];
     isComplete: boolean;
   }> {
-    const llm = getAIManager().getProvider('openai');
+    const llm = getAIManager().getProvider('deepseek');
     const systemPrompt = getPromptTemplate('skillDiscovery');
 
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...conversationHistory,
-      { role: 'user', content: message },
+    const messages: BaseMessage[] = [
+      new SystemMessage(systemPrompt),
+      ...conversationHistory.map((msg) =>
+        msg.role === 'user'
+          ? new HumanMessage(msg.content)
+          : new AIMessage(msg.content)
+      ),
+      new HumanMessage(message),
     ];
 
     const result = await llm.invoke(messages);
@@ -99,7 +104,7 @@ export class SkillDiscoveryService {
  */
 export class InterviewService {
   async generateQuestions(jobInfo: string, resumeSummary: string): Promise<unknown[]> {
-    const llm = getAIManager().getProvider('openai');
+    const llm = getAIManager().getProvider('deepseek');
     const prompt = PromptTemplate.fromTemplate(getPromptTemplate('interviewQuestionGeneration'));
 
     const chain = prompt.pipe(llm).pipe(new StringOutputParser());
@@ -118,7 +123,7 @@ export class InterviewService {
   }
 
   async evaluateAnswer(question: string, answer: string): Promise<Record<string, unknown>> {
-    const llm = getAIManager().getProvider('openai');
+    const llm = getAIManager().getProvider('deepseek');
     const prompt = PromptTemplate.fromTemplate(getPromptTemplate('interviewEvaluation'));
 
     const chain = prompt.pipe(llm).pipe(new StringOutputParser());

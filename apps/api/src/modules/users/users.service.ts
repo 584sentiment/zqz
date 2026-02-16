@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
 import { CreateEducationDto, UpdateEducationDto } from './dto/education.dto';
+import { CreateExperienceDto, UpdateExperienceDto } from './dto/experience.dto';
+import { CreateProjectDto, UpdateProjectDto } from './dto/project.dto';
 
 @Injectable()
 export class UsersService {
@@ -122,6 +124,136 @@ export class UsersService {
 
     return this.prisma.education.delete({
       where: { id: educationId },
+    });
+  }
+
+  // 工作经历 CRUD
+  async createExperience(userId: string, dto: CreateExperienceDto) {
+    const profileId = await this.getProfileId(userId);
+    return this.prisma.experience.create({
+      data: {
+        profileId,
+        company: dto.company,
+        position: dto.position,
+        location: dto.location,
+        startDate: new Date(dto.startDate),
+        endDate: dto.endDate ? new Date(dto.endDate) : null,
+        current: dto.current ?? false,
+        description: dto.description,
+        highlights: dto.highlights || [],
+      },
+    });
+  }
+
+  async getExperiences(userId: string) {
+    const profileId = await this.getProfileId(userId);
+    return this.prisma.experience.findMany({
+      where: { profileId },
+      orderBy: { startDate: 'desc' },
+    });
+  }
+
+  async getExperience(userId: string, experienceId: string) {
+    const profileId = await this.getProfileId(userId);
+    const experience = await this.prisma.experience.findFirst({
+      where: { id: experienceId, profileId },
+    });
+    if (!experience) {
+      throw new NotFoundException('工作经历不存在');
+    }
+    return experience;
+  }
+
+  async updateExperience(userId: string, experienceId: string, dto: UpdateExperienceDto) {
+    // 验证所有权
+    await this.getExperience(userId, experienceId);
+
+    return this.prisma.experience.update({
+      where: { id: experienceId },
+      data: {
+        company: dto.company,
+        position: dto.position,
+        location: dto.location,
+        startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+        endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+        current: dto.current,
+        description: dto.description,
+        highlights: dto.highlights,
+      },
+    });
+  }
+
+  async deleteExperience(userId: string, experienceId: string) {
+    // 验证所有权
+    await this.getExperience(userId, experienceId);
+
+    return this.prisma.experience.delete({
+      where: { id: experienceId },
+    });
+  }
+
+  // 项目经历 CRUD
+  async createProject(userId: string, dto: CreateProjectDto) {
+    const profileId = await this.getProfileId(userId);
+    return this.prisma.project.create({
+      data: {
+        profileId,
+        name: dto.name,
+        role: dto.role,
+        startDate: new Date(dto.startDate),
+        endDate: dto.endDate ? new Date(dto.endDate) : null,
+        description: dto.description,
+        techStack: dto.techStack || [],
+        achievements: dto.achievements || [],
+        link: dto.link,
+      },
+    });
+  }
+
+  async getProjects(userId: string) {
+    const profileId = await this.getProfileId(userId);
+    return this.prisma.project.findMany({
+      where: { profileId },
+      orderBy: { startDate: 'desc' },
+    });
+  }
+
+  async getProject(userId: string, projectId: string) {
+    const profileId = await this.getProfileId(userId);
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, profileId },
+    });
+    if (!project) {
+      throw new NotFoundException('项目经历不存在');
+    }
+    return project;
+  }
+
+  async updateProject(userId: string, projectId: string, dto: UpdateProjectDto) {
+    // 验证所有权
+    await this.getProject(userId, projectId);
+
+    return this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        name: dto.name,
+        role: dto.role,
+        startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+        endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+        description: dto.description,
+        techStack: dto.techStack,
+        achievements: dto.achievements,
+        link: dto.link,
+      },
+    });
+  }
+
+  async deleteProject(userId: string, projectId: string) {
+    // 验证所有权
+    await this.getProject(userId, projectId);
+
+    return this.prisma.project.delete({
+      where: { id: projectId },
     });
   }
 }

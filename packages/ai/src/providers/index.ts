@@ -3,7 +3,7 @@
 import { ChatOpenAI } from '@langchain/openai';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
-export type AIProviderName = 'openai' | 'anthropic' | 'wenxin' | 'tongyi';
+export type AIProviderName = 'openai' | 'deepseek' | 'anthropic' | 'wenxin' | 'tongyi';
 
 export interface AIProviderConfig {
   name: AIProviderName;
@@ -11,11 +11,12 @@ export interface AIProviderConfig {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  baseUrl?: string;
 }
 
 export class AIProviderManager {
   private providers: Map<AIProviderName, BaseChatModel> = new Map();
-  private defaultProvider: AIProviderName = 'openai';
+  private defaultProvider: AIProviderName = 'deepseek';
 
   constructor(configs: Partial<Record<AIProviderName, AIProviderConfig>> = {}) {
     this.initializeProviders(configs);
@@ -29,6 +30,19 @@ export class AIProviderManager {
         temperature: configs.openai?.temperature ?? 0.7,
         maxTokens: configs.openai?.maxTokens ?? 4096,
         openAIApiKey: configs.openai?.apiKey || process.env.OPENAI_API_KEY,
+      }));
+    }
+
+    // 初始化 DeepSeek (使用 OpenAI 兼容 API)
+    if (configs.deepseek?.apiKey || process.env.DEEPSEEK_API_KEY) {
+      this.providers.set('deepseek', new ChatOpenAI({
+        modelName: configs.deepseek?.model || 'deepseek-chat',
+        temperature: configs.deepseek?.temperature ?? 0.7,
+        maxTokens: configs.deepseek?.maxTokens ?? 4096,
+        openAIApiKey: configs.deepseek?.apiKey || process.env.DEEPSEEK_API_KEY,
+        configuration: {
+          baseURL: configs.deepseek?.baseUrl || 'https://api.deepseek.com',
+        },
       }));
     }
   }

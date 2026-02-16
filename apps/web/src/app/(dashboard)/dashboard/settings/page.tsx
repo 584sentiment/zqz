@@ -39,7 +39,8 @@ export default function SettingsPage() {
   const loadUser = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await apiClient.get('/users/me');
+      const response = await apiClient.get<UserProfile>('/users/me');
+      const data = response.data;
       setUser(data);
       setName(data.nickname || data.profile?.name || '');
       setAvatarUrl(data.avatarUrl || '');

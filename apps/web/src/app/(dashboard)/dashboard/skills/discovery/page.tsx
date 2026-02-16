@@ -18,7 +18,10 @@ import {
   Bot,
   User,
   Lightbulb,
+  Save,
+  Check,
 } from 'lucide-react';
+import { apiClient } from '@/lib/api/client';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -34,6 +37,8 @@ export default function SkillDiscoveryPage() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedSkills, setSavedSkills] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const loadSessions = useCallback(async () => {
@@ -173,6 +178,71 @@ export default function SkillDiscoveryPage() {
     }
   };
 
+  // 保存技能到个人档案
+  const saveSkillToProfile = async (skill: string) => {
+    if (savedSkills.includes(skill)) return;
+
+    setIsSaving(true);
+    try {
+      await apiClient.post('/users/me/skills', {
+        name: skill,
+        category: 'technical',
+        level: 3,
+      });
+      setSavedSkills((prev) => [...prev, skill]);
+      toast({
+        title: '保存成功',
+        description: `技能「${skill}」已添加到个人档案`,
+      });
+    } catch (error) {
+      toast({
+        title: '保存失败',
+        description: '请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // 保存所有技能到档案
+  const saveAllSkillsToProfile = async () => {
+    if (!currentSession) return;
+
+    const unsavedSkills = currentSession.discoveredSkills.filter(
+      (s) => !savedSkills.includes(s)
+    );
+    if (unsavedSkills.length === 0) {
+      toast({
+        title: '已全部保存',
+        description: '所有技能已保存到个人档案',
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    let savedCount = 0;
+    for (const skill of unsavedSkills) {
+      try {
+        await apiClient.post('/users/me/skills', {
+          name: skill,
+          category: 'technical',
+          level: 3,
+        });
+        savedCount++;
+      } catch (error) {
+        // 忽略单个失败
+      }
+    }
+    setSavedSkills((prev) => [...prev, ...unsavedSkills]);
+    setIsSaving(false);
+
+    toast({
+      title: '保存完成',
+      description: `已将 ${savedCount} 个技能保存到个人档案`,
+    });
+  };
+
   // 简单的技能提取（模拟）
   const extractSkills = (text: string): string[] => {
     const skillKeywords = [
@@ -279,19 +349,45 @@ export default function SkillDiscoveryPage() {
                 {/* 已发现技能 */}
                 {currentSession.discoveredSkills.length > 0 && (
                   <div className="p-4 border-b border-gray-100 bg-primary/5">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Lightbulb className="w-4 h-4 text-primary" />
-                      <span className="text-sm font-medium text-primary">已发现技能</span>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Lightbulb className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-medium text-primary">已发现技能</span>
+                        <span className="text-xs text-gray-500">
+                          ({savedSkills.length}/{currentSession.discoveredSkills.length} 已保存)
+                        </span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={saveAllSkillsToProfile}
+                        disabled={isSaving || savedSkills.length >= currentSession.discoveredSkills.length}
+                        className="h-7 text-xs"
+                      >
+                        <Save className="w-3 h-3 mr-1" />
+                        全部保存
+                      </Button>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {currentSession.discoveredSkills.map((skill, index) => (
-                        <span
-                          key={index}
-                          className="px-2 py-1 bg-white text-primary text-xs font-medium rounded-full border border-primary/20"
-                        >
-                          {skill}
-                        </span>
-                      ))}
+                      {currentSession.discoveredSkills.map((skill, index) => {
+                        const isSaved = savedSkills.includes(skill);
+                        return (
+                          <button
+                            key={index}
+                            onClick={() => !isSaved && saveSkillToProfile(skill)}
+                            disabled={isSaved || isSaving}
+                            className={`px-2 py-1 text-xs font-medium rounded-full border transition flex items-center gap-1 ${
+                              isSaved
+                                ? 'bg-green-50 text-green-600 border-green-200 cursor-default'
+                                : 'bg-white text-primary border-primary/20 hover:bg-primary hover:text-white cursor-pointer'
+                            }`}
+                          >
+                            {isSaved && <Check className="w-3 h-3" />}
+                            {skill}
+                            {!isSaved && <Save className="w-3 h-3" />}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

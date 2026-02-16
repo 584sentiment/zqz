@@ -15,6 +15,7 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { CreateEducationDto, UpdateEducationDto } from './dto/education.dto';
 import { CreateExperienceDto, UpdateExperienceDto } from './dto/experience.dto';
 import { CreateProjectDto, UpdateProjectDto } from './dto/project.dto';
+import { CreateSkillDto, UpdateSkillDto } from './dto/skill.dto';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
@@ -149,5 +150,44 @@ export class UsersController {
     @Param('id') id: string,
   ) {
     return this.usersService.deleteProject(req.user.id, id);
+  }
+
+  // 技能标签
+  @Get('me/skills')
+  async getSkills(@Request() req: { user: { id: string } }) {
+    return this.usersService.getSkills(req.user.id);
+  }
+
+  @Post('me/skills')
+  async createSkill(
+    @Request() req: { user: { id: string } },
+    @Body() dto: CreateSkillDto,
+  ) {
+    return this.usersService.createSkill(req.user.id, dto);
+  }
+
+  @Get('me/skills/:id')
+  async getSkill(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+  ) {
+    return this.usersService.getSkill(req.user.id, id);
+  }
+
+  @Patch('me/skills/:id')
+  async updateSkill(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() dto: UpdateSkillDto,
+  ) {
+    return this.usersService.updateSkill(req.user.id, id, dto);
+  }
+
+  @Delete('me/skills/:id')
+  async deleteSkill(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+  ) {
+    return this.usersService.deleteSkill(req.user.id, id);
   }
 }

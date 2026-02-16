@@ -3,6 +3,7 @@ import { PrismaService } from '@/common/database/prisma.service';
 import { CreateEducationDto, UpdateEducationDto } from './dto/education.dto';
 import { CreateExperienceDto, UpdateExperienceDto } from './dto/experience.dto';
 import { CreateProjectDto, UpdateProjectDto } from './dto/project.dto';
+import { CreateSkillDto, UpdateSkillDto } from './dto/skill.dto';
 
 @Injectable()
 export class UsersService {
@@ -254,6 +255,65 @@ export class UsersService {
 
     return this.prisma.project.delete({
       where: { id: projectId },
+    });
+  }
+
+  // 技能标签 CRUD
+  async createSkill(userId: string, dto: CreateSkillDto) {
+    const profileId = await this.getProfileId(userId);
+    return this.prisma.skill.create({
+      data: {
+        profileId,
+        name: dto.name,
+        category: dto.category,
+        level: dto.level,
+        evidence: dto.evidence,
+        years: dto.years,
+      },
+    });
+  }
+
+  async getSkills(userId: string) {
+    const profileId = await this.getProfileId(userId);
+    return this.prisma.skill.findMany({
+      where: { profileId },
+      orderBy: [{ category: 'asc' }, { level: 'desc' }],
+    });
+  }
+
+  async getSkill(userId: string, skillId: string) {
+    const profileId = await this.getProfileId(userId);
+    const skill = await this.prisma.skill.findFirst({
+      where: { id: skillId, profileId },
+    });
+    if (!skill) {
+      throw new NotFoundException('技能不存在');
+    }
+    return skill;
+  }
+
+  async updateSkill(userId: string, skillId: string, dto: UpdateSkillDto) {
+    // 验证所有权
+    await this.getSkill(userId, skillId);
+
+    return this.prisma.skill.update({
+      where: { id: skillId },
+      data: {
+        name: dto.name,
+        category: dto.category,
+        level: dto.level,
+        evidence: dto.evidence,
+        years: dto.years,
+      },
+    });
+  }
+
+  async deleteSkill(userId: string, skillId: string) {
+    // 验证所有权
+    await this.getSkill(userId, skillId);
+
+    return this.prisma.skill.delete({
+      where: { id: skillId },
     });
   }
 }

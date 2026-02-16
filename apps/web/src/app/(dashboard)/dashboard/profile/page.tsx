@@ -9,6 +9,7 @@ import {
   GraduationCap,
   Briefcase,
   FolderKanban,
+  Lightbulb,
   Plus,
   Edit2,
   Trash2,
@@ -55,7 +56,16 @@ interface Project {
   link: string | null;
 }
 
-type ActiveSection = 'education' | 'experience' | 'project' | null;
+interface Skill {
+  id: string;
+  name: string;
+  category: string;
+  level: number;
+  evidence: string | null;
+  years: number | null;
+}
+
+type ActiveSection = 'education' | 'experience' | 'project' | 'skill' | null;
 
 // 空表单
 const emptyEducationForm = {
@@ -89,6 +99,14 @@ const emptyProjectForm = {
   link: '',
 };
 
+const emptySkillForm = {
+  name: '',
+  category: 'technical',
+  level: 3,
+  evidence: '',
+  years: '',
+};
+
 export default function ProfilePage() {
   const { toast } = useToast();
 
@@ -96,6 +114,7 @@ export default function ProfilePage() {
   const [educations, setEducations] = useState<Education[]>([]);
   const [experiences, setExperiences] = useState<Experience[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [skills, setSkills] = useState<Skill[]>([]);
 
   // UI 状态
   const [activeSection, setActiveSection] = useState<ActiveSection>(null);
@@ -107,19 +126,22 @@ export default function ProfilePage() {
   const [educationForm, setEducationForm] = useState(emptyEducationForm);
   const [experienceForm, setExperienceForm] = useState(emptyExperienceForm);
   const [projectForm, setProjectForm] = useState(emptyProjectForm);
+  const [skillForm, setSkillForm] = useState(emptySkillForm);
 
   // 加载数据
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [eduRes, expRes, projRes] = await Promise.all([
+      const [eduRes, expRes, projRes, skillRes] = await Promise.all([
         apiClient.get<Education[]>('/users/me/educations'),
         apiClient.get<Experience[]>('/users/me/experiences'),
         apiClient.get<Project[]>('/users/me/projects'),
+        apiClient.get<Skill[]>('/users/me/skills'),
       ]);
       setEducations(eduRes.data);
       setExperiences(expRes.data);
       setProjects(projRes.data);
+      setSkills(skillRes.data);
     } catch (error) {
       toast({
         title: '加载失败',
@@ -313,7 +335,70 @@ export default function ProfilePage() {
     }
   };
 
+  // 技能标签操作
+  const handleAddSkill = () => {
+    setActiveSection('skill');
+    setEditingId(null);
+    setSkillForm(emptySkillForm);
+  };
+
+  const handleEditSkill = (skill: Skill) => {
+    setActiveSection('skill');
+    setEditingId(skill.id);
+    setSkillForm({
+      name: skill.name,
+      category: skill.category,
+      level: skill.level,
+      evidence: skill.evidence || '',
+      years: skill.years?.toString() || '',
+    });
+  };
+
+  const handleSaveSkill = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      const payload = {
+        name: skillForm.name,
+        category: skillForm.category,
+        level: Number(skillForm.level),
+        evidence: skillForm.evidence || null,
+        years: skillForm.years ? Number(skillForm.years) : null,
+      };
+      if (editingId) {
+        await apiClient.patch(`/users/me/skills/${editingId}`, payload);
+        toast({ title: '更新成功', description: '技能已更新' });
+      } else {
+        await apiClient.post('/users/me/skills', payload);
+        toast({ title: '添加成功', description: '技能已添加' });
+      }
+      setActiveSection(null);
+      loadData();
+    } catch (error) {
+      toast({ title: '保存失败', description: '请稍后重试', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteSkill = async (id: string) => {
+    if (!confirm('确定要删除这个技能吗？')) return;
+    try {
+      await apiClient.delete(`/users/me/skills/${id}`);
+      toast({ title: '删除成功', description: '技能已删除' });
+      loadData();
+    } catch (error) {
+      toast({ title: '删除失败', description: '请稍后重试', variant: 'destructive' });
+    }
+  };
+
   const degreeOptions = ['高中', '大专', '本科', '硕士', '博士'];
+  const skillCategoryOptions = [
+    { value: 'technical', label: '技术技能' },
+    { value: 'soft', label: '软技能' },
+    { value: 'language', label: '语言能力' },
+  ];
+  const skillLevelLabels = ['入门', '初级', '中级', '高级', '专家'];
 
   const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('zh-CN', { year: 'numeric', month: 'short' });
@@ -324,6 +409,7 @@ export default function ProfilePage() {
     setEducationForm(emptyEducationForm);
     setExperienceForm(emptyExperienceForm);
     setProjectForm(emptyProjectForm);
+    setSkillForm(emptySkillForm);
   };
 
   return (
@@ -332,7 +418,7 @@ export default function ProfilePage() {
         {/* 页面标题 */}
         <div>
           <h1 className="text-2xl font-bold text-gray-900">个人档案</h1>
-          <p className="text-sm text-gray-500 mt-1">管理您的教育背景、工作经历和项目经历</p>
+          <p className="text-sm text-gray-500 mt-1">管理您的教育背景、工作经历、项目经历和技能标签</p>
         </div>
 
         {isLoading ? (
@@ -460,6 +546,68 @@ export default function ProfilePage() {
               }))}
               emptyIcon={<FolderKanban className="w-12 h-12 mx-auto mb-2 opacity-50" />}
               emptyText="暂无项目经历"
+            />
+
+            {/* 技能标签卡片 */}
+            <SectionCard
+              title="技能标签"
+              icon={<Lightbulb className="w-5 h-5 text-primary" />}
+              onAdd={handleAddSkill}
+              showForm={activeSection === 'skill'}
+              formContent={
+                <form onSubmit={handleSaveSkill} className="p-4 bg-gray-50 rounded-lg space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <InputField label="技能名称" required value={skillForm.name} onChange={(v) => setSkillForm({ ...skillForm, name: v })} placeholder="例如：React, Python" />
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">技能类别 *</label>
+                      <select
+                        required
+                        value={skillForm.category}
+                        onChange={(e) => setSkillForm({ ...skillForm, category: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        {skillCategoryOptions.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">熟练程度 *</label>
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map((level) => (
+                          <button
+                            key={level}
+                            type="button"
+                            onClick={() => setSkillForm({ ...skillForm, level })}
+                            className={`flex-1 py-2 rounded text-sm font-medium transition ${
+                              skillForm.level >= level
+                                ? 'bg-primary text-white'
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            }`}
+                          >
+                            {level}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1 text-center">{skillLevelLabels[skillForm.level - 1]}</p>
+                    </div>
+                    <InputField label="使用年限" type="number" value={skillForm.years} onChange={(v) => setSkillForm({ ...skillForm, years: v })} placeholder="例如：3" />
+                  </div>
+                  <TextAreaField label="证明/经历" value={skillForm.evidence} onChange={(v) => setSkillForm({ ...skillForm, evidence: v })} placeholder="相关项目经历、证书等..." />
+                  <FormButtons onCancel={resetForm} isSaving={isSaving} />
+                </form>
+              }
+              items={skills.map((skill) => ({
+                id: skill.id,
+                title: skill.name,
+                subtitle: `${skillCategoryOptions.find((c) => c.value === skill.category)?.label || skill.category} · ${skillLevelLabels[skill.level - 1]}`,
+                date: skill.years ? `${skill.years} 年经验` : undefined,
+                description: skill.evidence,
+                onEdit: () => handleEditSkill(skill),
+                onDelete: () => handleDeleteSkill(skill.id),
+              }))}
+              emptyIcon={<Lightbulb className="w-12 h-12 mx-auto mb-2 opacity-50" />}
+              emptyText="暂无技能标签"
             />
           </>
         )}

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { skillsApi, SkillSession } from '@/lib/api/skills';
+import { jobsApi, Job } from '@/lib/api/jobs';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,13 +14,14 @@ import {
   Plus,
   History,
   Trash2,
-  ChevronRight,
   Loader2,
   Bot,
   User,
   Lightbulb,
   Save,
   Check,
+  Briefcase,
+  X,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 
@@ -32,6 +34,7 @@ export default function SkillDiscoveryPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [sessions, setSessions] = useState<SkillSession[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [currentSession, setCurrentSession] = useState<SkillSession | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -39,13 +42,19 @@ export default function SkillDiscoveryPage() {
   const [isSending, setIsSending] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savedSkills, setSavedSkills] = useState<string[]>([]);
+  const [showJobSelector, setShowJobSelector] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const loadSessions = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await skillsApi.getSessions();
-      setSessions(data);
+      const [sessionsData, jobsResponse] = await Promise.all([
+        skillsApi.getSessions(),
+        jobsApi.getList({ status: 'active' }),
+      ]);
+      setSessions(sessionsData);
+      setJobs(jobsResponse.data);
     } catch (error) {
       toast({
         title: '加载失败',
@@ -65,17 +74,21 @@ export default function SkillDiscoveryPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const startNewSession = async () => {
+  const startNewSession = async (jobId?: string) => {
     try {
-      const session = await skillsApi.createSession();
+      const session = await skillsApi.createSession(jobId);
       setCurrentSession(session);
-      setMessages([
-        {
-          role: 'assistant',
-          content: '你好！我是你的技能发掘助手。让我来帮助你发现自己的核心技能和优势。\n\n请告诉我你最近的一份工作或项目经历，我会通过对话帮你挖掘出你可能忽视的技能。',
-        },
-      ]);
+
+      // 根据是否关联岗位生成不同的开场白
+      const job = jobs.find(j => j.id === jobId);
+      const welcomeMessage = job
+        ? `你好！我是你的技能发掘助手。我看到你对「${job.title}」岗位感兴趣。\n\n让我来帮助你发掘与这个岗位相关的技能。请告诉我你在哪些工作或项目经历中，展示过与这个岗位相关的能力？`
+        : '你好！我是你的技能发掘助手。让我来帮助你发现自己的核心技能和优势。\n\n请告诉我你最近的一份工作或项目经历，我会通过对话帮你挖掘出你可能忽视的技能。';
+
+      setMessages([{ role: 'assistant', content: welcomeMessage }]);
       setSessions((prev) => [session, ...prev]);
+      setShowJobSelector(false);
+      setSelectedJobId('');
     } catch (error) {
       toast({
         title: '创建失败',
@@ -286,7 +299,7 @@ export default function SkillDiscoveryPage() {
           <div className="lg:w-72 flex-shrink-0">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-4 border-b border-gray-100">
-                <Button onClick={startNewSession} className="w-full shadow-lg shadow-primary/20">
+                <Button onClick={() => setShowJobSelector(true)} className="w-full shadow-lg shadow-primary/20">
                   <Plus className="w-4 h-4 mr-2" />
                   开始新对话
                 </Button>
@@ -320,6 +333,12 @@ export default function SkillDiscoveryPage() {
                             <p className="text-sm font-medium text-gray-900 truncate">
                               {session.job?.title || '技能发掘对话'}
                             </p>
+                            {session.job?.company && (
+                              <p className="text-xs text-gray-400 truncate flex items-center gap-1">
+                                <Briefcase className="w-3 h-3" />
+                                {session.job.company}
+                              </p>
+                            )}
                             <p className="text-xs text-gray-500 mt-0.5">
                               {session.discoveredSkills.length} 个技能 · {session.messagesCount} 条消息
                             </p>
@@ -346,6 +365,24 @@ export default function SkillDiscoveryPage() {
           <div className="flex-1">
             {currentSession ? (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-[calc(100vh-12rem)]">
+                {/* 会话头部 - 显示关联岗位 */}
+                {currentSession.job && (
+                  <div className="p-4 border-b border-gray-100 bg-blue-50">
+                    <div className="flex items-center gap-2">
+                      <Briefcase className="w-4 h-4 text-blue-600" />
+                      <span className="text-sm text-blue-600">关联岗位：</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {currentSession.job.title}
+                      </span>
+                      {currentSession.job.company && (
+                        <span className="text-sm text-gray-500">
+                          @ {currentSession.job.company}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* 已发现技能 */}
                 {currentSession.discoveredSkills.length > 0 && (
                   <div className="p-4 border-b border-gray-100 bg-primary/5">
@@ -471,7 +508,7 @@ export default function SkillDiscoveryPage() {
                 <p className="text-gray-500 mb-6 max-w-md">
                   通过与 AI 对话，挖掘你可能在简历中遗漏的核心技能和优势。我们会引导你描述工作经历，并从中识别可迁移技能。
                 </p>
-                <Button onClick={startNewSession} size="lg" className="shadow-lg shadow-primary/20">
+                <Button onClick={() => setShowJobSelector(true)} size="lg" className="shadow-lg shadow-primary/20">
                   <Plus className="w-4 h-4 mr-2" />
                   开始发掘我的技能
                 </Button>
@@ -480,6 +517,80 @@ export default function SkillDiscoveryPage() {
           </div>
         </div>
       </div>
+
+      {/* 岗位选择弹窗 */}
+      {showJobSelector && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">选择关联岗位</h2>
+              <button
+                onClick={() => {
+                  setShowJobSelector(false);
+                  setSelectedJobId('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-gray-500 text-sm mb-4">
+              选择一个岗位可以让 AI 更有针对性地发掘相关技能
+            </p>
+
+            <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
+              <button
+                onClick={() => setSelectedJobId('')}
+                className={`w-full p-3 rounded-lg border text-left transition ${
+                  selectedJobId === ''
+                    ? 'border-primary bg-primary/5'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="font-medium text-gray-900">不关联岗位</div>
+                <div className="text-sm text-gray-500">进行通用技能发掘</div>
+              </button>
+
+              {jobs.map((job) => (
+                <button
+                  key={job.id}
+                  onClick={() => setSelectedJobId(job.id)}
+                  className={`w-full p-3 rounded-lg border text-left transition ${
+                    selectedJobId === job.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="font-medium text-gray-900">{job.title}</div>
+                  <div className="text-sm text-gray-500">
+                    {job.company} {job.location && `· ${job.location}`}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowJobSelector(false);
+                  setSelectedJobId('');
+                }}
+                className="flex-1"
+              >
+                取消
+              </Button>
+              <Button
+                onClick={() => startNewSession(selectedJobId || undefined)}
+                className="flex-1"
+              >
+                开始对话
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

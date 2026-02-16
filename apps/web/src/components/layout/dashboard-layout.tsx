@@ -16,6 +16,8 @@ import {
   User,
   ChevronDown,
   Briefcase,
+  Menu,
+  X,
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -34,6 +36,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const { user, logout, setUser } = useAuthStore();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   // 从 API 获取最新用户信息
   useEffect(() => {
@@ -67,6 +70,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   }, [user?.name, setUser]);
 
+  // 关闭移动菜单当路由变化
+  useEffect(() => {
+    setShowMobileMenu(false);
+  }, [pathname]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation */}
@@ -74,7 +82,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             {/* Left: Logo + Nav */}
-            <div className="flex items-center gap-8">
+            <div className="flex items-center gap-4 md:gap-8">
               <Link href="/dashboard" className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-sm">智</span>
@@ -82,6 +90,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <span className="font-bold text-xl text-gray-900">智求职</span>
               </Link>
 
+              {/* Desktop Nav */}
               <div className="hidden md:flex items-center space-x-6">
                 {navItems.map((item) => {
                   const Icon = item.icon;
@@ -103,8 +112,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
 
             {/* Right: Search + Notifications + User */}
-            <div className="flex items-center gap-4">
-              {/* Search */}
+            <div className="flex items-center gap-2 sm:gap-4">
+              {/* Search - Desktop */}
               <div className="hidden lg:block relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
@@ -113,6 +122,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   className="w-64 pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                 />
               </div>
+
+              {/* Search - Mobile */}
+              <button className="lg:hidden p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg transition">
+                <Search className="w-5 h-5" />
+              </button>
 
               {/* Notifications */}
               <button className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg transition">
@@ -123,7 +137,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center gap-3 pl-4 border-l border-gray-200"
+                  className="flex items-center gap-2 sm:gap-3 sm:pl-4 sm:border-l sm:border-gray-200"
                 >
                   <div className="text-right hidden sm:block">
                     <p className="text-sm font-medium text-gray-900">{user?.name || '用户'}</p>
@@ -136,7 +150,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                       <User className="w-5 h-5 text-primary" />
                     )}
                   </div>
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                  <ChevronDown className="w-4 h-4 text-gray-400 hidden sm:block" />
                 </button>
 
                 {showUserMenu && (
@@ -162,13 +176,48 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   </div>
                 )}
               </div>
+
+              {/* Mobile Menu Button */}
+              <button
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="md:hidden p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg transition"
+              >
+                {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </button>
             </div>
           </div>
         </div>
+
+        {/* Mobile Menu */}
+        {showMobileMenu && (
+          <div className="md:hidden border-t border-gray-200 bg-white">
+            <div className="px-4 py-3 space-y-1">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
+                      isActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                    onClick={() => setShowMobileMenu(false)}
+                  >
+                    <Icon className="w-5 h-5" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</main>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">{children}</main>
     </div>
   );
 }

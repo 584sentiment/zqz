@@ -9,6 +9,24 @@ export const apiClient = axios.create({
   },
 });
 
+// 防止重复刷新 token
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (error: Error) => void;
+}> = [];
+
+const processQueue = (error: Error | null, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else if (token) {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
 // 请求拦截器 - 添加 token
 apiClient.interceptors.request.use(
   (config) => {
@@ -27,29 +45,60 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      // Token 过期，尝试刷新
-      const refreshToken = localStorage.getItem('refreshToken');
-      if (refreshToken) {
-        try {
-          const { data } = await apiClient.post('/auth/refresh', {
-            refreshToken,
-          });
-          localStorage.setItem('accessToken', data.accessToken);
-          localStorage.setItem('refreshToken', data.refreshToken);
-          // 重试原请求
-          error.config.headers.Authorization = `Bearer ${data.accessToken}`;
-          return apiClient.request(error.config);
-        } catch {
-          // 刷新失败，清除 token 并跳转登录
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          window.location.href = '/login';
-        }
-      } else {
+    const originalRequest = error.config;
+
+    // 如果是 401 且不是刷新 token 的请求
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      // 如果是刷新 token 接口本身返回 401，直接跳转登录
+      if (originalRequest.url?.includes('/auth/refresh')) {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
         window.location.href = '/login';
+        return Promise.reject(error);
+      }
+
+      // 如果正在刷新，将请求加入队列
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return apiClient(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (!refreshToken) {
+        isRefreshing = false;
+        window.location.href = '/login';
+        return Promise.reject(error);
+      }
+
+      try {
+        const { data } = await apiClient.post('/auth/refresh', {
+          refreshToken,
+        });
+        localStorage.setItem('accessToken', data.accessToken);
+        localStorage.setItem('refreshToken', data.refreshToken);
+        originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+        processQueue(null, data.accessToken);
+        return apiClient(originalRequest);
+      } catch (refreshError) {
+        processQueue(refreshError as Error, null);
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
     }
+
     return Promise.reject(error);
   }
 );

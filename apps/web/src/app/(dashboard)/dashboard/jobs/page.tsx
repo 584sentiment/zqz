@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { jobsApi, Job } from '@/lib/api/jobs';
@@ -27,11 +27,7 @@ export default function JobsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  useEffect(() => {
-    loadJobs();
-  }, [statusFilter]);
-
-  const loadJobs = async () => {
+  const loadJobs = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await jobsApi.getList({
@@ -47,7 +43,11 @@ export default function JobsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [statusFilter, toast]);
+
+  useEffect(() => {
+    loadJobs();
+  }, [loadJobs]);
 
   const handleDelete = async (jobId: string) => {
     try {

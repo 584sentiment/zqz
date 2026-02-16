@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
@@ -37,11 +37,9 @@ export default function JobDetailPage({ params }: PageProps) {
   const [job, setJob] = useState<Job | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadJob();
-  }, [id]);
+  const loadJob = useCallback(async () => {
+    if (!id) return;
 
-  const loadJob = async () => {
     setIsLoading(true);
     try {
       const data = await jobsApi.getById(id);
@@ -56,7 +54,11 @@ export default function JobDetailPage({ params }: PageProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id, router, toast]);
+
+  useEffect(() => {
+    loadJob();
+  }, [loadJob]);
 
   const handleDelete = async () => {
     if (!confirm('确定要删除这个岗位吗？')) return;

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
+import { useAuthStore } from '@/stores/auth';
 import { apiClient } from '@/lib/api/client';
 import {
   User,
@@ -28,6 +29,7 @@ interface UserProfile {
 
 export default function SettingsPage() {
   const { toast } = useToast();
+  const { setUser: setAuthUser } = useAuthStore();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -39,7 +41,7 @@ export default function SettingsPage() {
     try {
       const data = await apiClient.get('/users/me');
       setUser(data);
-      setName(data.nickname || '');
+      setName(data.nickname || data.profile?.name || '');
       setAvatarUrl(data.avatarUrl || '');
     } catch (error) {
       toast({
@@ -71,6 +73,14 @@ export default function SettingsPage() {
       if (user) {
         setUser({ ...user, nickname: name, avatarUrl });
       }
+      // 同步更新 auth store
+      setAuthUser({
+        id: user?.id || '',
+        email: user?.email || '',
+        name,
+        avatarUrl: avatarUrl || undefined,
+        emailVerified: user?.emailVerified || false,
+      });
     } catch (error) {
       toast({
         title: '保存失败',

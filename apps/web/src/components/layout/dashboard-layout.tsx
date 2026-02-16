@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth';
+import { apiClient } from '@/lib/api/client';
 import {
   LayoutDashboard,
   FileText,
@@ -28,8 +29,32 @@ const navItems = [
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
-  const { user, logout } = useAuthStore();
+  const { user, logout, setUser } = useAuthStore();
   const [showUserMenu, setShowUserMenu] = useState(false);
+
+  // 从 API 获取最新用户信息
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const data = await apiClient.get('/users/me');
+        // 更新 auth store 中的用户信息
+        setUser({
+          id: data.id,
+          email: data.email,
+          name: data.nickname || data.profile?.name || '用户',
+          avatarUrl: data.avatarUrl,
+          emailVerified: data.emailVerified,
+        });
+      } catch (error) {
+        // 静默失败，可能是 token 过期，由 API client 处理
+      }
+    };
+
+    // 只在用户信息不完整时获取
+    if (!user?.name) {
+      fetchUser();
+    }
+  }, [user?.name, setUser]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -93,8 +118,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     <p className="text-sm font-medium text-gray-900">{user?.name || '用户'}</p>
                     <p className="text-xs text-gray-500">免费会员</p>
                   </div>
-                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="w-5 h-5 text-primary" />
+                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
+                    {user?.avatarUrl ? (
+                      <img src={user.avatarUrl} alt="头像" className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-5 h-5 text-primary" />
+                    )}
                   </div>
                   <ChevronDown className="w-4 h-4 text-gray-400" />
                 </button>

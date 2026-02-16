@@ -115,7 +115,32 @@ export class AuthService {
     });
   }
 
-  private async generateTokens(userId: string, email: string) {
+  /**
+   * 验证用户凭证（用于 Local Strategy）
+   * @returns 用户对象或 null
+   */
+  async validateCredentials(email: string, password: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isPasswordValid) {
+      return null;
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      nickname: user.nickname,
+    };
+  }
+
+  async generateTokens(userId: string, email: string) {
     const accessToken = this.jwtService.sign({
       sub: userId,
       email,

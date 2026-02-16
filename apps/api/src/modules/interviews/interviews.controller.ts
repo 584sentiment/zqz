@@ -71,4 +71,41 @@ export class InterviewsController {
   async delete(@Request() req: { user: { userId: string } }, @Param('id') id: string) {
     return this.interviewsService.delete(req.user.userId, id);
   }
+
+  // ============== 面试准备计划 ==============
+
+  @Get('preparations')
+  async getPreparationPlans(@Request() req: { user: { userId: string } }) {
+    return this.interviewsService.getPreparationPlans(req.user.userId);
+  }
+
+  @Get('preparations/:id')
+  async getPreparationPlan(@Request() req: { user: { userId: string } }, @Param('id') id: string) {
+    return this.interviewsService.getPreparationPlan(req.user.userId, id);
+  }
+
+  @Post('preparations')
+  async createPreparationPlan(
+    @Request() req: { user: { userId: string } },
+    @Body() body: { jobId?: string; days: number; focusAreas?: string[] },
+  ) {
+    return this.interviewsService.createPreparationPlan(req.user.userId, body);
+  }
+
+  @Post('preparations/:id/complete')
+  async completeTask(
+    @Request() req: { user: { userId: string } },
+    @Param('id') id: string,
+    @Body() body: { dayIndex: number; taskId: string },
+  ) {
+    return this.interviewsService.completeTask(req.user.userId, id, body.dayIndex, body.taskId);
+  }
+
+  @Delete('preparations/:id')
+  async deletePreparationPlan(
+    @Request() req: { user: { userId: string } },
+    @Param('id') id: string,
+  ) {
+    return this.interviewsService.deletePreparationPlan(req.user.userId, id);
+  }
 }

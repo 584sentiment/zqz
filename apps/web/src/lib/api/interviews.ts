@@ -33,6 +33,43 @@ export interface AnswerFeedback {
   suggestions: string;
 }
 
+// 面试准备计划相关类型
+export interface PreparationTask {
+  id: string;
+  title: string;
+  duration: number;
+  type: string;
+  completed: boolean;
+}
+
+export interface DailyPlan {
+  day: number;
+  date: string;
+  focusArea: string;
+  tasks: PreparationTask[];
+  totalDuration: number;
+  completedCount: number;
+  totalTasks: number;
+}
+
+export interface PreparationPlan {
+  id: string;
+  type: string;
+  status: string;
+  jobContext: Record<string, unknown> | null;
+  questions: DailyPlan[];
+  createdAt: string;
+  progress: number;
+}
+
+export interface PreparationPlanListItem {
+  id: string;
+  jobContext: Record<string, unknown> | null;
+  status: string;
+  createdAt: string;
+  progress: number;
+}
+
 export const interviewsApi = {
   async getList(params?: { status?: string; type?: string }): Promise<Interview[]> {
     const searchParams = new URLSearchParams();
@@ -101,6 +138,44 @@ export const interviewsApi = {
 
   async delete(id: string): Promise<{ success: boolean }> {
     const response = await apiClient.delete<{ success: boolean }>(`/interviews/${id}`);
+    return response.data;
+  },
+
+  // 面试准备计划
+  async getPreparationPlans(): Promise<PreparationPlanListItem[]> {
+    const response = await apiClient.get<PreparationPlanListItem[]>('/interviews/preparations');
+    return response.data;
+  },
+
+  async getPreparationPlan(id: string): Promise<PreparationPlan> {
+    const response = await apiClient.get<PreparationPlan>(`/interviews/preparations/${id}`);
+    return response.data;
+  },
+
+  async createPreparationPlan(data: {
+    jobId?: string;
+    days: number;
+    focusAreas?: string[];
+  }): Promise<PreparationPlan> {
+    const response = await apiClient.post<PreparationPlan>('/interviews/preparations', data);
+    return response.data;
+  },
+
+  async completePreparationTask(
+    planId: string,
+    data: { dayIndex: number; taskId: string }
+  ): Promise<PreparationPlan> {
+    const response = await apiClient.post<PreparationPlan>(
+      `/interviews/preparations/${planId}/complete`,
+      data
+    );
+    return response.data;
+  },
+
+  async deletePreparationPlan(id: string): Promise<{ success: boolean }> {
+    const response = await apiClient.delete<{ success: boolean }>(
+      `/interviews/preparations/${id}`
+    );
     return response.data;
   },
 };

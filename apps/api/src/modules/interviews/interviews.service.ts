@@ -425,4 +425,222 @@ export class InterviewsService {
       { id: 'situational', name: '情景面试', icon: 'target' },
     ];
   }
+
+  // ============== 面试准备计划 ==============
+
+  // 创建准备计划
+  async createPreparationPlan(
+    userId: string,
+    data: { jobId?: string; days: number; focusAreas?: string[] },
+  ) {
+    // 获取岗位上下文
+    let jobContext: Record<string, unknown> | null = null;
+    if (data.jobId) {
+      const job = await prisma.job.findFirst({
+        where: { id: data.jobId, userId },
+        select: {
+          id: true,
+          title: true,
+          company: true,
+          description: true,
+          requirements: true,
+          matchedSkills: true,
+        },
+      });
+      if (job) {
+        jobContext = job;
+      }
+    }
+
+    // 生成每日准备计划
+    const dailyPlan = this.generateDailyPlan(data.days, jobContext, data.focusAreas);
+
+    const plan = await prisma.interview.create({
+      data: {
+        userId,
+        type: 'preparation',
+        status: 'pending',
+        jobContext: jobContext ? JSON.parse(JSON.stringify(jobContext)) : undefined,
+        questions: JSON.parse(JSON.stringify(dailyPlan)),
+      },
+    });
+
+    return plan;
+  }
+
+  // 生成每日准备计划
+  private generateDailyPlan(
+    days: number,
+    jobContext: Record<string, unknown> | null,
+    focusAreas?: string[],
+  ): Record<string, unknown>[] {
+    const plan: Record<string, unknown>[] = [];
+    const areas = focusAreas || ['technical', 'behavioral', 'company', 'self_intro'];
+
+    // 基础任务模板
+    const taskTemplates: Record<string, Record<string, unknown>[]> = {
+      technical: [
+        { title: '复习核心技术栈', duration: 60, type: 'study' },
+        { title: '刷算法题 2 道', duration: 45, type: 'practice' },
+        { title: '整理项目技术亮点', duration: 30, type: 'review' },
+      ],
+      behavioral: [
+        { title: '准备 STAR 故事素材', duration: 30, type: 'prepare' },
+        { title: '模拟回答行为面试题', duration: 45, type: 'practice' },
+        { title: '复盘过往工作经历', duration: 30, type: 'review' },
+      ],
+      company: [
+        { title: '研究目标公司背景', duration: 30, type: 'research' },
+        { title: '了解行业动态', duration: 20, type: 'research' },
+        { title: '准备针对性问题', duration: 20, type: 'prepare' },
+      ],
+      self_intro: [
+        { title: '完善自我介绍', duration: 20, type: 'prepare' },
+        { title: '练习自我介绍表达', duration: 15, type: 'practice' },
+        { title: '录制并回看自我介绍', duration: 15, type: 'review' },
+      ],
+    };
+
+    // 根据天数分配任务
+    for (let day = 1; day <= days; day++) {
+      const dayIndex = (day - 1) % areas.length;
+      const area = areas[dayIndex] ?? 'technical';
+      const tasks = taskTemplates[area] || taskTemplates.technical;
+
+      // 根据进度调整任务类型
+      let adjustedTasks = [...tasks];
+      if (day <= Math.ceil(days / 3)) {
+        // 前期：以学习和准备为主
+        adjustedTasks = tasks.filter(
+          (t) => t.type === 'study' || t.type === 'prepare' || t.type === 'research',
+        );
+      } else if (day <= Math.ceil((days * 2) / 3)) {
+        // 中期：以练习为主
+        adjustedTasks = tasks.filter((t) => t.type === 'practice' || t.type === 'prepare');
+      } else {
+        // 后期：以复习和模拟为主
+        adjustedTasks = [
+          { title: '模拟面试练习', duration: 60, type: 'mock' },
+          { title: '复习重点内容', duration: 30, type: 'review' },
+        ];
+      }
+
+      // 确保至少有任务
+      if (adjustedTasks.length === 0) {
+        adjustedTasks = tasks.slice(0, 2);
+      }
+
+      plan.push({
+        day,
+        date: new Date(Date.now() + (day - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        focusArea: area,
+        tasks: adjustedTasks.map((t, index) => ({
+          id: `day${day}-task${index + 1}`,
+          ...t,
+          completed: false,
+        })),
+        totalDuration: adjustedTasks.reduce((sum, t) => sum + (t.duration as number), 0),
+        completedCount: 0,
+        totalTasks: adjustedTasks.length,
+      });
+    }
+
+    return plan;
+  }
+
+  // 获取准备计划列表
+  async getPreparationPlans(userId: string) {
+    const plans = await prisma.interview.findMany({
+      where: { userId, type: 'preparation' },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    return plans.map((plan) => ({
+      id: plan.id,
+      jobContext: plan.jobContext,
+      status: plan.status,
+      createdAt: plan.createdAt,
+      progress: this.calculatePlanProgress(plan.questions as Record<string, unknown>[]),
+    }));
+  }
+
+  // 获取单个准备计划详情
+  async getPreparationPlan(userId: string, planId: string) {
+    const plan = await prisma.interview.findFirst({
+      where: { id: planId, userId, type: 'preparation' },
+    });
+
+    if (!plan) {
+      throw new NotFoundException('准备计划不存在');
+    }
+
+    return {
+      ...plan,
+      progress: this.calculatePlanProgress(plan.questions as Record<string, unknown>[]),
+    };
+  }
+
+  // 计算计划进度
+  private calculatePlanProgress(dailyPlan: Record<string, unknown>[]): number {
+    if (!dailyPlan || dailyPlan.length === 0) return 0;
+
+    let totalTasks = 0;
+    let completedTasks = 0;
+
+    for (const day of dailyPlan) {
+      const tasks = day.tasks as Record<string, unknown>[] || [];
+      totalTasks += tasks.length;
+      completedTasks += tasks.filter((t) => t.completed).length;
+    }
+
+    return totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  }
+
+  // 标记任务完成
+  async completeTask(userId: string, planId: string, dayIndex: number, taskId: string) {
+    const plan = await this.getPreparationPlan(userId, planId);
+    const dailyPlan = plan.questions as Record<string, unknown>[];
+
+    if (dayIndex < 0 || dayIndex >= dailyPlan.length) {
+      throw new NotFoundException('任务日期不存在');
+    }
+
+    const day = dailyPlan[dayIndex] as Record<string, unknown>;
+    const tasks = day.tasks as Record<string, unknown>[];
+    const taskIndex = tasks.findIndex((t) => t.id === taskId);
+
+    if (taskIndex === -1) {
+      throw new NotFoundException('任务不存在');
+    }
+
+    // 切换完成状态
+    tasks[taskIndex] = { ...tasks[taskIndex], completed: !tasks[taskIndex].completed };
+
+    // 更新当天的完成计数
+    day.completedCount = tasks.filter((t) => t.completed).length;
+
+    // 更新整个计划
+    const updatedPlan = await prisma.interview.update({
+      where: { id: planId },
+      data: {
+        questions: JSON.parse(JSON.stringify(dailyPlan)),
+        status: this.calculatePlanProgress(dailyPlan) === 100 ? 'completed' : 'in_progress',
+      },
+    });
+
+    return {
+      ...updatedPlan,
+      progress: this.calculatePlanProgress(dailyPlan),
+    };
+  }
+
+  // 删除准备计划
+  async deletePreparationPlan(userId: string, planId: string) {
+    const plan = await this.getPreparationPlan(userId, planId);
+    await prisma.interview.delete({
+      where: { id: plan.id },
+    });
+    return { success: true };
+  }
 }

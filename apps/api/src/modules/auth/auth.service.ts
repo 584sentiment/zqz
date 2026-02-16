@@ -161,4 +161,39 @@ export class AuthService {
       expiresIn: 900, // 15 分钟
     };
   }
+
+  async refreshTokens(refreshToken: string) {
+    try {
+      // 验证 refresh token
+      const payload = this.jwtService.verify(refreshToken);
+
+      // 检查是否是 refresh token
+      if (payload.type !== 'refresh') {
+        throw new UnauthorizedException('无效的刷新令牌');
+      }
+
+      // 验证用户是否存在
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException('用户不存在');
+      }
+
+      // 生成新的令牌
+      const tokens = await this.generateTokens(user.id, user.email);
+
+      return {
+        ...tokens,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.nickname,
+        },
+      };
+    } catch (error) {
+      throw new UnauthorizedException('刷新令牌无效或已过期');
+    }
+  }
 }

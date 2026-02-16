@@ -30,8 +30,7 @@ export class AuthController {
 
   @Post('refresh')
   async refresh(@Body() dto: RefreshTokenDto) {
-    // TODO: 实现 refresh token 逻辑
-    return { message: 'Not implemented yet' };
+    return this.authService.refreshTokens(dto.refreshToken);
   }
 
   @Post('logout')

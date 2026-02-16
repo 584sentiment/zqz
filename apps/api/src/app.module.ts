@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 
 import { PrismaModule } from './common/database/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -21,6 +22,14 @@ import { HealthController } from './health.controller';
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
+
+    // 速率限制
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 1 分钟
+        limit: 100, // 每分钟最多 100 次请求
+      },
+    ]),
 
     // 数据库模块
     PrismaModule,
@@ -50,5 +59,11 @@ import { HealthController } from './health.controller';
     SubscriptionsModule,
   ],
   controllers: [HealthController],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

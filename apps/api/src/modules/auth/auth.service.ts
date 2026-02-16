@@ -196,4 +196,32 @@ export class AuthService {
       throw new UnauthorizedException('刷新令牌无效或已过期');
     }
   }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    // 查找用户
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('用户不存在');
+    }
+
+    // 验证当前密码
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('当前密码错误');
+    }
+
+    // 哈希新密码
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    // 更新密码
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    return { success: true };
+  }
 }

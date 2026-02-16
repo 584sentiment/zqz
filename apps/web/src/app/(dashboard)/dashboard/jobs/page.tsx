@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { jobsApi, Job } from '@/lib/api/jobs';
+import { jobsApi, Job, JobsListResponse } from '@/lib/api/jobs';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,22 +20,45 @@ import {
   Clock,
   Archive,
   ArchiveRestore,
+  Loader2,
+  ChevronDown,
 } from 'lucide-react';
+
+const PAGE_SIZE = 10;
 
 export default function JobsPage() {
   const { toast } = useToast();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [pagination, setPagination] = useState<{ total: number; hasMore: boolean }>({ total: 0, hasMore: false });
+  const [currentPage, setCurrentPage] = useState(0);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
-  const loadJobs = useCallback(async () => {
-    setIsLoading(true);
+  const loadJobs = useCallback(async (page: number = 0, append: boolean = false) => {
+    if (append) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+    }
+
     try {
-      const response = await jobsApi.getList({
+      const response: JobsListResponse = await jobsApi.getList({
         status: statusFilter === 'all' ? undefined : statusFilter,
+        skip: page * PAGE_SIZE,
+        take: PAGE_SIZE,
       });
-      setJobs(response.data);
+
+      if (append) {
+        setJobs((prev) => [...prev, ...response.data]);
+      } else {
+        setJobs(response.data);
+      }
+      setPagination(response.pagination);
+      setCurrentPage(page);
     } catch (error) {
       toast({
         title: '加载失败',
@@ -44,12 +67,53 @@ export default function JobsPage() {
       });
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
   }, [statusFilter, toast]);
 
+  // 初始加载
   useEffect(() => {
-    loadJobs();
-  }, [loadJobs]);
+    loadJobs(0, false);
+  }, [statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 搜索时重置分页
+  useEffect(() => {
+    setCurrentPage(0);
+    setJobs([]);
+    loadJobs(0, false);
+  }, [statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleLoadMore = () => {
+    if (!isLoadingMore && pagination.hasMore) {
+      loadJobs(currentPage + 1, true);
+    }
+  };
+
+  // 无限滚动
+  useEffect(() => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && pagination.hasMore && !isLoadingMore && !isLoading) {
+          handleLoadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreRef.current) {
+      observerRef.current.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [pagination.hasMore, isLoadingMore, isLoading, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDelete = async (jobId: string) => {
     try {
@@ -200,126 +264,147 @@ export default function JobsPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid gap-4">
-            {filteredJobs.map((job) => {
-              const statusBadge = getStatusBadge(job.status);
-              const requirements = job.requirements as Record<string, unknown> | null;
-              const skills = (requirements?.skills as string[]) || [];
-              const salary = (requirements?.salary as string) || job.matchScore ? `${Math.round((job.matchScore || 0) * 100)}% 匹配` : null;
+          <>
+            <div className="grid gap-4">
+              {filteredJobs.map((job) => {
+                const statusBadge = getStatusBadge(job.status);
+                const requirements = job.requirements as Record<string, unknown> | null;
+                const skills = (requirements?.skills as string[]) || [];
+                const salary = (requirements?.salary as string) || job.matchScore ? `${Math.round((job.matchScore || 0) * 100)}% 匹配` : null;
 
-              return (
-                <div
-                  key={job.id}
-                  className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-start gap-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="text-lg font-semibold text-gray-900">
-                              {job.title || '未命名职位'}
-                            </h3>
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge.bg} ${statusBadge.text}`}
-                            >
-                              {statusBadge.label}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-gray-500">
-                            {job.company && (
-                              <span className="flex items-center gap-1">
-                                <Briefcase className="w-4 h-4" />
-                                {job.company}
+                return (
+                  <div
+                    key={job.id}
+                    className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="text-lg font-semibold text-gray-900">
+                                {job.title || '未命名职位'}
+                              </h3>
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge.bg} ${statusBadge.text}`}
+                              >
+                                {statusBadge.label}
                               </span>
-                            )}
-                            {job.location && (
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-gray-500">
+                              {job.company && (
+                                <span className="flex items-center gap-1">
+                                  <Briefcase className="w-4 h-4" />
+                                  {job.company}
+                                </span>
+                              )}
+                              {job.location && (
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="w-4 h-4" />
+                                  {job.location}
+                                </span>
+                              )}
                               <span className="flex items-center gap-1">
-                                <MapPin className="w-4 h-4" />
-                                {job.location}
+                                <Calendar className="w-4 h-4" />
+                                {new Date(job.createdAt).toLocaleDateString('zh-CN')}
                               </span>
-                            )}
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-4 h-4" />
-                              {new Date(job.createdAt).toLocaleDateString('zh-CN')}
-                            </span>
+                            </div>
                           </div>
+                          {salary && (
+                            <div className="text-right">
+                              <span className="text-lg font-bold text-primary">{salary}</span>
+                            </div>
+                          )}
                         </div>
-                        {salary && (
-                          <div className="text-right">
-                            <span className="text-lg font-bold text-primary">{salary}</span>
+
+                        {/* 技能标签 */}
+                        {skills.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            {skills.slice(0, 5).map((skill, index) => (
+                              <span
+                                key={index}
+                                className="px-2 py-1 bg-primary/10 text-primary text-xs font-medium rounded"
+                              >
+                                {skill}
+                              </span>
+                            ))}
+                            {skills.length > 5 && (
+                              <span className="px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded">
+                                +{skills.length - 5}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
 
-                      {/* 技能标签 */}
-                      {skills.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {skills.slice(0, 5).map((skill, index) => (
-                            <span
-                              key={index}
-                              className="px-2 py-1 bg-primary/10 text-primary text-xs font-medium rounded"
-                            >
-                              {skill}
-                            </span>
-                          ))}
-                          {skills.length > 5 && (
-                            <span className="px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded">
-                              +{skills.length - 5}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 操作按钮 */}
-                    <div className="flex items-center gap-2">
-                      <Link href={`/dashboard/jobs/${job.id}`}>
-                        <Button variant="outline" size="sm">
-                          <Eye className="w-4 h-4 mr-1" />
-                          查看
-                        </Button>
-                      </Link>
-                      {job.status === 'archived' ? (
+                      {/* 操作按钮 */}
+                      <div className="flex items-center gap-2">
+                        <Link href={`/dashboard/jobs/${job.id}`}>
+                          <Button variant="outline" size="sm">
+                            <Eye className="w-4 h-4 mr-1" />
+                            查看
+                          </Button>
+                        </Link>
+                        {job.status === 'archived' ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRestore(job.id)}
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                          >
+                            <ArchiveRestore className="w-4 h-4 mr-1" />
+                            恢复
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleArchive(job.id)}
+                            className="text-gray-600 hover:text-gray-700 hover:bg-gray-50"
+                          >
+                            <Archive className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleRestore(job.id)}
-                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                          onClick={() => handleDelete(job.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
-                          <ArchiveRestore className="w-4 h-4 mr-1" />
-                          恢复
+                          <Trash2 className="w-4 h-4" />
                         </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleArchive(job.id)}
-                          className="text-gray-600 hover:text-gray-700 hover:bg-gray-50"
-                        >
-                          <Archive className="w-4 h-4" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(job.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      </div>
                     </div>
                   </div>
+                );
+              })}
+            </div>
+
+            {/* 加载更多指示器 */}
+            <div ref={loadMoreRef} className="py-6 text-center">
+              {isLoadingMore ? (
+                <div className="flex items-center justify-center gap-2 text-gray-500">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>加载中...</span>
                 </div>
-              );
-            })}
-          </div>
+              ) : pagination.hasMore ? (
+                <Button
+                  variant="outline"
+                  onClick={handleLoadMore}
+                  className="gap-2"
+                >
+                  <ChevronDown className="w-4 h-4" />
+                  加载更多
+                </Button>
+              ) : null}
+            </div>
+          </>
         )}
 
         {/* 统计信息 */}
         {filteredJobs.length > 0 && (
           <div className="text-sm text-gray-500 text-center">
-            共 {filteredJobs.length} 个岗位
+            已加载 {filteredJobs.length} / {pagination.total} 个岗位
           </div>
         )}
       </div>

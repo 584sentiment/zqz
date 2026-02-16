@@ -9,9 +9,12 @@ import { apiClient } from '@/lib/api/client';
 import {
   User,
   Mail,
-  Camera,
+  Lock,
   Save,
   Loader2,
+  Eye,
+  EyeOff,
+  Shield,
 } from 'lucide-react';
 
 interface UserProfile {
@@ -35,6 +38,15 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+
+  // 密码修改状态
+  const [showPasswordSection, setShowPasswordSection] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const loadUser = useCallback(async () => {
     setIsLoading(true);
@@ -90,6 +102,62 @@ export default function SettingsPage() {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    // 验证
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast({
+        title: '请填写完整',
+        description: '所有密码字段都必须填写',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      toast({
+        title: '密码太短',
+        description: '新密码至少需要8个字符',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: '密码不匹配',
+        description: '两次输入的新密码不一致',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await apiClient.post('/auth/change-password', {
+        currentPassword,
+        newPassword,
+      });
+      toast({
+        title: '密码修改成功',
+        description: '您的密码已更新，请使用新密码登录',
+      });
+      // 重置表单
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowPasswordSection(false);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast({
+        title: '修改失败',
+        description: err.response?.data?.message || '当前密码错误或服务器异常',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -232,12 +300,118 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* 账户安全提示 */}
-        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-          <h3 className="font-medium text-blue-900 mb-1">安全提示</h3>
-          <p className="text-sm text-blue-700">
-            如需修改密码或删除账户，请联系客服处理。
-          </p>
+        {/* 安全设置卡片 */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+            <Shield className="w-5 h-5" />
+            安全设置
+          </h2>
+
+          <div className="space-y-4">
+            {/* 修改密码入口 */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-gray-900">登录密码</h3>
+                <p className="text-sm text-gray-500">定期修改密码可以提高账户安全性</p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setShowPasswordSection(!showPasswordSection)}
+              >
+                <Lock className="w-4 h-4 mr-2" />
+                修改密码
+              </Button>
+            </div>
+
+            {/* 修改密码表单 */}
+            {showPasswordSection && (
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    当前密码
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showCurrentPassword ? 'text' : 'password'}
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="请输入当前密码"
+                      className="w-full px-4 py-2.5 pr-10 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    新密码
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="至少8个字符"
+                      className="w-full px-4 py-2.5 pr-10 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    确认新密码
+                  </label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="再次输入新密码"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowPasswordSection(false);
+                      setCurrentPassword('');
+                      setNewPassword('');
+                      setConfirmPassword('');
+                    }}
+                  >
+                    取消
+                  </Button>
+                  <Button
+                    onClick={handleChangePassword}
+                    disabled={isChangingPassword}
+                  >
+                    {isChangingPassword ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        修改中...
+                      </>
+                    ) : (
+                      '确认修改'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </DashboardLayout>

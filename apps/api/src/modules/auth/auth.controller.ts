@@ -1,7 +1,8 @@
 import { Controller, Post, Body, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
-import { RegisterDto, LoginDto, RefreshTokenDto } from './dto/auth.dto';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RegisterDto, LoginDto, RefreshTokenDto, ChangePasswordDto } from './dto/auth.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -37,5 +38,15 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async logout() {
     // TODO: 实现 logout 逻辑
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Request() req: { user: { id: string } },
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(req.user.id, dto.currentPassword, dto.newPassword);
   }
 }

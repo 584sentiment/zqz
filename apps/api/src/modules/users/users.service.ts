@@ -29,12 +29,23 @@ export class UsersService {
   }
 
   async updateProfile(userId: string, data: { name?: string; avatarUrl?: string }) {
-    return this.prisma.user.update({
+    // 更新用户表
+    const user = await this.prisma.user.update({
       where: { id: userId },
       data: {
         nickname: data.name,
         avatarUrl: data.avatarUrl,
       },
     });
+
+    // 同步更新 Profile 表
+    if (data.name) {
+      await this.prisma.profile.update({
+        where: { userId },
+        data: { name: data.name },
+      });
+    }
+
+    return user;
   }
 }

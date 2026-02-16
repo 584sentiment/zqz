@@ -15,6 +15,7 @@ import {
   LogOut,
   User,
   ChevronDown,
+  Briefcase,
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -23,6 +24,8 @@ interface DashboardLayoutProps {
 
 const navItems = [
   { href: '/dashboard', label: '首页', icon: LayoutDashboard },
+  { href: '/dashboard/jobs', label: '岗位管理', icon: Briefcase },
+  { href: '/dashboard/profile', label: '个人档案', icon: User },
   { href: '/dashboard/resumes', label: '简历管理', icon: FileText },
   { href: '/dashboard/interviews', label: '模拟面试', icon: MessageSquare },
 ];

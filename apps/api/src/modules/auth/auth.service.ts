@@ -1,7 +1,9 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '@/common/database/prisma.service';
+import { MailService } from '../mail/mail.service';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 
 @Injectable()
@@ -9,6 +11,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private mailService: MailService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -24,12 +27,18 @@ export class AuthService {
     // 哈希密码
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
+    // 生成验证令牌
+    const verifyToken = randomBytes(32).toString('hex');
+    const verifyTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24小时后过期
+
     // 创建用户
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
         passwordHash,
         nickname: dto.name || dto.email.split('@')[0],
+        verifyToken,
+        verifyTokenExpiry,
       },
     });
 
@@ -51,6 +60,9 @@ export class AuthService {
         interviewQuota: 1,
       },
     });
+
+    // 发送验证邮件
+    await this.mailService.sendVerificationEmail(user.email, verifyToken, user.nickname || undefined);
 
     // 生成令牌
     const tokens = await this.generateTokens(user.id, user.email);
@@ -223,5 +235,80 @@ export class AuthService {
     });
 
     return { success: true };
+  }
+
+  /**
+   * 重新发送验证邮件
+   */
+  async resendVerificationEmail(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('用户不存在');
+    }
+
+    if (user.emailVerified) {
+      throw new BadRequestException('邮箱已验证');
+    }
+
+    // 生成新的验证令牌
+    const verifyToken = randomBytes(32).toString('hex');
+    const verifyTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24小时后过期
+
+    // 更新用户的验证令牌
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        verifyToken,
+        verifyTokenExpiry,
+      },
+    });
+
+    // 发送验证邮件
+    await this.mailService.sendVerificationEmail(user.email, verifyToken, user.nickname || undefined);
+
+    return { success: true, message: '验证邮件已发送' };
+  }
+
+  /**
+   * 通过邮件令牌验证邮箱
+   */
+  async verifyEmail(token: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        verifyToken: token,
+        verifyTokenExpiry: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('验证链接无效或已过期');
+    }
+
+    // 更新用户验证状态
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+        verifyToken: null,
+        verifyTokenExpiry: null,
+      },
+    });
+
+    // 发送欢迎邮件
+    await this.mailService.sendWelcomeEmail(user.email, user.nickname || undefined);
+
+    return {
+      success: true,
+      message: '邮箱验证成功',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.nickname,
+      },
+    };
   }
 }

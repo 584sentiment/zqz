@@ -6,6 +6,7 @@ import { PassportModule } from '@nestjs/passport';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 
 import { PrismaModule } from './common/database/prisma.module';
+import { MailModule } from './modules/mail/mail.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { JobsModule } from './modules/jobs/jobs.module';
@@ -33,6 +34,9 @@ import { HealthController } from './health.controller';
 
     // 数据库模块
     PrismaModule,
+
+    // 邮件模块
+    MailModule,
 
     // Passport 认证模块
     PassportModule.register({ defaultStrategy: 'jwt' }),

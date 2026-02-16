@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request, HttpCode, HttpStatus, Get, Query } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -48,5 +48,17 @@ export class AuthController {
     @Body() dto: ChangePasswordDto,
   ) {
     return this.authService.changePassword(req.user.id, dto.currentPassword, dto.newPassword);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  async resendVerification(@Request() req: { user: { id: string } }) {
+    return this.authService.resendVerificationEmail(req.user.id);
+  }
+
+  @Get('verify-email')
+  async verifyEmail(@Query('token') token: string) {
+    return this.authService.verifyEmail(token);
   }
 }

@@ -25,6 +25,16 @@ export interface AuthResponse {
   };
 }
 
+export interface VerifyEmailResponse {
+  success: boolean;
+  message: string;
+  user?: {
+    id: string;
+    email: string;
+    name: string;
+  };
+}
+
 export const authApi = {
   async login(data: LoginRequest): Promise<AuthResponse> {
     const response = await apiClient.post<AuthResponse>('/auth/login', data);
@@ -38,5 +48,19 @@ export const authApi = {
 
   async logout(): Promise<void> {
     await apiClient.post('/auth/logout');
+  },
+
+  async resendVerification(): Promise<{ success: boolean; message: string }> {
+    const response = await apiClient.post<{ success: boolean; message: string }>(
+      '/auth/resend-verification'
+    );
+    return response.data;
+  },
+
+  async verifyEmail(token: string): Promise<VerifyEmailResponse> {
+    const response = await apiClient.get<VerifyEmailResponse>('/auth/verify-email', {
+      params: { token },
+    });
+    return response.data;
   },
 };

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth';
 import { apiClient } from '@/lib/api/client';
+import { authApi } from '@/lib/api/auth';
+import { useToast } from '@/components/ui/use-toast';
 import {
   LayoutDashboard,
   FileText,
@@ -18,13 +20,19 @@ import {
   Briefcase,
   Menu,
   X,
+  Mail,
+  Loader2,
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
-const navItems = [
+const navItems: Array<{
+  href: '/dashboard' | '/dashboard/jobs' | '/dashboard/profile' | '/dashboard/resumes' | '/dashboard/interviews';
+  label: string;
+  icon: typeof LayoutDashboard;
+}> = [
   { href: '/dashboard', label: '首页', icon: LayoutDashboard },
   { href: '/dashboard/jobs', label: '岗位管理', icon: Briefcase },
   { href: '/dashboard/profile', label: '个人档案', icon: User },
@@ -34,9 +42,37 @@ const navItems = [
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
+  const { toast } = useToast();
   const { user, logout, setUser } = useAuthStore();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+
+  // 检查是否需要显示验证邮件提示
+  const showVerificationBanner = user && !user.emailVerified && !emailSent;
+
+  const handleResendVerification = async () => {
+    setIsResending(true);
+    try {
+      const result = await authApi.resendVerification();
+      if (result.success) {
+        setEmailSent(true);
+        toast({
+          title: '验证邮件已发送',
+          description: '请检查您的邮箱',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: '发送失败',
+        description: '请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsResending(false);
+    }
+  };
 
   // 从 API 获取最新用户信息
   useEffect(() => {
@@ -215,6 +251,40 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         )}
       </nav>
+
+      {/* Email Verification Banner */}
+      {showVerificationBanner && (
+        <div className="bg-yellow-50 border-b border-yellow-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Mail className="w-5 h-5 text-yellow-600" />
+                <p className="text-sm text-yellow-700">
+                  <span className="font-medium">您的邮箱尚未验证</span>
+                  <span className="hidden sm:inline">，验证后可使用全部功能</span>
+                </p>
+              </div>
+              <button
+                onClick={handleResendVerification}
+                disabled={isResending}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-yellow-700 bg-yellow-100 hover:bg-yellow-200 rounded-md transition disabled:opacity-50"
+              >
+                {isResending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    发送中...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-4 h-4" />
+                    重新发送验证邮件
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">{children}</main>

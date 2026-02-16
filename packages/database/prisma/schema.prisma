@@ -22,8 +22,10 @@ model User {
   avatarUrl      String?  @map("avatar_url")
 
   // 邮箱验证
-  emailVerified  Boolean  @default(false) @map("email_verified")
-  emailVerifiedAt DateTime? @map("email_verified_at")
+  emailVerified     Boolean  @default(false) @map("email_verified")
+  emailVerifiedAt   DateTime? @map("email_verified_at")
+  verifyToken       String?  @map("verify_token")
+  verifyTokenExpiry DateTime? @map("verify_token_expiry")
 
   // OAuth
   oauthProvider  String?  @map("oauth_provider")

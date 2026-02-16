@@ -21,7 +21,7 @@ const registerSchema = z.object({
     .regex(/[A-Za-z]/, '密码必须包含字母')
     .regex(/[0-9]/, '密码必须包含数字'),
   confirmPassword: z.string(),
-  name: z.string().min(2, '姓名至少2个字符').optional(),
+  name: z.string().min(2, '姓名至少2个字符').optional().or(z.literal('')),
 }).refine((data) => data.password === data.confirmPassword, {
   message: '两次密码输入不一致',
   path: ['confirmPassword'],

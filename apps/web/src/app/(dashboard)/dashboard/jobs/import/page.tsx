@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { jobsApi, ParsedJobResult } from '@/lib/api/jobs';
@@ -20,9 +20,26 @@ import {
   Bookmark,
   FilePlus,
   Loader2,
+  FileSearch,
+  Brain,
+  Target,
 } from 'lucide-react';
 
 type ImportTab = 'text' | 'link' | 'image';
+
+interface ParsingProgress {
+  stage: string;
+  progress: number;
+  message: string;
+}
+
+const PARSING_STAGES: ParsingProgress[] = [
+  { stage: 'analyzing', progress: 0, message: '正在分析文本...' },
+  { stage: 'extracting', progress: 25, message: '提取职位基本信息...' },
+  { stage: 'requirements', progress: 50, message: '识别岗位要求...' },
+  { stage: 'skills', progress: 75, message: '分析技能关键词...' },
+  { stage: 'finalizing', progress: 90, message: '生成分析报告...' },
+];
 
 export default function JobImportPage() {
   const router = useRouter();
@@ -34,6 +51,8 @@ export default function JobImportPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [parsedResult, setParsedResult] = useState<ParsedJobResult | null>(null);
   const [clearFormat, setClearFormat] = useState(true);
+  const [parsingProgress, setParsingProgress] = useState<ParsingProgress | null>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleParse = async () => {
     if (!jobText.trim()) {
@@ -45,14 +64,41 @@ export default function JobImportPage() {
     }
 
     setIsParsing(true);
+    setParsedResult(null);
+    setParsingProgress(PARSING_STAGES[0]);
+
+    // 模拟进度更新
+    let stageIndex = 0;
+    progressIntervalRef.current = setInterval(() => {
+      stageIndex++;
+      if (stageIndex < PARSING_STAGES.length) {
+        setParsingProgress(PARSING_STAGES[stageIndex]);
+      }
+    }, 800); // 每 800ms 更新一次进度
+
     try {
       const result = await jobsApi.parseText(jobText);
-      setParsedResult(result);
-      toast({
-        title: '解析成功',
-        description: `置信度: ${Math.round(result.confidence * 100)}%`,
-      });
+
+      // 清除进度定时器并设置为完成
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+      setParsingProgress({ stage: 'complete', progress: 100, message: '解析完成!' });
+
+      // 短暂延迟后显示结果
+      setTimeout(() => {
+        setParsedResult(result);
+        setParsingProgress(null);
+        toast({
+          title: '解析成功',
+          description: `置信度: ${Math.round(result.confidence * 100)}%`,
+        });
+      }, 500);
     } catch (error) {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+      setParsingProgress(null);
       toast({
         title: '解析失败',
         description: '请稍后重试',
@@ -62,6 +108,15 @@ export default function JobImportPage() {
       setIsParsing(false);
     }
   };
+
+  // 清理定时器
+  useEffect(() => {
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, []);
 
   const handleSave = async () => {
     if (!parsedResult) return;
@@ -380,6 +435,105 @@ export default function JobImportPage() {
                 </div>
               </div>
             </>
+          ) : parsingProgress ? (
+            /* 解析进度显示 */
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+              <div className="max-w-md mx-auto">
+                {/* 进度动画 */}
+                <div className="relative w-32 h-32 mx-auto mb-6">
+                  <svg className="w-full h-full transform -rotate-90">
+                    <circle
+                      cx="64"
+                      cy="64"
+                      r="56"
+                      fill="none"
+                      stroke="#f3f4f6"
+                      strokeWidth="8"
+                    />
+                    <circle
+                      cx="64"
+                      cy="64"
+                      r="56"
+                      fill="none"
+                      stroke="url(#progressGradient)"
+                      strokeWidth="8"
+                      strokeLinecap="round"
+                      strokeDasharray={`${parsingProgress.progress * 3.52} 352`}
+                      className="transition-all duration-500"
+                    />
+                    <defs>
+                      <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#6366f1" />
+                        <stop offset="100%" stopColor="#14b8a6" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-3xl font-bold text-primary">
+                      {parsingProgress.progress}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* 当前阶段 */}
+                <div className="text-center mb-6">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full mb-3">
+                    {parsingProgress.stage === 'analyzing' && <FileSearch className="w-4 h-4 text-primary" />}
+                    {parsingProgress.stage === 'extracting' && <Briefcase className="w-4 h-4 text-primary" />}
+                    {parsingProgress.stage === 'requirements' && <Target className="w-4 h-4 text-primary" />}
+                    {parsingProgress.stage === 'skills' && <Brain className="w-4 h-4 text-primary" />}
+                    {parsingProgress.stage === 'finalizing' && <Sparkles className="w-4 h-4 text-primary" />}
+                    {parsingProgress.stage === 'complete' && <Check className="w-4 h-4 text-green-500" />}
+                    <span className="text-sm font-medium text-primary">
+                      {parsingProgress.message}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 进度步骤 */}
+                <div className="space-y-3">
+                  {PARSING_STAGES.map((stage, index) => {
+                    const isActive = parsingProgress.stage === stage.stage;
+                    const isCompleted = PARSING_STAGES.findIndex(s => s.stage === parsingProgress.stage) > index;
+                    const isPending = PARSING_STAGES.findIndex(s => s.stage === parsingProgress.stage) < index;
+
+                    return (
+                      <div
+                        key={stage.stage}
+                        className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+                          isActive ? 'bg-primary/5 border border-primary/20' : ''
+                        } ${isCompleted ? 'opacity-60' : ''} ${isPending ? 'opacity-40' : ''}`}
+                      >
+                        <div
+                          className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            isCompleted
+                              ? 'bg-green-100 text-green-600'
+                              : isActive
+                              ? 'bg-primary/20 text-primary animate-pulse'
+                              : 'bg-gray-100 text-gray-400'
+                          }`}
+                        >
+                          {isCompleted ? (
+                            <Check className="w-3 h-3" />
+                          ) : isActive ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <span className="text-xs">{index + 1}</span>
+                          )}
+                        </div>
+                        <span
+                          className={`text-sm ${
+                            isActive ? 'text-primary font-medium' : 'text-gray-500'
+                          }`}
+                        >
+                          {stage.message}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
               <Sparkles className="w-16 h-16 text-gray-200 mx-auto mb-4" />

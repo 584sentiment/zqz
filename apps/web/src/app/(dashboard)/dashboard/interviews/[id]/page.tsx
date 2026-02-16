@@ -156,6 +156,19 @@ export default function InterviewDetailPage() {
     const totalScore = report.totalScore as number;
     const dimensions = report.dimensions as Record<string, Record<string, unknown>>;
     const recommendations = report.recommendations as string[];
+    const timeStats = report.timeStats as {
+      totalTime: number;
+      averageTime: number;
+      questionTimes: { questionIndex: number; duration: number }[];
+    } | undefined;
+    const answersSummary = report.answersSummary as { questionIndex: number; score: number; duration?: number }[] | undefined;
+
+    // 格式化时间
+    const formatTime = (seconds: number): string => {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return mins > 0 ? `${mins}分${secs}秒` : `${secs}秒`;
+    };
 
     return (
       <DashboardLayout>
@@ -180,7 +193,7 @@ export default function InterviewDetailPage() {
                 : 'AI 模拟面试'}
             </p>
 
-            {/* 总分 */}
+            {/* 总分和时间统计 */}
             <div className="flex items-center gap-8">
               <div className="text-center">
                 <div className="text-5xl font-bold mb-1">{totalScore}</div>
@@ -197,8 +210,104 @@ export default function InterviewDetailPage() {
                   {report.summary as string}
                 </p>
               </div>
+              {timeStats && (
+                <div className="text-center border-l border-white/20 pl-6">
+                  <div className="flex items-center gap-1 text-white/80 text-sm mb-1">
+                    <Clock className="w-4 h-4" />
+                    总耗时
+                  </div>
+                  <div className="text-2xl font-bold">{formatTime(timeStats.totalTime)}</div>
+                  <div className="text-white/60 text-xs mt-1">
+                    平均每题 {formatTime(timeStats.averageTime)}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* 时间统计详情 */}
+          {timeStats && answersSummary && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-gray-400" />
+                答题时间统计
+              </h2>
+              <div className="space-y-3">
+                {answersSummary.map((answer, index) => {
+                  const question = questions[answer.questionIndex];
+                  const duration = answer.duration || timeStats.questionTimes[index]?.duration || 0;
+                  const maxDuration = Math.max(...(timeStats.questionTimes?.map(t => t.duration) || [1]));
+                  const percentage = maxDuration > 0 ? (duration / maxDuration) * 100 : 0;
+
+                  return (
+                    <div key={index} className="flex items-center gap-4">
+                      <div className="w-16 text-sm text-gray-500">
+                        第 {index + 1} 题
+                      </div>
+                      <div className="flex-1">
+                        <div className="h-6 bg-gray-100 rounded-full overflow-hidden relative">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              duration < 60
+                                ? 'bg-green-400'
+                                : duration < 120
+                                ? 'bg-blue-400'
+                                : 'bg-orange-400'
+                            }`}
+                            style={{ width: `${percentage}%` }}
+                          />
+                          <span className="absolute inset-0 flex items-center px-3 text-xs font-medium text-gray-700">
+                            {(question?.question as string)?.slice(0, 30)}...
+                          </span>
+                        </div>
+                      </div>
+                      <div className="w-20 text-right">
+                        <span className={`text-sm font-medium ${
+                          duration < 60
+                            ? 'text-green-600'
+                            : duration < 120
+                            ? 'text-blue-600'
+                            : 'text-orange-600'
+                        }`}>
+                          {formatTime(duration)}
+                        </span>
+                      </div>
+                      <div className="w-12 text-right">
+                        <span className={`text-sm font-bold ${
+                          (answer.score || 0) >= 80
+                            ? 'text-green-600'
+                            : (answer.score || 0) >= 60
+                            ? 'text-yellow-600'
+                            : 'text-red-600'
+                        }`}>
+                          {answer.score}分
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-sm">
+                <div className="flex items-center gap-4">
+                  <span className="flex items-center gap-1">
+                    <span className="w-3 h-3 bg-green-400 rounded-full"></span>
+                    &lt;1分钟
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-3 h-3 bg-blue-400 rounded-full"></span>
+                    1-2分钟
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-3 h-3 bg-orange-400 rounded-full"></span>
+                    &gt;2分钟
+                  </span>
+                </div>
+                <div className="text-gray-500">
+                  总耗时: <span className="font-semibold text-gray-900">{formatTime(timeStats.totalTime)}</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 维度评分 */}
           {dimensions && (

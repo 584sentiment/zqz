@@ -279,9 +279,23 @@ export class InterviewsService {
       scores.reduce((sum, s) => sum + (s || 0), 0) / scores.length
     );
 
+    // 计算总耗时（秒）
+    const totalTime = answers.reduce(
+      (sum, a) => sum + ((a.duration as number) || 0),
+      0
+    );
+
     const report = {
       totalScore,
       summary: this.generateSummary(totalScore),
+      timeStats: {
+        totalTime,
+        averageTime: Math.round(totalTime / answers.length),
+        questionTimes: answers.map((a, index) => ({
+          questionIndex: index,
+          duration: (a.duration as number) || 0,
+        })),
+      },
       dimensions: {
         technical: {
           score: Math.min(100, totalScore + Math.floor(Math.random() * 10) - 5),
@@ -313,6 +327,7 @@ export class InterviewsService {
         questionIndex: index,
         score: (a.feedback as Record<string, unknown>)?.score,
         briefFeedback: (a.feedback as Record<string, unknown>)?.suggestions,
+        duration: (a.duration as number) || 0,
       })),
       generatedAt: new Date().toISOString(),
     };

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { prisma } from '@ai-job-assistant/database';
+import { PrismaService } from '@/common/database/prisma.service';
 
-interface CreateInterviewDto {
+export interface CreateInterviewDto {
   type: string;
   jobId?: string;
   mode?: string; // text, voice
@@ -15,7 +15,7 @@ interface UpdateInterviewDto {
   report?: Record<string, unknown>;
 }
 
-interface SubmitAnswerDto {
+export interface SubmitAnswerDto {
   questionIndex: number;
   answer: string;
   duration?: number;
@@ -23,6 +23,8 @@ interface SubmitAnswerDto {
 
 @Injectable()
 export class InterviewsService {
+  constructor(private prisma: PrismaService) {}
+
   // 获取用户的面试列表
   async getList(userId: string, params?: { status?: string; type?: string }) {
     const where: Record<string, unknown> = { userId };
@@ -34,7 +36,7 @@ export class InterviewsService {
       where.type = params.type;
     }
 
-    const interviews = await prisma.interview.findMany({
+    const interviews = await this.prisma.interview.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -45,7 +47,7 @@ export class InterviewsService {
 
   // 获取单个面试详情
   async getOne(userId: string, interviewId: string) {
-    const interview = await prisma.interview.findFirst({
+    const interview = await this.prisma.interview.findFirst({
       where: { id: interviewId, userId },
     });
 
@@ -61,7 +63,7 @@ export class InterviewsService {
     // 获取岗位上下文
     let jobContext: Record<string, unknown> | null = null;
     if (dto.jobId) {
-      const job = await prisma.job.findFirst({
+      const job = await this.prisma.job.findFirst({
         where: { id: dto.jobId, userId },
         select: {
           id: true,
@@ -79,7 +81,7 @@ export class InterviewsService {
     // 生成面试问题
     const questions = await this.generateQuestions(jobContext, dto.difficulty || 'medium');
 
-    const interview = await prisma.interview.create({
+    const interview = await this.prisma.interview.create({
       data: {
         userId,
         type: dto.type || 'mock',
@@ -173,7 +175,7 @@ export class InterviewsService {
       throw new ForbiddenException('面试已经开始或已完成');
     }
 
-    const updated = await prisma.interview.update({
+    const updated = await this.prisma.interview.update({
       where: { id: interviewId },
       data: {
         status: 'in_progress',
@@ -211,13 +213,13 @@ export class InterviewsService {
     const questions = interview.questions as Record<string, unknown>[];
     const isLastQuestion = dto.questionIndex >= questions.length - 1;
 
-    const updated = await prisma.interview.update({
+    const updated = await this.prisma.interview.update({
       where: { id: interviewId },
       data: {
-        transcript: {
+        transcript: JSON.parse(JSON.stringify({
           ...transcript,
           answers,
-        },
+        })),
         // 如果是最后一题，更新状态为完成
         ...(isLastQuestion ? { status: 'completed' } : {}),
       },
@@ -304,7 +306,7 @@ export class InterviewsService {
       generatedAt: new Date().toISOString(),
     };
 
-    await prisma.interview.update({
+    await this.prisma.interview.update({
       where: { id: interviewId },
       data: { report: JSON.parse(JSON.stringify(report)) },
     });
@@ -353,7 +355,7 @@ export class InterviewsService {
       await this.generateReport(interviewId, answers);
     }
 
-    const updated = await prisma.interview.update({
+    const updated = await this.prisma.interview.update({
       where: { id: interviewId },
       data: { status: 'aborted' },
     });
@@ -365,7 +367,7 @@ export class InterviewsService {
   async delete(userId: string, interviewId: string) {
     const interview = await this.getOne(userId, interviewId);
 
-    await prisma.interview.delete({
+    await this.prisma.interview.delete({
       where: { id: interview.id },
     });
 
@@ -374,24 +376,23 @@ export class InterviewsService {
 
   // 获取面试统计
   async getStats(userId: string) {
-    const total = await prisma.interview.count({
+    const total = await this.prisma.interview.count({
       where: { userId },
     });
 
-    const completed = await prisma.interview.count({
+    const completed = await this.prisma.interview.count({
       where: { userId, status: 'completed' },
     });
 
-    const inProgress = await prisma.interview.count({
+    const inProgress = await this.prisma.interview.count({
       where: { userId, status: 'in_progress' },
     });
 
     // 获取最近的面试平均分
-    const recentInterviews = await prisma.interview.findMany({
+    const recentInterviews = await this.prisma.interview.findMany({
       where: {
         userId,
         status: 'completed',
-        report: { not: null },
       },
       orderBy: { createdAt: 'desc' },
       take: 5,
@@ -401,10 +402,10 @@ export class InterviewsService {
     let avgScore = null;
     if (recentInterviews.length > 0) {
       const scores = recentInterviews
-        .map((i) => (i.report as Record<string, unknown>)?.totalScore as number)
+        .map((i: { report: unknown }) => (i.report as Record<string, unknown>)?.totalScore as number)
         .filter(Boolean);
       if (scores.length > 0) {
-        avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+        avgScore = Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length);
       }
     }
 
@@ -436,7 +437,7 @@ export class InterviewsService {
     // 获取岗位上下文
     let jobContext: Record<string, unknown> | null = null;
     if (data.jobId) {
-      const job = await prisma.job.findFirst({
+      const job = await this.prisma.job.findFirst({
         where: { id: data.jobId, userId },
         select: {
           id: true,
@@ -455,7 +456,7 @@ export class InterviewsService {
     // 生成每日准备计划
     const dailyPlan = this.generateDailyPlan(data.days, jobContext, data.focusAreas);
 
-    const plan = await prisma.interview.create({
+    const plan = await this.prisma.interview.create({
       data: {
         userId,
         type: 'preparation',
@@ -550,13 +551,13 @@ export class InterviewsService {
 
   // 获取准备计划列表
   async getPreparationPlans(userId: string) {
-    const plans = await prisma.interview.findMany({
+    const plans = await this.prisma.interview.findMany({
       where: { userId, type: 'preparation' },
       orderBy: { createdAt: 'desc' },
       take: 20,
     });
 
-    return plans.map((plan) => ({
+    return plans.map((plan: { id: string; jobContext: unknown; status: string; createdAt: Date; questions: unknown }) => ({
       id: plan.id,
       jobContext: plan.jobContext,
       status: plan.status,
@@ -567,7 +568,7 @@ export class InterviewsService {
 
   // 获取单个准备计划详情
   async getPreparationPlan(userId: string, planId: string) {
-    const plan = await prisma.interview.findFirst({
+    const plan = await this.prisma.interview.findFirst({
       where: { id: planId, userId, type: 'preparation' },
     });
 
@@ -621,7 +622,7 @@ export class InterviewsService {
     day.completedCount = tasks.filter((t) => t.completed).length;
 
     // 更新整个计划
-    const updatedPlan = await prisma.interview.update({
+    const updatedPlan = await this.prisma.interview.update({
       where: { id: planId },
       data: {
         questions: JSON.parse(JSON.stringify(dailyPlan)),
@@ -638,7 +639,7 @@ export class InterviewsService {
   // 删除准备计划
   async deletePreparationPlan(userId: string, planId: string) {
     const plan = await this.getPreparationPlan(userId, planId);
-    await prisma.interview.delete({
+    await this.prisma.interview.delete({
       where: { id: plan.id },
     });
     return { success: true };

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
 
-interface MatchAnalysis {
+export interface MatchAnalysis {
   score: number;
   matchedSkills: string[];
   missingSkills: string[];
@@ -129,7 +129,7 @@ export class ResumesService {
         jobId: original.jobId,
         templateId: original.templateId,
         language: original.language,
-        content: original.content,
+        content: original.content ?? undefined,
         status: 'draft',
       },
     });

@@ -22,6 +22,7 @@ import {
   Check,
   Briefcase,
   X,
+  Target,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 
@@ -382,6 +383,44 @@ export default function SkillDiscoveryPage() {
                     </div>
                   </div>
                 )}
+
+                {/* 技能发掘进度 */}
+                <div className="p-4 border-b border-gray-100 bg-gray-50">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Target className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium text-gray-700">发掘进度</span>
+                    </div>
+                    <span className="text-sm text-gray-500">
+                      已发现 {currentSession.discoveredSkills.length} 个技能
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        currentSession.discoveredSkills.length >= 5
+                          ? 'bg-green-500'
+                          : currentSession.discoveredSkills.length >= 3
+                          ? 'bg-primary'
+                          : 'bg-blue-400'
+                      }`}
+                      style={{
+                        width: `${Math.min(100, (currentSession.discoveredSkills.length / 5) * 100)}%`
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+                    <span>建议发现 5+ 个技能</span>
+                    {currentSession.discoveredSkills.length >= 5 ? (
+                      <span className="text-green-600 font-medium flex items-center gap-1">
+                        <Check className="w-3 h-3" />
+                        进度良好
+                      </span>
+                    ) : (
+                      <span>继续对话发掘更多</span>
+                    )}
+                  </div>
+                </div>
 
                 {/* 已发现技能 */}
                 {currentSession.discoveredSkills.length > 0 && (

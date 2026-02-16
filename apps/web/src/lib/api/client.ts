@@ -2,6 +2,30 @@ import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
+// 辅助函数：检查是否在浏览器环境
+const isBrowser = () => typeof window !== 'undefined';
+
+// 辅助函数：安全访问 localStorage
+const getAccessToken = () => (isBrowser() ? localStorage.getItem('accessToken') : null);
+const getRefreshToken = () => (isBrowser() ? localStorage.getItem('refreshToken') : null);
+const setTokens = (accessToken: string, refreshToken: string) => {
+  if (isBrowser()) {
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+  }
+};
+const clearTokens = () => {
+  if (isBrowser()) {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+  }
+};
+const redirectToLogin = () => {
+  if (isBrowser()) {
+    window.location.href = '/login';
+  }
+};
+
 export const apiClient = axios.create({
   baseURL: API_URL,
   headers: {
@@ -30,7 +54,7 @@ const processQueue = (error: Error | null, token: string | null = null) => {
 // 请求拦截器 - 添加 token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('accessToken');
+    const token = getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -51,9 +75,8 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       // 如果是刷新 token 接口本身返回 401，直接跳转登录
       if (originalRequest.url?.includes('/auth/refresh')) {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        window.location.href = '/login';
+        clearTokens();
+        redirectToLogin();
         return Promise.reject(error);
       }
 
@@ -72,10 +95,10 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
       isRefreshing = true;
 
-      const refreshToken = localStorage.getItem('refreshToken');
+      const refreshToken = getRefreshToken();
       if (!refreshToken) {
         isRefreshing = false;
-        window.location.href = '/login';
+        redirectToLogin();
         return Promise.reject(error);
       }
 
@@ -83,16 +106,14 @@ apiClient.interceptors.response.use(
         const { data } = await apiClient.post('/auth/refresh', {
           refreshToken,
         });
-        localStorage.setItem('accessToken', data.accessToken);
-        localStorage.setItem('refreshToken', data.refreshToken);
+        setTokens(data.accessToken, data.refreshToken);
         originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
         processQueue(null, data.accessToken);
         return apiClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError as Error, null);
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        window.location.href = '/login';
+        clearTokens();
+        redirectToLogin();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

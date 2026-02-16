@@ -757,7 +757,7 @@ export default function ProfilePage() {
                 id: skill.id,
                 title: skill.name,
                 subtitle: `${skillCategoryOptions.find((c) => c.value === skill.category)?.label || skill.category} · ${skillLevelLabels[skill.level - 1]}`,
-                date: skill.years ? `${skill.years} 年经验` : undefined,
+                date: skill.years ? `${skill.years} 年经验` : '',
                 description: skill.evidence,
                 onEdit: () => handleEditSkill(skill),
                 onDelete: () => handleDeleteSkill(skill.id),

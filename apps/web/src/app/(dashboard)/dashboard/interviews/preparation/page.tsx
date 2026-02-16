@@ -231,11 +231,11 @@ export default function InterviewPreparationPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">
-                            {plan.jobContext?.title || '通用面试准备'}
+                            {(plan.jobContext?.title as string) || '通用面试准备'}
                           </p>
-                          {plan.jobContext?.company && (
+                          {plan.jobContext?.company !== undefined && plan.jobContext?.company !== null && (
                             <p className="text-xs text-gray-400 truncate">
-                              {plan.jobContext.company as string}
+                              {String(plan.jobContext.company)}
                             </p>
                           )}
                           <div className="flex items-center gap-2 mt-1">
@@ -281,11 +281,11 @@ export default function InterviewPreparationPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="text-lg font-semibold text-gray-900">
-                        {selectedPlan.jobContext?.title || '通用面试准备'}
+                        {(selectedPlan.jobContext?.title as string) || '通用面试准备'}
                       </h2>
-                      {selectedPlan.jobContext?.company && (
+                      {selectedPlan.jobContext?.company !== undefined && selectedPlan.jobContext?.company !== null && (
                         <p className="text-sm text-gray-500">
-                          {(selectedPlan.jobContext.company as string) || ''}
+                          {String(selectedPlan.jobContext.company)}
                         </p>
                       )}
                     </div>

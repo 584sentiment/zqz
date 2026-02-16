@@ -15,7 +15,13 @@ import {
   Play,
 } from 'lucide-react';
 
-const quickActions = [
+const quickActions: Array<{
+  title: string;
+  description: string;
+  icon: typeof Link2;
+  href: '/dashboard/jobs/import' | '/dashboard/resumes' | '/dashboard/interviews/prepare' | '/dashboard/interviews/mock';
+  color: string;
+}> = [
   {
     title: '导入职位',
     description: '粘贴链接或文本进行分析',

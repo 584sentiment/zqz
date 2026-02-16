@@ -214,17 +214,17 @@ export default function InterviewsPage() {
                           <StatusIcon className="w-3 h-3" />
                           {statusBadge.label}
                         </span>
-                        {report?.totalScore && (
+                        {report?.totalScore !== undefined && report?.totalScore !== null && (
                           <span className="flex items-center gap-1 text-sm font-medium text-green-600">
                             <BarChart3 className="w-4 h-4" />
-                            {report.totalScore as number}分
+                            {String(report.totalScore)}分
                           </span>
                         )}
                       </div>
 
                       <h3 className="font-semibold text-gray-900 mb-1">
                         {interview.type === 'mock' ? 'AI 模拟面试' : '面试准备'}
-                        {jobContext?.title && ` - ${jobContext.title as string}`}
+                        {jobContext?.title ? ` - ${String(jobContext.title)}` : ''}
                       </h3>
 
                       <div className="flex items-center gap-4 text-sm text-gray-500">
@@ -243,9 +243,9 @@ export default function InterviewsPage() {
                         </span>
                       </div>
 
-                      {jobContext?.company && (
+                      {jobContext?.company !== undefined && jobContext?.company !== null && (
                         <p className="text-sm text-gray-500 mt-1">
-                          关联岗位：{jobContext.company as string}
+                          关联岗位：{String(jobContext.company)}
                         </p>
                       )}
                     </div>

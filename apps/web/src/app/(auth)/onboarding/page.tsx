@@ -360,7 +360,7 @@ export default function OnboardingPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => router.push('/profile')}
+                    onClick={() => router.push('/dashboard/profile')}
                     className="flex-1"
                   >
                     完善档案

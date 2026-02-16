@@ -2,7 +2,7 @@
 const nextConfig = {
   transpilePackages: ['@ai-job-assistant/shared', '@ai-job-assistant/database'],
   experimental: {
-    typedRoutes: true,
+    typedRoutes: false,
   },
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1',

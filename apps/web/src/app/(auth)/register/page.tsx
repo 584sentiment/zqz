@@ -159,13 +159,9 @@ export default function RegisterPage() {
             />
             <label htmlFor="terms" className="ml-2 text-sm text-gray-600">
               我已阅读并同意{' '}
-              <Link href="/terms" className="text-primary hover:underline">
-                服务条款
-              </Link>{' '}
-              和{' '}
-              <Link href="/privacy" className="text-primary hover:underline">
-                隐私政策
-              </Link>
+              <span className="text-primary">服务条款</span>
+              {' '}和{' '}
+              <span className="text-primary">隐私政策</span>
             </label>
           </div>
 

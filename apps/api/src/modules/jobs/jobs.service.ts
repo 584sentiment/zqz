@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
 import { CreateJobDto, ParseJobTextDto, UpdateJobDto, ParsedJobResult } from './dto/job.dto';
 
@@ -213,5 +213,97 @@ export class JobsService {
         matchedSkills: parsed.skills,
       },
     });
+  }
+
+  /**
+   * 从 URL 抓取岗位信息
+   */
+  async parseJobUrl(url: string): Promise<ParsedJobResult> {
+    // 验证 URL
+    try {
+      new URL(url);
+    } catch {
+      throw new BadRequestException('无效的 URL');
+    }
+
+    // 抓取网页内容
+    let html: string;
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        },
+      });
+
+      if (!response.ok) {
+        throw new BadRequestException(`无法访问该页面: ${response.status}`);
+      }
+
+      html = await response.text();
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('无法抓取该页面，请检查链接是否正确');
+    }
+
+    // 从 HTML 中提取文本内容
+    const text = this.extractTextFromHtml(html);
+
+    if (text.length < 50) {
+      throw new BadRequestException('页面内容太少，无法解析');
+    }
+
+    // 使用现有的文本解析方法
+    const result = await this.parseJobText({ text });
+
+    // 更新置信度（URL 解析置信度略低）
+    result.confidence = Math.min(result.confidence, 0.8);
+
+    return result;
+  }
+
+  /**
+   * 从 HTML 中提取纯文本
+   */
+  private extractTextFromHtml(html: string): string {
+    // 移除 script 和 style 标签
+    let text = html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+      .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, '')
+      .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, '')
+      .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, '');
+
+    // 将块级元素替换为换行
+    text = text
+      .replace(/<\/div>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<\/li>/gi, '\n')
+      .replace(/<\/dd>/gi, '\n')
+      .replace(/<\/td>/gi, ' ')
+      .replace(/<br\s*\/?>/gi, '\n');
+
+    // 移除所有 HTML 标签
+    text = text.replace(/<[^>]+>/g, ' ');
+
+    // 解码 HTML 实体
+    text = text
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+
+    // 清理多余空白
+    text = text
+      .replace(/\s+/g, ' ')
+      .replace(/\n\s*\n/g, '\n\n')
+      .trim();
+
+    return text;
   }
 }

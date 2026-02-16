@@ -47,6 +47,7 @@ export default function JobImportPage() {
 
   const [activeTab, setActiveTab] = useState<ImportTab>('text');
   const [jobText, setJobText] = useState('');
+  const [jobUrl, setJobUrl] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [parsedResult, setParsedResult] = useState<ParsedJobResult | null>(null);
@@ -123,7 +124,8 @@ export default function JobImportPage() {
 
     setIsSaving(true);
     try {
-      await jobsApi.importJob(jobText, parsedResult as unknown as Record<string, unknown>);
+      const sourceText = activeTab === 'link' ? `来源: ${jobUrl}\n\n${jobText}` : jobText;
+      await jobsApi.importJob(sourceText, parsedResult as unknown as Record<string, unknown>);
       toast({
         title: '保存成功',
         description: '岗位已添加到您的列表',
@@ -137,6 +139,81 @@ export default function JobImportPage() {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleParseUrl = async () => {
+    if (!jobUrl.trim()) {
+      toast({
+        title: '请输入链接',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // 验证 URL 格式
+    try {
+      new URL(jobUrl);
+    } catch {
+      toast({
+        title: '请输入有效的链接',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsParsing(true);
+    setParsedResult(null);
+    setJobText('');
+    setParsingProgress({ stage: 'fetching', progress: 0, message: '正在获取页面内容...' });
+
+    const stages = [
+      { stage: 'fetching', progress: 20, message: '正在获取页面内容...' },
+      { stage: 'extracting', progress: 40, message: '提取职位信息...' },
+      { stage: 'analyzing', progress: 60, message: '智能分析中...' },
+      { stage: 'finalizing', progress: 80, message: '生成结果...' },
+    ];
+
+    let stageIndex = 0;
+    progressIntervalRef.current = setInterval(() => {
+      stageIndex++;
+      if (stageIndex < stages.length) {
+        setParsingProgress(stages[stageIndex]);
+      }
+    }, 1000);
+
+    try {
+      const result = await jobsApi.parseUrl(jobUrl);
+
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+      setParsingProgress({ stage: 'complete', progress: 100, message: '解析完成!' });
+
+      setTimeout(() => {
+        setParsedResult(result);
+        setJobText(`来源: ${jobUrl}`);
+        setParsingProgress(null);
+        toast({
+          title: '解析成功',
+          description: `置信度: ${Math.round(result.confidence * 100)}%`,
+        });
+      }, 500);
+    } catch (error: unknown) {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+      setParsingProgress(null);
+      const errorMessage =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        '解析失败，请检查链接是否正确';
+      toast({
+        title: '解析失败',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsParsing(false);
     }
   };
 
@@ -235,9 +312,54 @@ export default function JobImportPage() {
               )}
 
               {activeTab === 'link' && (
-                <div className="text-center py-12">
-                  <Link2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">链接导入功能即将上线</p>
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      职位链接
+                    </label>
+                    <div className="relative">
+                      <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="url"
+                        value={jobUrl}
+                        onChange={(e) => setJobUrl(e.target.value)}
+                        className="block w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-sm"
+                        placeholder="https://jobs.example.com/position/12345"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      支持各大招聘网站的职位详情页面链接
+                    </p>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-blue-800 mb-2">支持的网站</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {['Boss直聘', '拉勾网', '猎聘', '智联招聘', '前程无忧', 'LinkedIn'].map(
+                        (site) => (
+                          <span
+                            key={site}
+                            className="px-2 py-1 bg-white text-blue-700 text-xs rounded border border-blue-200"
+                          >
+                            {site}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handleParseUrl}
+                    disabled={isParsing || !jobUrl.trim()}
+                    className="w-full py-3 shadow-lg shadow-primary/20"
+                  >
+                    {isParsing ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 mr-2" />
+                    )}
+                    抓取并解析
+                  </Button>
                 </div>
               )}
 

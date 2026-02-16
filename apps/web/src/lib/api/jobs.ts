@@ -45,6 +45,11 @@ export const jobsApi = {
     return response.data;
   },
 
+  async parseUrl(url: string): Promise<ParsedJobResult> {
+    const response = await apiClient.post<ParsedJobResult>('/jobs/parse-url', { url });
+    return response.data;
+  },
+
   async importJob(text: string, parsedData?: Record<string, unknown>): Promise<Job> {
     const response = await apiClient.post<Job>('/jobs/import', { text, parsedData });
     return response.data;

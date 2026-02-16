@@ -29,6 +29,11 @@ export class JobsController {
     return this.jobsService.parseJobText(dto);
   }
 
+  @Post('parse-url')
+  async parseJobUrl(@Body('url') url: string) {
+    return this.jobsService.parseJobUrl(url);
+  }
+
   @Post('import')
   async importJob(
     @Request() req: { user: { id: string } },

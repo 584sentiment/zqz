@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Button } from '@/components/ui/button';

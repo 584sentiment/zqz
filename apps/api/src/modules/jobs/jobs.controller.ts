@@ -14,6 +14,10 @@ import { JobsService } from './jobs.service';
 import { CreateJobDto, ParseJobTextDto, UpdateJobDto } from './dto/job.dto';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 
+class ParseImageDto {
+  imageBase64: string;
+}
+
 @Controller('jobs')
 @UseGuards(JwtAuthGuard)
 export class JobsController {
@@ -32,6 +36,11 @@ export class JobsController {
   @Post('parse-url')
   async parseJobUrl(@Body('url') url: string) {
     return this.jobsService.parseJobUrl(url);
+  }
+
+  @Post('parse-image')
+  async parseJobImage(@Body() dto: ParseImageDto) {
+    return this.jobsService.parseJobImage(dto.imageBase64);
   }
 
   @Post('import')

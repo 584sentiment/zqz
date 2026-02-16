@@ -50,6 +50,11 @@ export const jobsApi = {
     return response.data;
   },
 
+  async parseImage(imageBase64: string): Promise<ParsedJobResult> {
+    const response = await apiClient.post<ParsedJobResult>('/jobs/parse-image', { imageBase64 });
+    return response.data;
+  },
+
   async importJob(text: string, parsedData?: Record<string, unknown>): Promise<Job> {
     const response = await apiClient.post<Job>('/jobs/import', { text, parsedData });
     return response.data;

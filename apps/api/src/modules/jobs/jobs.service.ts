@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/common/database/prisma.service';
 import { CreateJobDto, ParseJobTextDto, UpdateJobDto, ParsedJobResult } from './dto/job.dto';
 
 @Injectable()
 export class JobsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private configService: ConfigService,
+  ) {}
 
   async create(userId: string, dto: CreateJobDto) {
     return this.prisma.job.create({
@@ -305,5 +309,101 @@ export class JobsService {
       .trim();
 
     return text;
+  }
+
+  /**
+   * 从图片解析岗位信息（使用 OpenAI Vision API）
+   */
+  async parseJobImage(imageBase64: string): Promise<ParsedJobResult> {
+    const openaiApiKey = this.configService.get<string>('OPENAI_API_KEY');
+
+    if (!openaiApiKey) {
+      throw new BadRequestException('图片解析功能未配置，请联系管理员');
+    }
+
+    try {
+      // 调用 OpenAI Vision API
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openaiApiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: `你是一个专业的招聘信息解析助手。请从图片中提取招聘信息，并以JSON格式返回。
+返回格式要求：
+{
+  "title": "职位名称",
+  "company": "公司名称",
+  "location": "工作地点",
+  "salary": "薪资范围（如果有）",
+  "experience": "经验要求（如果有）",
+  "education": "学历要求（如果有）",
+  "requirements": ["任职要求1", "任职要求2"],
+  "niceToHave": ["加分项1"],
+  "skills": ["技能1", "技能2"],
+  "confidence": 0.8
+}
+confidence 是解析置信度，0-1之间。如果图片不清晰或信息不完整，置信度应较低。`,
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: '请从这张招聘截图或图片中提取职位信息。',
+                },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:image/jpeg;base64,${imageBase64}`,
+                  },
+                },
+              ],
+            },
+          ],
+          max_tokens: 2000,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('OpenAI API error:', error);
+        throw new BadRequestException('图片解析失败，请稍后重试');
+      }
+
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content;
+
+      if (!content) {
+        throw new BadRequestException('无法解析图片内容');
+      }
+
+      // 提取 JSON
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new BadRequestException('无法从图片中识别招聘信息');
+      }
+
+      const result: ParsedJobResult = JSON.parse(jsonMatch[0]);
+
+      // 验证必要字段
+      if (!result.title) {
+        result.title = '未知职位';
+        result.confidence = Math.min(result.confidence || 0.5, 0.3);
+      }
+
+      return result;
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      console.error('Image parsing error:', error);
+      throw new BadRequestException('图片解析失败，请确保图片清晰');
+    }
   }
 }

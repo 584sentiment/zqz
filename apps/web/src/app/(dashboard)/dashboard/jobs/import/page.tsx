@@ -23,6 +23,8 @@ import {
   FileSearch,
   Brain,
   Target,
+  Upload,
+  X,
 } from 'lucide-react';
 
 type ImportTab = 'text' | 'link' | 'image';
@@ -41,6 +43,13 @@ const PARSING_STAGES: ParsingProgress[] = [
   { stage: 'finalizing', progress: 90, message: '生成分析报告...' },
 ];
 
+const IMAGE_STAGES: ParsingProgress[] = [
+  { stage: 'uploading', progress: 0, message: '正在上传图片...' },
+  { stage: 'recognizing', progress: 30, message: 'OCR 识别中...' },
+  { stage: 'extracting', progress: 60, message: '提取职位信息...' },
+  { stage: 'finalizing', progress: 90, message: '生成结果...' },
+];
+
 export default function JobImportPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -48,12 +57,15 @@ export default function JobImportPage() {
   const [activeTab, setActiveTab] = useState<ImportTab>('text');
   const [jobText, setJobText] = useState('');
   const [jobUrl, setJobUrl] = useState('');
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [parsedResult, setParsedResult] = useState<ParsedJobResult | null>(null);
   const [clearFormat, setClearFormat] = useState(true);
   const [parsingProgress, setParsingProgress] = useState<ParsingProgress | null>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleParse = async () => {
     if (!jobText.trim()) {
@@ -364,9 +376,153 @@ export default function JobImportPage() {
               )}
 
               {activeTab === 'image' && (
-                <div className="text-center py-12">
-                  <ImageIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">图片导入功能即将上线</p>
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      上传截图
+                    </label>
+
+                    {/* 图片预览 */}
+                    {selectedImagePreview ? (
+                      <div className="relative mb-4">
+                        <img
+                          src={selectedImagePreview}
+                          alt="预览"
+                          className="w-full h-48 object-contain rounded-lg border border-gray-200"
+                        />
+                        <button
+                          onClick={() => {
+                            setSelectedImage(null);
+                            setSelectedImagePreview(null);
+                            if (fileInputRef.current) {
+                              fileInputRef.current.value = '';
+                            }
+                          }}
+                          className="absolute top-2 right-2 p-1.5 bg-white rounded-full shadow-md hover:bg-gray-100"
+                        >
+                          <X className="w-4 h-4 text-gray-600" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
+                      >
+                        <Upload className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                        <p className="text-sm text-gray-600 mb-1">点击上传或拖拽图片到此处</p>
+                        <p className="text-xs text-gray-400">支持 JPG、PNG 格式，最大 10MB</p>
+                      </div>
+                    )}
+
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/jpg"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+
+                        // 检查文件大小
+                        if (file.size > 10 * 1024 * 1024) {
+                          toast({
+                            title: '文件过大',
+                            description: '图片大小不能超过 10MB',
+                            variant: 'destructive',
+                          });
+                          return;
+                        }
+
+                        // 读取文件
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          const dataUrl = event.target?.result as string;
+                          setSelectedImagePreview(dataUrl);
+                          // 提取 base64 部分
+                          const base64 = dataUrl.split(',')[1];
+                          setSelectedImage(base64);
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-blue-800 mb-2">使用提示</h4>
+                    <ul className="text-xs text-blue-700 space-y-1">
+                      <li>• 确保截图清晰，文字可辨认</li>
+                      <li>• 尽量截取完整的职位信息</li>
+                      <li>• 手机截图请确保方向正确</li>
+                    </ul>
+                  </div>
+
+                  <Button
+                    onClick={async () => {
+                      if (!selectedImage) {
+                        toast({
+                          title: '请先上传图片',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+
+                      setIsParsing(true);
+                      setParsedResult(null);
+                      setJobText('');
+                      setParsingProgress(IMAGE_STAGES[0]);
+
+                      let stageIndex = 0;
+                      progressIntervalRef.current = setInterval(() => {
+                        stageIndex++;
+                        if (stageIndex < IMAGE_STAGES.length) {
+                          setParsingProgress(IMAGE_STAGES[stageIndex]);
+                        }
+                      }, 1500);
+
+                      try {
+                        const result = await jobsApi.parseImage(selectedImage);
+
+                        if (progressIntervalRef.current) {
+                          clearInterval(progressIntervalRef.current);
+                        }
+                        setParsingProgress({ stage: 'complete', progress: 100, message: '解析完成!' });
+
+                        setTimeout(() => {
+                          setParsedResult(result);
+                          setJobText('来源: 图片上传');
+                          setParsingProgress(null);
+                          toast({
+                            title: '解析成功',
+                            description: `置信度: ${Math.round(result.confidence * 100)}%`,
+                          });
+                        }, 500);
+                      } catch (error: unknown) {
+                        if (progressIntervalRef.current) {
+                          clearInterval(progressIntervalRef.current);
+                        }
+                        setParsingProgress(null);
+                        const errorMessage =
+                          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+                          '图片解析失败，请确保图片清晰';
+                        toast({
+                          title: '解析失败',
+                          description: errorMessage,
+                          variant: 'destructive',
+                        });
+                      } finally {
+                        setIsParsing(false);
+                      }
+                    }}
+                    disabled={isParsing || !selectedImage}
+                    className="w-full py-3 shadow-lg shadow-primary/20"
+                  >
+                    {isParsing ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 mr-2" />
+                    )}
+                    解析图片
+                  </Button>
                 </div>
               )}
             </div>

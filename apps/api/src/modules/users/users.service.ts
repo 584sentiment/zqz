@@ -316,4 +316,120 @@ export class UsersService {
       where: { id: skillId },
     });
   }
+
+  // AI 优化工作经历描述
+  async optimizeExperience(
+    userId: string,
+    experienceId: string,
+    targetType: 'description' | 'highlights' = 'description',
+  ) {
+    // 获取原始工作经历
+    const experience = await this.getExperience(userId, experienceId);
+
+    // 模拟 AI 优化（实际项目中应调用 AI 服务）
+    const optimized = this.generateOptimizedContent(
+      experience.company,
+      experience.position,
+      experience.description,
+      experience.highlights,
+      targetType,
+    );
+
+    return {
+      original:
+        targetType === 'description' ? experience.description : experience.highlights?.join('\n'),
+      optimized: targetType === 'description' ? optimized.description : optimized.highlights,
+      suggestions: optimized.suggestions,
+    };
+  }
+
+  private generateOptimizedContent(
+    company: string,
+    position: string,
+    description: string | null,
+    highlights: string[],
+    targetType: 'description' | 'highlights',
+  ) {
+    // 模拟 AI 优化逻辑
+    const suggestions: string[] = [];
+
+    if (targetType === 'description') {
+      // 优化工作描述
+      let optimizedDesc = description || '';
+
+      // 添加建议
+      if (!description || description.length < 50) {
+        suggestions.push('建议补充更多工作职责细节，包括具体负责的业务领域');
+      }
+      if (description && !description.includes('负责')) {
+        suggestions.push('建议使用"负责"、"主导"、"参与"等动词开头描述职责');
+      }
+      if (description && !/\d+/.test(description)) {
+        suggestions.push('建议添加量化数据，如团队规模、项目数量、业绩指标等');
+      }
+
+      // 生成优化后的描述
+      if (!description || description.length < 20) {
+        optimizedDesc = `在${company}担任${position}期间，主要负责相关业务系统的开发与维护工作。参与多个核心项目的技术设计与实现，与团队协作确保项目按时高质量交付。`;
+      } else {
+        // 对已有描述进行简单优化（添加更专业的表述）
+        optimizedDesc = this.enhanceDescription(description, position);
+      }
+
+      return {
+        description: optimizedDesc,
+        highlights: null,
+        suggestions,
+      };
+    } else {
+      // 优化主要成就
+      let optimizedHighlights = [...highlights];
+
+      if (highlights.length === 0) {
+        suggestions.push('建议添加 3-5 条主要成就，突出工作成果');
+        optimizedHighlights = [
+          `主导完成${position}相关的核心模块开发，提升系统性能 30%`,
+          '参与技术方案设计，解决关键技术难题',
+          '与跨部门团队协作，确保项目按期交付',
+        ];
+      } else {
+        // 优化现有成就描述
+        optimizedHighlights = highlights.map((h, index) => {
+          suggestions.push(`建议第 ${index + 1} 条添加量化数据或具体成果`);
+          return this.enhanceHighlight(h);
+        });
+      }
+
+      return {
+        description: null,
+        highlights: optimizedHighlights.join('\n'),
+        suggestions,
+      };
+    }
+  }
+
+  private enhanceDescription(description: string, position: string): string {
+    // 简单的描述增强逻辑
+    let enhanced = description;
+
+    // 确保以专业动词开头
+    const professionalStarts = ['负责', '主导', '参与', '承担', '协助', '推动'];
+    const startsWithProfessional = professionalStarts.some((start) =>
+      enhanced.trim().startsWith(start),
+    );
+
+    if (!startsWithProfessional) {
+      enhanced = `负责${enhanced}`;
+    }
+
+    return enhanced;
+  }
+
+  private enhanceHighlight(highlight: string): string {
+    // 如果不包含数字，添加一些量化表述
+    if (!/\d+%/.test(highlight) && !/\d+个/.test(highlight) && !/\d+万/.test(highlight)) {
+      return `${highlight}，获得团队认可`;
+    }
+    return highlight;
+  }
 }

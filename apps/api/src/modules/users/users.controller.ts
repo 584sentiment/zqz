@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   Request,
 } from '@nestjs/common';
@@ -111,6 +112,20 @@ export class UsersController {
     @Param('id') id: string,
   ) {
     return this.usersService.deleteExperience(req.user.id, id);
+  }
+
+  // AI 优化工作经历
+  @Post('me/experiences/:id/optimize')
+  async optimizeExperience(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Query('type') type: 'description' | 'highlights',
+  ) {
+    return this.usersService.optimizeExperience(
+      req.user.id,
+      id,
+      type || 'description',
+    );
   }
 
   // 项目经历

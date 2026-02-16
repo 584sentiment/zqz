@@ -19,6 +19,8 @@ import {
   Loader2,
   MapPin,
   ExternalLink,
+  Sparkles,
+  Check,
 } from 'lucide-react';
 
 // 类型定义
@@ -121,6 +123,13 @@ export default function ProfilePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [optimizationResult, setOptimizationResult] = useState<{
+    type: 'description' | 'highlights';
+    original: string | null;
+    optimized: string | null;
+    suggestions: string[];
+  } | null>(null);
 
   // 表单状态
   const [educationForm, setEducationForm] = useState(emptyEducationForm);
@@ -270,6 +279,49 @@ export default function ProfilePage() {
     } catch (error) {
       toast({ title: '删除失败', description: '请稍后重试', variant: 'destructive' });
     }
+  };
+
+  // AI 优化工作经历
+  const handleOptimizeExperience = async (type: 'description' | 'highlights') => {
+    if (!editingId) {
+      toast({ title: '请先保存', description: '优化功能需要先保存工作经历', variant: 'destructive' });
+      return;
+    }
+
+    setIsOptimizing(true);
+    setOptimizationResult(null);
+    try {
+      const response = await apiClient.post<{
+        original: string | null;
+        optimized: string | null;
+        suggestions: string[];
+      }>(`/users/me/experiences/${editingId}/optimize?type=${type}`);
+
+      setOptimizationResult({
+        type,
+        ...response.data,
+      });
+    } catch (error) {
+      toast({ title: '优化失败', description: '请稍后重试', variant: 'destructive' });
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
+  const handleApplyOptimization = () => {
+    if (!optimizationResult?.optimized) return;
+
+    if (optimizationResult.type === 'description') {
+      setExperienceForm({ ...experienceForm, description: optimizationResult.optimized || '' });
+    } else {
+      setExperienceForm({ ...experienceForm, highlights: optimizationResult.optimized || '' });
+    }
+    setOptimizationResult(null);
+    toast({ title: '已应用', description: '优化内容已填入表单' });
+  };
+
+  const handleDismissOptimization = () => {
+    setOptimizationResult(null);
   };
 
   // 项目经历操作
@@ -489,8 +541,112 @@ export default function ProfilePage() {
                     />
                     <label htmlFor="current" className="text-sm text-gray-700">目前在职</label>
                   </div>
-                  <TextAreaField label="工作描述" value={experienceForm.description} onChange={(v) => setExperienceForm({ ...experienceForm, description: v })} placeholder="工作职责描述..." />
-                  <TextAreaField label="主要成就" value={experienceForm.highlights} onChange={(v) => setExperienceForm({ ...experienceForm, highlights: v })} placeholder="每行一条成就..." rows={3} />
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-sm font-medium text-gray-700">工作描述</label>
+                      {editingId && (
+                        <button
+                          type="button"
+                          onClick={() => handleOptimizeExperience('description')}
+                          disabled={isOptimizing}
+                          className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 disabled:opacity-50"
+                        >
+                          {isOptimizing ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-3 h-3" />
+                          )}
+                          AI 优化
+                        </button>
+                      )}
+                    </div>
+                    <textarea
+                      value={experienceForm.description}
+                      onChange={(e) => setExperienceForm({ ...experienceForm, description: e.target.value })}
+                      placeholder="工作职责描述..."
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-sm font-medium text-gray-700">主要成就</label>
+                      {editingId && (
+                        <button
+                          type="button"
+                          onClick={() => handleOptimizeExperience('highlights')}
+                          disabled={isOptimizing}
+                          className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 disabled:opacity-50"
+                        >
+                          {isOptimizing ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-3 h-3" />
+                          )}
+                          AI 优化
+                        </button>
+                      )}
+                    </div>
+                    <textarea
+                      value={experienceForm.highlights}
+                      onChange={(e) => setExperienceForm({ ...experienceForm, highlights: e.target.value })}
+                      placeholder="每行一条成就..."
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+
+                  {/* AI 优化结果展示 */}
+                  {optimizationResult && (
+                    <div className="p-4 bg-gradient-to-r from-primary/5 to-teal-50 rounded-lg border border-primary/20">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-medium text-primary">
+                          AI 优化建议 - {optimizationResult.type === 'description' ? '工作描述' : '主要成就'}
+                        </span>
+                      </div>
+                      {optimizationResult.suggestions.length > 0 && (
+                        <div className="mb-3">
+                          <p className="text-xs text-gray-500 mb-1">优化建议：</p>
+                          <ul className="text-xs text-gray-600 space-y-1">
+                            {optimizationResult.suggestions.map((s, i) => (
+                              <li key={i} className="flex items-start gap-1">
+                                <span className="text-primary">•</span>
+                                {s}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <div className="mb-3">
+                        <p className="text-xs text-gray-500 mb-1">优化后内容：</p>
+                        <div className="p-3 bg-white rounded border text-sm text-gray-700 whitespace-pre-wrap">
+                          {optimizationResult.optimized}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleApplyOptimization}
+                          className="flex-1"
+                        >
+                          <Check className="w-3 h-3 mr-1" />
+                          采纳建议
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleDismissOptimization}
+                          className="flex-1"
+                        >
+                          忽略
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   <FormButtons onCancel={resetForm} isSaving={isSaving} />
                 </form>
               }

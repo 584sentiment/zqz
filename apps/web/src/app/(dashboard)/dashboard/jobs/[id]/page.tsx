@@ -21,6 +21,8 @@ import {
   Loader2,
   Trash2,
   Edit2,
+  X,
+  Save,
   ExternalLink,
   Sparkles,
   MessageSquare,
@@ -36,6 +38,17 @@ export default function JobDetailPage({ params }: PageProps) {
   const { toast } = useToast();
   const [job, setJob] = useState<Job | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // 编辑表单状态
+  const [editForm, setEditForm] = useState({
+    title: '',
+    company: '',
+    location: '',
+    status: 'pending' as string,
+    notes: '',
+  });
 
   const loadJob = useCallback(async () => {
     if (!id) return;
@@ -44,6 +57,13 @@ export default function JobDetailPage({ params }: PageProps) {
     try {
       const data = await jobsApi.getById(id);
       setJob(data);
+      setEditForm({
+        title: data.title || '',
+        company: data.company || '',
+        location: data.location || '',
+        status: data.status || 'pending',
+        notes: data.notes || '',
+      });
     } catch (error) {
       toast({
         title: '加载失败',
@@ -79,6 +99,40 @@ export default function JobDetailPage({ params }: PageProps) {
     }
   };
 
+  const handleSaveEdit = async () => {
+    setIsSaving(true);
+    try {
+      const updated = await jobsApi.update(id, editForm);
+      setJob(updated);
+      setIsEditing(false);
+      toast({
+        title: '保存成功',
+        description: '岗位信息已更新',
+      });
+    } catch (error) {
+      toast({
+        title: '保存失败',
+        description: '请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    if (job) {
+      setEditForm({
+        title: job.title || '',
+        company: job.company || '',
+        location: job.location || '',
+        status: job.status || 'pending',
+        notes: job.notes || '',
+      });
+    }
+    setIsEditing(false);
+  };
+
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { bg: string; text: string; label: string }> = {
       pending: { bg: 'bg-gray-100', text: 'text-gray-700', label: '待处理' },
@@ -89,6 +143,14 @@ export default function JobDetailPage({ params }: PageProps) {
     };
     return statusMap[status] || statusMap.pending;
   };
+
+  const statusOptions = [
+    { value: 'pending', label: '待处理' },
+    { value: 'applied', label: '已申请' },
+    { value: 'interview', label: '面试中' },
+    { value: 'offer', label: '已录用' },
+    { value: 'rejected', label: '已拒绝' },
+  ];
 
   if (isLoading) {
     return (
@@ -135,10 +197,33 @@ export default function JobDetailPage({ params }: PageProps) {
             返回岗位列表
           </Link>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleDelete}>
-              <Trash2 className="w-4 h-4 mr-1" />
-              删除
-            </Button>
+            {isEditing ? (
+              <>
+                <Button variant="outline" size="sm" onClick={handleCancelEdit}>
+                  <X className="w-4 h-4 mr-1" />
+                  取消
+                </Button>
+                <Button size="sm" onClick={handleSaveEdit} disabled={isSaving}>
+                  {isSaving ? (
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4 mr-1" />
+                  )}
+                  保存
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                  <Edit2 className="w-4 h-4 mr-1" />
+                  编辑
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleDelete}>
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  删除
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -148,54 +233,116 @@ export default function JobDetailPage({ params }: PageProps) {
             <Briefcase className="w-32 h-32 text-primary" />
           </div>
           <div className="relative z-10">
-            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-2xl font-bold text-gray-900">
-                    {job.title || '未命名职位'}
-                  </h1>
-                  <span
-                    className={`px-3 py-1 rounded-full text-sm font-medium ${statusBadge.bg} ${statusBadge.text}`}
-                  >
-                    {statusBadge.label}
-                  </span>
+            {isEditing ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">职位名称</label>
+                    <input
+                      type="text"
+                      value={editForm.title}
+                      onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">公司名称</label>
+                    <input
+                      type="text"
+                      value={editForm.company}
+                      onChange={(e) => setEditForm({ ...editForm, company: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-gray-500">
-                  <Briefcase className="w-5 h-5" />
-                  <span className="font-medium">{job.company || '未知公司'}</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">工作地点</label>
+                    <input
+                      type="text"
+                      value={editForm.location}
+                      onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">状态</label>
+                    <select
+                      value={editForm.status}
+                      onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      {statusOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">备注</label>
+                  <textarea
+                    value={editForm.notes}
+                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="添加备注..."
+                  />
                 </div>
               </div>
-              {salary && (
-                <div className="lg:text-right">
-                  <span className="text-3xl font-bold text-primary">{salary}</span>
+            ) : (
+              <>
+                <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <h1 className="text-2xl font-bold text-gray-900">
+                        {job.title || '未命名职位'}
+                      </h1>
+                      <span
+                        className={`px-3 py-1 rounded-full text-sm font-medium ${statusBadge.bg} ${statusBadge.text}`}
+                      >
+                        {statusBadge.label}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-gray-500">
+                      <Briefcase className="w-5 h-5" />
+                      <span className="font-medium">{job.company || '未知公司'}</span>
+                    </div>
+                  </div>
+                  {salary && (
+                    <div className="lg:text-right">
+                      <span className="text-3xl font-bold text-primary">{salary}</span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            <div className="flex flex-wrap gap-3 mt-6">
-              {job.location && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg text-sm text-gray-600 border border-gray-100">
-                  <MapPin className="w-4 h-4 text-gray-400" />
-                  {job.location}
+                <div className="flex flex-wrap gap-3 mt-6">
+                  {job.location && (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg text-sm text-gray-600 border border-gray-100">
+                      <MapPin className="w-4 h-4 text-gray-400" />
+                      {job.location}
+                    </div>
+                  )}
+                  {experience && (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg text-sm text-gray-600 border border-gray-100">
+                      <Briefcase className="w-4 h-4 text-gray-400" />
+                      {experience}
+                    </div>
+                  )}
+                  {education && (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg text-sm text-gray-600 border border-gray-100">
+                      <GraduationCap className="w-4 h-4 text-gray-400" />
+                      {education}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg text-sm text-gray-600 border border-gray-100">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    {new Date(job.createdAt).toLocaleDateString('zh-CN')} 导入
+                  </div>
                 </div>
-              )}
-              {experience && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg text-sm text-gray-600 border border-gray-100">
-                  <Briefcase className="w-4 h-4 text-gray-400" />
-                  {experience}
-                </div>
-              )}
-              {education && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg text-sm text-gray-600 border border-gray-100">
-                  <GraduationCap className="w-4 h-4 text-gray-400" />
-                  {education}
-                </div>
-              )}
-              <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg text-sm text-gray-600 border border-gray-100">
-                <Calendar className="w-4 h-4 text-gray-400" />
-                {new Date(job.createdAt).toLocaleDateString('zh-CN')} 导入
-              </div>
-            </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -317,7 +464,7 @@ export default function JobDetailPage({ params }: PageProps) {
         )}
 
         {/* 备注 */}
-        {job.notes && (
+        {(job.notes || !isEditing) && job.notes && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
             <h3 className="font-semibold text-yellow-800 mb-2">备注</h3>
             <p className="text-sm text-yellow-700">{job.notes}</p>

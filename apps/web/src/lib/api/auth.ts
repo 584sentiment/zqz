@@ -63,4 +63,20 @@ export const authApi = {
     });
     return response.data;
   },
+
+  async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
+    const response = await apiClient.post<{ success: boolean; message: string }>(
+      '/auth/forgot-password',
+      { email }
+    );
+    return response.data;
+  },
+
+  async resetPassword(token: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+    const response = await apiClient.post<{ success: boolean; message: string }>(
+      '/auth/reset-password',
+      { token, newPassword }
+    );
+    return response.data;
+  },
 };

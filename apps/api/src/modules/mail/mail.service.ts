@@ -57,6 +57,17 @@ export class MailService {
   }
 
   /**
+   * 发送密码重置邮件
+   */
+  async sendPasswordResetEmail(email: string, token: string, userName?: string): Promise<boolean> {
+    const resetUrl = `${this.frontendUrl}/reset-password?token=${token}`;
+    const subject = '重置您的密码 - AI 求职助手';
+    const html = this.getPasswordResetEmailHtml(resetUrl, userName);
+
+    return this.sendMail(email, subject, html);
+  }
+
+  /**
    * 发送邮件
    */
   private async sendMail(to: string, subject: string, html: string): Promise<boolean> {
@@ -156,6 +167,50 @@ export class MailService {
               <li>发掘您的核心技能</li>
             </ul>
             <p>祝您求职顺利！</p>
+          </div>
+          <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} AI 求职助手. 保留所有权利.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private getPasswordResetEmailHtml(resetUrl: string, userName?: string): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { text-align: center; padding: 30px 0; }
+          .logo { font-size: 24px; font-weight: bold; color: #4F46E5; }
+          .content { background: #f9f9f9; padding: 30px; border-radius: 10px; }
+          .button { display: inline-block; padding: 12px 30px; background: #4F46E5; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+          .footer { text-align: center; color: #666; font-size: 12px; padding-top: 20px; }
+          .warning { background: #FEF3C7; padding: 12px; border-radius: 6px; margin-top: 20px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="logo">AI 求职助手</div>
+          </div>
+          <div class="content">
+            <h2>您好，${userName || '用户'}！</h2>
+            <p>我们收到了重置您密码的请求。请点击下方按钮重置您的密码：</p>
+            <p style="text-align: center;">
+              <a href="${resetUrl}" class="button">重置密码</a>
+            </p>
+            <p>或复制以下链接到浏览器：</p>
+            <p style="word-break: break-all; color: #666;">${resetUrl}</p>
+            <p>此链接将在 1 小时后过期。</p>
+            <div class="warning">
+              <p style="margin: 0; font-size: 14px;">⚠️ 如果您没有请求重置密码，请忽略此邮件。您的密码不会被更改。</p>
+            </div>
           </div>
           <div class="footer">
             <p>&copy; ${new Date().getFullYear()} AI 求职助手. 保留所有权利.</p>

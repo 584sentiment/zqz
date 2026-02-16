@@ -311,4 +311,70 @@ export class AuthService {
       },
     };
   }
+
+  /**
+   * 发送密码重置邮件
+   */
+  async forgotPassword(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      // 为安全起见，不暴露用户是否存在
+      return { success: true, message: '如果该邮箱已注册，您将收到重置密码邮件' };
+    }
+
+    // 生成重置令牌
+    const resetToken = randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1小时后过期
+
+    // 更新用户的重置令牌
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetToken,
+        resetTokenExpiry,
+      },
+    });
+
+    // 发送重置邮件
+    await this.mailService.sendPasswordResetEmail(user.email, resetToken, user.nickname || undefined);
+
+    return { success: true, message: '如果该邮箱已注册，您将收到重置密码邮件' };
+  }
+
+  /**
+   * 重置密码
+   */
+  async resetPassword(token: string, newPassword: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        resetToken: token,
+        resetTokenExpiry: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('重置链接无效或已过期');
+    }
+
+    // 哈希新密码
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    // 更新密码并清除重置令牌
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        resetToken: null,
+        resetTokenExpiry: null,
+      },
+    });
+
+    return {
+      success: true,
+      message: '密码重置成功',
+    };
+  }
 }

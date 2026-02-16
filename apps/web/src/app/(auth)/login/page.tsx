@@ -111,10 +111,9 @@ export default function LoginPage() {
               <input type="checkbox" className="rounded border-gray-300" />
               <span className="ml-2 text-sm text-gray-600">记住我</span>
             </label>
-            {/* TODO: 创建忘记密码页面 (F007) */}
-            <span className="text-sm text-gray-400 cursor-not-allowed">
+            <Link href="/forgot-password" className="text-sm text-primary hover:underline">
               忘记密码？
-            </span>
+            </Link>
           </div>
 
           <Button type="submit" className="w-full" disabled={isLoading}>

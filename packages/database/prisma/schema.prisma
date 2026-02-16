@@ -27,6 +27,10 @@ model User {
   verifyToken       String?  @map("verify_token")
   verifyTokenExpiry DateTime? @map("verify_token_expiry")
 
+  // 密码重置
+  resetToken       String?  @map("reset_token")
+  resetTokenExpiry DateTime? @map("reset_token_expiry")
+
   // OAuth
   oauthProvider  String?  @map("oauth_provider")
   oauthId        String?  @map("oauth_id")

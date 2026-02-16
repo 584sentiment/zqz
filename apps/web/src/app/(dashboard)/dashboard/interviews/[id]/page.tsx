@@ -22,6 +22,8 @@ import {
   AlertCircle,
   FileText,
   Target,
+  Download,
+  Share2,
 } from 'lucide-react';
 
 export default function InterviewDetailPage() {
@@ -136,6 +138,156 @@ export default function InterviewDetailPage() {
     }
   };
 
+  // 格式化时间
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return mins > 0 ? `${mins}分${secs}秒` : `${secs}秒`;
+  };
+
+  // 导出报告
+  const handleExportReport = () => {
+    if (!report || !interview) return;
+
+    const totalScore = report.totalScore as number;
+    const dimensions = report.dimensions as Record<string, Record<string, unknown>>;
+    const recommendations = report.recommendations as string[];
+    const timeStats = report.timeStats as {
+      totalTime: number;
+      averageTime: number;
+    } | undefined;
+    const jobContext = interview.jobContext as Record<string, unknown> | null;
+
+    const html = `
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>面试报告 - ${jobContext?.title || 'AI 模拟面试'}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+    .header { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; padding: 40px; border-radius: 16px; margin-bottom: 24px; }
+    .header h1 { font-size: 28px; margin-bottom: 8px; }
+    .header .subtitle { opacity: 0.8; margin-bottom: 24px; }
+    .score-section { display: flex; align-items: center; gap: 32px; }
+    .total-score { text-align: center; }
+    .total-score .score { font-size: 56px; font-weight: bold; }
+    .total-score .label { font-size: 14px; opacity: 0.8; }
+    .progress-bar { flex: 1; }
+    .progress-bar .bar { height: 16px; background: rgba(255,255,255,0.2); border-radius: 8px; overflow: hidden; }
+    .progress-bar .bar-inner { height: 100%; background: white; border-radius: 8px; }
+    .progress-bar .summary { font-size: 14px; margin-top: 8px; opacity: 0.8; }
+    .time-stats { border-left: 1px solid rgba(255,255,255,0.2); padding-left: 24px; text-align: center; }
+    .time-stats .time { font-size: 24px; font-weight: bold; }
+    .time-stats .label { font-size: 12px; opacity: 0.6; }
+    .section { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; margin-bottom: 16px; }
+    .section h2 { font-size: 18px; margin-bottom: 16px; color: #111; }
+    .dimension-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .dimension-card { background: #f9fafb; padding: 16px; border-radius: 8px; }
+    .dimension-card .header { display: flex; justify-content: space-between; margin-bottom: 8px; background: none; padding: 0; color: inherit; }
+    .dimension-card .title { font-weight: 500; }
+    .dimension-card .score { font-weight: bold; color: #2563eb; }
+    .dimension-card .bar { height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
+    .dimension-card .bar-inner { height: 100%; background: #2563eb; }
+    .dimension-card .feedback { font-size: 14px; color: #6b7280; margin-top: 8px; }
+    .recommendations li { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+    .recommendations .icon { color: #2563eb; flex-shrink: 0; }
+    .footer { text-align: center; margin-top: 32px; color: #9ca3af; font-size: 12px; }
+    @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>面试报告</h1>
+      <p class="subtitle">${jobContext?.title || 'AI 模拟面试'}</p>
+      <div class="score-section">
+        <div class="total-score">
+          <div class="score">${totalScore}</div>
+          <div class="label">总分</div>
+        </div>
+        <div class="progress-bar">
+          <div class="bar"><div class="bar-inner" style="width: ${totalScore}%"></div></div>
+          <p class="summary">${report.summary || ''}</p>
+        </div>
+        ${timeStats ? `
+        <div class="time-stats">
+          <div class="time">${formatTime(timeStats.totalTime)}</div>
+          <div class="label">总耗时</div>
+          <div class="label" style="margin-top: 4px">平均 ${formatTime(timeStats.averageTime)}/题</div>
+        </div>
+        ` : ''}
+      </div>
+    </div>
+
+    ${dimensions ? `
+    <div class="section">
+      <h2>能力维度分析</h2>
+      <div class="dimension-grid">
+        ${Object.entries(dimensions).map(([key, value]) => `
+        <div class="dimension-card">
+          <div class="header">
+            <span class="title">${value.label}</span>
+            <span class="score">${value.score}</span>
+          </div>
+          <div class="bar"><div class="bar-inner" style="width: ${value.score}%"></div></div>
+          <p class="feedback">${value.feedback}</p>
+        </div>
+        `).join('')}
+      </div>
+    </div>
+    ` : ''}
+
+    ${recommendations?.length ? `
+    <div class="section">
+      <h2>改进建议</h2>
+      <ul class="recommendations" style="list-style: none;">
+        ${recommendations.map(rec => `
+        <li>
+          <span class="icon">↑</span>
+          <span>${rec}</span>
+        </li>
+        `).join('')}
+      </ul>
+    </div>
+    ` : ''}
+
+    <div class="footer">
+      <p>由 AI 求职辅助平台生成 · ${new Date().toLocaleDateString('zh-CN')}</p>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    // 创建下载
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `面试报告_${new Date().toISOString().slice(0, 10)}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({ title: '导出成功', description: '报告已下载' });
+  };
+
+  // 复制分享链接
+  const handleShareReport = async () => {
+    const url = window.location.href;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: '链接已复制', description: '可以分享给他人查看' });
+    } catch {
+      toast({ title: '复制失败', description: '请手动复制链接', variant: 'destructive' });
+    }
+  };
+
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -162,13 +314,6 @@ export default function InterviewDetailPage() {
       questionTimes: { questionIndex: number; duration: number }[];
     } | undefined;
     const answersSummary = report.answersSummary as { questionIndex: number; score: number; duration?: number }[] | undefined;
-
-    // 格式化时间
-    const formatTime = (seconds: number): string => {
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      return mins > 0 ? `${mins}分${secs}秒` : `${secs}秒`;
-    };
 
     return (
       <DashboardLayout>
@@ -362,8 +507,16 @@ export default function InterviewDetailPage() {
                 再次面试
               </Button>
             </Link>
+            <Button variant="outline" onClick={handleExportReport}>
+              <Download className="w-4 h-4 mr-2" />
+              导出报告
+            </Button>
+            <Button variant="outline" onClick={handleShareReport}>
+              <Share2 className="w-4 h-4 mr-2" />
+              分享链接
+            </Button>
             <Link href="/dashboard/interviews">
-              <Button variant="outline">返回列表</Button>
+              <Button variant="ghost">返回列表</Button>
             </Link>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 
+import { PrismaModule } from './common/database/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { JobsModule } from './modules/jobs/jobs.module';
@@ -20,6 +21,9 @@ import { HealthController } from './health.controller';
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
+
+    // 数据库模块
+    PrismaModule,
 
     // Passport 认证模块
     PassportModule.register({ defaultStrategy: 'jwt' }),

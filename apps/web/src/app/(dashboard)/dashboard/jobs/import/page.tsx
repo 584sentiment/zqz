@@ -1,0 +1,394 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { DashboardLayout } from '@/components/layout/dashboard-layout';
+import { jobsApi, ParsedJobResult } from '@/lib/api/jobs';
+import { useToast } from '@/components/ui/use-toast';
+import { Button } from '@/components/ui/button';
+import {
+  FileText,
+  Link2,
+  ImageIcon,
+  Sparkles,
+  MapPin,
+  Briefcase,
+  GraduationCap,
+  Check,
+  Star,
+  Tag,
+  Bookmark,
+  FilePlus,
+  Loader2,
+} from 'lucide-react';
+
+type ImportTab = 'text' | 'link' | 'image';
+
+export default function JobImportPage() {
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const [activeTab, setActiveTab] = useState<ImportTab>('text');
+  const [jobText, setJobText] = useState('');
+  const [isParsing, setIsParsing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [parsedResult, setParsedResult] = useState<ParsedJobResult | null>(null);
+  const [clearFormat, setClearFormat] = useState(true);
+
+  const handleParse = async () => {
+    if (!jobText.trim()) {
+      toast({
+        title: '请输入职位描述',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsParsing(true);
+    try {
+      const result = await jobsApi.parseText(jobText);
+      setParsedResult(result);
+      toast({
+        title: '解析成功',
+        description: `置信度: ${Math.round(result.confidence * 100)}%`,
+      });
+    } catch (error) {
+      toast({
+        title: '解析失败',
+        description: '请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!parsedResult) return;
+
+    setIsSaving(true);
+    try {
+      await jobsApi.importJob(jobText, parsedResult as unknown as Record<string, unknown>);
+      toast({
+        title: '保存成功',
+        description: '岗位已添加到您的列表',
+      });
+      router.push('/dashboard/jobs');
+    } catch (error) {
+      toast({
+        title: '保存失败',
+        description: '请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const tabs: { id: ImportTab; label: string; icon: React.ReactNode }[] = [
+    { id: 'text', label: '文本导入', icon: <FileText className="w-4 h-4" /> },
+    { id: 'link', label: '链接导入', icon: <Link2 className="w-4 h-4" /> },
+    { id: 'image', label: '图片导入', icon: <ImageIcon className="w-4 h-4" /> },
+  ];
+
+  return (
+    <DashboardLayout>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* 左侧：输入区域 */}
+        <div className="lg:col-span-5 xl:col-span-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-4 border-b border-gray-100">
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">导入职位</h2>
+              <p className="text-sm text-gray-500">选择您想要添加职位详情的方式。</p>
+            </div>
+
+            {/* 标签页 */}
+            <div className="flex border-b border-gray-100">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex-1 py-3 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                    activeTab === tab.id
+                      ? 'text-primary border-b-2 border-primary bg-primary/5'
+                      : 'text-gray-500 border-b-2 border-transparent hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="p-6">
+              {activeTab === 'text' && (
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      职位描述
+                    </label>
+                    <div className="relative">
+                      <textarea
+                        value={jobText}
+                        onChange={(e) => setJobText(e.target.value)}
+                        className="block w-full h-64 p-3 border border-gray-200 rounded-lg leading-relaxed bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-sm resize-none"
+                        placeholder="请在此粘贴职位描述文本..."
+                      />
+                      <div className="absolute bottom-3 right-3 text-xs text-gray-400">
+                        {jobText.length}/5000
+                      </div>
+                    </div>
+                  </div>
+
+                  <label className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100 cursor-pointer hover:border-gray-300 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="p-1.5 rounded bg-white shadow-sm border border-gray-200 text-primary">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="block text-sm font-medium text-gray-900">清除格式</span>
+                        <span className="block text-xs text-gray-500">移除多余空格和样式</span>
+                      </div>
+                    </div>
+                    <div
+                      className={`relative inline-flex items-center cursor-pointer w-9 h-5 rounded-full transition-colors ${
+                        clearFormat ? 'bg-primary' : 'bg-gray-200'
+                      }`}
+                      onClick={() => setClearFormat(!clearFormat)}
+                    >
+                      <div
+                        className={`absolute w-4 h-4 bg-white rounded-full transition-transform ${
+                          clearFormat ? 'translate-x-4' : 'translate-x-0.5'
+                        }`}
+                      />
+                    </div>
+                  </label>
+
+                  <Button
+                    onClick={handleParse}
+                    disabled={isParsing || !jobText.trim()}
+                    className="w-full py-3 shadow-lg shadow-primary/20"
+                  >
+                    {isParsing ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 mr-2" />
+                    )}
+                    开始智能分析
+                  </Button>
+                </div>
+              )}
+
+              {activeTab === 'link' && (
+                <div className="text-center py-12">
+                  <Link2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">链接导入功能即将上线</p>
+                </div>
+              )}
+
+              {activeTab === 'image' && (
+                <div className="text-center py-12">
+                  <ImageIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">图片导入功能即将上线</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 提示卡片 */}
+          <div className="mt-6 bg-primary/5 border border-primary/10 rounded-xl p-4 flex gap-3 items-start">
+            <div className="text-primary mt-0.5">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1z" />
+              </svg>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-primary mb-1">专业建议</h4>
+              <p className="text-xs text-gray-600 leading-relaxed">
+                粘贴完整的职位描述可获得最佳效果。无需担心页眉或页脚，我们的 AI
+                会自动过滤无关信息。
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 右侧：解析结果 */}
+        <div className="lg:col-span-7 xl:col-span-8 space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              解析结果
+              {parsedResult && (
+                <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium border border-green-200">
+                  实时
+                </span>
+              )}
+            </h2>
+          </div>
+
+          {parsedResult ? (
+            <>
+              {/* 职位信息卡片 */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-10">
+                  <Briefcase className="w-24 h-24 text-primary" />
+                </div>
+                <div className="relative z-10">
+                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-4">
+                    <div>
+                      <h1 className="text-2xl font-bold text-gray-900 mb-1">
+                        {parsedResult.title || '未识别职位名称'}
+                      </h1>
+                      <div className="flex items-center gap-2 text-gray-500 font-medium">
+                        <Briefcase className="w-4 h-4" />
+                        {parsedResult.company || '未识别公司'}
+                      </div>
+                    </div>
+                    {parsedResult.salary && (
+                      <div className="flex flex-col items-start md:items-end">
+                        <span className="text-2xl font-bold text-primary">{parsedResult.salary}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-3 mt-4">
+                    {parsedResult.location && (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded text-sm text-gray-600 border border-gray-100">
+                        <MapPin className="w-4 h-4 text-gray-400" />
+                        {parsedResult.location}
+                      </div>
+                    )}
+                    {parsedResult.experience && (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded text-sm text-gray-600 border border-gray-100">
+                        <Briefcase className="w-4 h-4 text-gray-400" />
+                        {parsedResult.experience}
+                      </div>
+                    )}
+                    {parsedResult.education && (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded text-sm text-gray-600 border border-gray-100">
+                        <GraduationCap className="w-4 h-4 text-gray-400" />
+                        {parsedResult.education}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 核心要求 */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                  <div className="flex items-center gap-2 mb-4 border-b border-gray-100 pb-3">
+                    <Check className="w-5 h-5 text-primary" />
+                    <h3 className="font-semibold text-gray-900">核心要求</h3>
+                  </div>
+                  <ul className="space-y-3">
+                    {parsedResult.requirements.length > 0 ? (
+                      parsedResult.requirements.slice(0, 5).map((req, index) => (
+                        <li key={index} className="flex items-start gap-3">
+                          <div className="mt-1 w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <Check className="w-3 h-3 text-primary" />
+                          </div>
+                          <span className="text-sm text-gray-700">{req}</span>
+                        </li>
+                      ))
+                    ) : (
+                      <li className="text-sm text-gray-400">暂未识别到具体要求</li>
+                    )}
+                  </ul>
+                </div>
+
+                {/* 加分项和技能 */}
+                <div className="space-y-6">
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                    <div className="flex items-center gap-2 mb-4 border-b border-gray-100 pb-3">
+                      <Star className="w-5 h-5 text-orange-500" />
+                      <h3 className="font-semibold text-gray-900">加分项</h3>
+                    </div>
+                    <ul className="space-y-3">
+                      {parsedResult.niceToHave.length > 0 ? (
+                        parsedResult.niceToHave.slice(0, 3).map((item, index) => (
+                          <li key={index} className="flex items-start gap-3">
+                            <Star className="w-4 h-4 text-orange-400 mt-0.5" />
+                            <span className="text-sm text-gray-700">{item}</span>
+                          </li>
+                        ))
+                      ) : (
+                        <li className="text-sm text-gray-400">暂未识别</li>
+                      )}
+                    </ul>
+                  </div>
+
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                    <div className="flex items-center gap-2 mb-4 pb-1">
+                      <Tag className="w-5 h-5 text-primary" />
+                      <h3 className="font-semibold text-gray-900">技能关键词</h3>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {parsedResult.skills.length > 0 ? (
+                        parsedResult.skills.map((skill, index) => (
+                          <span
+                            key={index}
+                            className="px-3 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full border border-primary/20"
+                          >
+                            {skill}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-sm text-gray-400">暂未识别技能</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 底部操作栏 */}
+              <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-4">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                    <span className="text-sm text-gray-500">
+                      分析置信度得分：
+                      <strong className="text-gray-900">
+                        {Math.round(parsedResult.confidence * 100)}%
+                      </strong>
+                    </span>
+                  </div>
+                  <div className="flex w-full md:w-auto gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={handleParse}
+                      className="flex-1 md:flex-none"
+                    >
+                      重新解析
+                    </Button>
+                    <Button
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      className="flex-1 md:flex-none"
+                    >
+                      {isSaving ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      ) : (
+                        <Bookmark className="w-4 h-4 mr-2" />
+                      )}
+                      保存岗位
+                    </Button>
+                    <Button className="flex-1 md:flex-none bg-orange-500 hover:bg-orange-600 shadow-lg shadow-orange-500/20">
+                      <FilePlus className="w-4 h-4 mr-2" />
+                      生成简历
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+              <Sparkles className="w-16 h-16 text-gray-200 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">等待解析</h3>
+              <p className="text-gray-500">粘贴职位描述并点击"开始智能分析"</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+}

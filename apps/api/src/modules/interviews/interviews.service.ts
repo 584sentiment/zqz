@@ -21,6 +21,17 @@ export interface SubmitAnswerDto {
   duration?: number;
 }
 
+export interface QuestionBankItem {
+  id: string;
+  category: string;
+  type: string;
+  difficulty: string;
+  question: string;
+  tags: string[];
+  keypoints: string[];
+  referenceAnswer: string;
+}
+
 @Injectable()
 export class InterviewsService {
   constructor(private prisma: PrismaService) {}
@@ -424,6 +435,234 @@ export class InterviewsService {
       { id: 'technical', name: '技术面试', icon: 'code' },
       { id: 'hr', name: 'HR 面试', icon: 'briefcase' },
       { id: 'situational', name: '情景面试', icon: 'target' },
+    ];
+  }
+
+  // ============== 面试题库 ==============
+
+  // 获取题库列表
+  async getQuestionBank(params?: {
+    category?: string;
+    difficulty?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const questions = this.getPredefinedQuestions();
+
+    let filtered = questions;
+
+    // 按分类筛选
+    if (params?.category) {
+      filtered = filtered.filter((q) => q.category === params.category);
+    }
+
+    // 按难度筛选
+    if (params?.difficulty) {
+      filtered = filtered.filter((q) => q.difficulty === params.difficulty);
+    }
+
+    // 搜索
+    if (params?.search) {
+      const searchLower = params.search.toLowerCase();
+      filtered = filtered.filter(
+        (q) =>
+          q.question.toLowerCase().includes(searchLower) ||
+          q.tags?.some((t: string) => t.toLowerCase().includes(searchLower))
+      );
+    }
+
+    const total = filtered.length;
+    const limit = params?.limit || 20;
+    const offset = params?.offset || 0;
+
+    return {
+      data: filtered.slice(offset, offset + limit),
+      pagination: {
+        total,
+        hasMore: offset + limit < total,
+      },
+    };
+  }
+
+  // 获取题目详情
+  async getQuestionDetail(questionId: string) {
+    const questions = this.getPredefinedQuestions();
+    const question = questions.find((q) => q.id === questionId);
+
+    if (!question) {
+      throw new NotFoundException('题目不存在');
+    }
+
+    return question;
+  }
+
+  // 预设题库
+  private getPredefinedQuestions(): QuestionBankItem[] {
+    return [
+      // 行为面试
+      {
+        id: 'b001',
+        category: 'behavioral',
+        type: 'behavioral',
+        difficulty: 'easy',
+        question: '请简单介绍一下自己。',
+        tags: ['自我介绍', '开场'],
+        keypoints: ['简洁明了', '突出相关经验', '展示个人特点'],
+        referenceAnswer:
+          '建议用 1-2 分钟介绍自己的教育背景、工作经历和核心技能，重点突出与应聘岗位相关的经验。最后可以简单说明为什么对这个岗位感兴趣。',
+      },
+      {
+        id: 'b002',
+        category: 'behavioral',
+        type: 'behavioral',
+        difficulty: 'medium',
+        question: '请描述一次你遇到的工作挑战，以及你是如何解决的？',
+        tags: ['挑战', '问题解决', 'STAR原则'],
+        keypoints: ['STAR 原则', '具体细节', '结果量化'],
+        referenceAnswer:
+          '使用 STAR 原则回答：Situation（情境）→ Task（任务）→ Action（行动）→ Result（结果）。重点描述你采取的具体行动和最终取得的成果。',
+      },
+      {
+        id: 'b003',
+        category: 'behavioral',
+        type: 'behavioral',
+        difficulty: 'medium',
+        question: '你如何处理与同事的意见分歧？',
+        tags: ['团队协作', '沟通', '冲突处理'],
+        keypoints: ['沟通方式', '寻求共识', '结果导向'],
+        referenceAnswer:
+          '描述一次具体的分歧经历，说明你如何倾听对方观点、寻找共同点、提出解决方案，最终达成共识的过程。',
+      },
+      {
+        id: 'b004',
+        category: 'behavioral',
+        type: 'behavioral',
+        difficulty: 'hard',
+        question: '请举例说明你是如何带领团队完成一个重要项目的。',
+        tags: ['领导力', '项目管理', '团队协作'],
+        keypoints: ['目标设定', '资源协调', '风险管控', '结果展示'],
+        referenceAnswer:
+          '重点描述你如何设定目标、分配任务、协调资源、激励团队、处理突发情况，以及最终达成的成果。',
+      },
+
+      // 技术面试 - 前端
+      {
+        id: 't001',
+        category: 'technical',
+        type: 'technical',
+        difficulty: 'easy',
+        question: '请解释什么是闭包？在 JavaScript 中有什么应用？',
+        tags: ['JavaScript', '闭包', '前端'],
+        keypoints: ['定义理解', '作用域链', '实际应用'],
+        referenceAnswer:
+          '闭包是指有权访问另一个函数作用域中变量的函数。常见应用包括：数据私有化、函数柯里化、模块模式、回调函数等。',
+      },
+      {
+        id: 't002',
+        category: 'technical',
+        type: 'technical',
+        difficulty: 'medium',
+        question: 'React 中的虚拟 DOM 是什么？它有什么优势？',
+        tags: ['React', '虚拟DOM', '前端'],
+        keypoints: ['概念理解', 'Diff算法', '性能优势'],
+        referenceAnswer:
+          '虚拟 DOM 是真实 DOM 的 JavaScript 对象表示。优势包括：减少真实 DOM 操作、跨平台能力、方便测试和调试。React 使用 Diff 算法比较新旧虚拟 DOM，只更新必要的部分。',
+      },
+      {
+        id: 't003',
+        category: 'technical',
+        type: 'technical',
+        difficulty: 'hard',
+        question: '请解释浏览器从输入 URL 到页面展示的完整过程。',
+        tags: ['浏览器', '网络', '渲染'],
+        keypoints: ['DNS解析', 'TCP连接', 'HTTP请求', '渲染流程'],
+        referenceAnswer:
+          '主要包括：DNS解析 → TCP连接 → HTTP请求 → 服务器响应 → 浏览器解析HTML → 构建DOM树 → 构建CSSOM树 → 执行JavaScript → 渲染树 → 布局 → 绘制。每个环节都有很多细节可以展开。',
+      },
+
+      // 技术面试 - 后端
+      {
+        id: 't004',
+        category: 'technical',
+        type: 'technical',
+        difficulty: 'medium',
+        question: '请解释 RESTful API 的设计原则。',
+        tags: ['API设计', 'REST', '后端'],
+        keypoints: ['资源导向', 'HTTP方法', '状态码', '无状态'],
+        referenceAnswer:
+          'RESTful API 设计原则包括：使用名词表示资源、使用HTTP方法表示操作（GET/POST/PUT/DELETE）、使用正确的状态码、无状态设计、版本控制、过滤和分页等。',
+      },
+      {
+        id: 't005',
+        category: 'technical',
+        type: 'technical',
+        difficulty: 'hard',
+        question: '如何设计一个高并发系统？',
+        tags: ['系统设计', '高并发', '架构'],
+        keypoints: ['负载均衡', '缓存', '数据库优化', '异步处理'],
+        referenceAnswer:
+          '高并发系统设计要点：1）负载均衡（Nginx、服务网关）；2）缓存策略（Redis、CDN）；3）数据库优化（索引、分库分表、读写分离）；4）异步处理（消息队列）；5）服务拆分（微服务）；6）限流降级。',
+      },
+
+      // HR 面试
+      {
+        id: 'h001',
+        category: 'hr',
+        type: 'hr',
+        difficulty: 'easy',
+        question: '你为什么想离开目前的公司？',
+        tags: ['离职原因', '职业规划'],
+        keypoints: ['积极正面', '发展导向', '避免负面'],
+        referenceAnswer:
+          '从个人发展角度回答，强调对新机会的期待，而非对现有公司的不满。可以提到：寻求更大发展空间、希望接触新技术、对行业方向感兴趣等。',
+      },
+      {
+        id: 'h002',
+        category: 'hr',
+        type: 'hr',
+        difficulty: 'medium',
+        question: '你的薪资期望是多少？',
+        tags: ['薪资谈判', '期望'],
+        keypoints: ['市场调研', '价值匹配', '灵活态度'],
+        referenceAnswer:
+          '建议先了解市场行情，给出合理区间而非具体数字。可以表示：根据我的经验和能力，期望在 X-Y 范围内，但也愿意根据公司整体package来协商。',
+      },
+      {
+        id: 'h003',
+        category: 'hr',
+        type: 'hr',
+        difficulty: 'hard',
+        question: '你觉得自己有什么缺点？',
+        tags: ['自我认知', '缺点'],
+        keypoints: ['真实可信', '改进措施', '正面转化'],
+        referenceAnswer:
+          '选择真实但可改进的缺点，并说明你正在采取的改进措施。避免说"没有缺点"或提到影响工作的致命缺点。',
+      },
+
+      // 情景面试
+      {
+        id: 's001',
+        category: 'situational',
+        type: 'situational',
+        difficulty: 'medium',
+        question: '如果你的项目进度落后，你会怎么处理？',
+        tags: ['项目管理', '进度控制'],
+        keypoints: ['分析原因', '调整计划', '沟通协调'],
+        referenceAnswer:
+          '首先分析落后原因（需求变更、资源不足、技术困难等），然后制定赶工计划（加班、增加资源、调整范围），同时及时与相关方沟通，管理预期。',
+      },
+      {
+        id: 's002',
+        category: 'situational',
+        type: 'situational',
+        difficulty: 'hard',
+        question: '如果客户的需求与你的专业判断冲突，你会如何处理？',
+        tags: ['沟通', '专业判断', '客户关系'],
+        keypoints: ['倾听理解', '专业建议', '寻求平衡'],
+        referenceAnswer:
+          '先充分理解客户的真实需求和顾虑，然后用专业角度解释可能的风险和更好的替代方案，最终寻求双赢的解决方案。',
+      },
     ];
   }
 

@@ -33,6 +33,23 @@ export class InterviewsController {
     return this.interviewsService.getQuestionCategories();
   }
 
+  // 面试题库
+  @Get('questions')
+  async getQuestionBank(@Query() query: { category?: string; difficulty?: string; search?: string; limit?: string; offset?: string }) {
+    return this.interviewsService.getQuestionBank({
+      category: query.category,
+      difficulty: query.difficulty,
+      search: query.search,
+      limit: query.limit ? parseInt(query.limit, 10) : undefined,
+      offset: query.offset ? parseInt(query.offset, 10) : undefined,
+    });
+  }
+
+  @Get('questions/:id')
+  async getQuestionDetail(@Param('id') id: string) {
+    return this.interviewsService.getQuestionDetail(id);
+  }
+
   @Get(':id')
   async getOne(@Request() req: { user: { userId: string } }, @Param('id') id: string) {
     return this.interviewsService.getOne(req.user.userId, id);

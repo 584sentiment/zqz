@@ -70,6 +70,26 @@ export interface PreparationPlanListItem {
   progress: number;
 }
 
+// 面试题库相关类型
+export interface QuestionBankItem {
+  id: string;
+  category: string;
+  type: string;
+  difficulty: string;
+  question: string;
+  tags: string[];
+  keypoints: string[];
+  referenceAnswer: string;
+}
+
+export interface QuestionBankListResponse {
+  data: QuestionBankItem[];
+  pagination: {
+    total: number;
+    hasMore: boolean;
+  };
+}
+
 export const interviewsApi = {
   async getList(params?: { status?: string; type?: string }): Promise<Interview[]> {
     const searchParams = new URLSearchParams();
@@ -175,6 +195,34 @@ export const interviewsApi = {
   async deletePreparationPlan(id: string): Promise<{ success: boolean }> {
     const response = await apiClient.delete<{ success: boolean }>(
       `/interviews/preparations/${id}`
+    );
+    return response.data;
+  },
+
+  // 面试题库
+  async getQuestionBank(params?: {
+    category?: string;
+    difficulty?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<QuestionBankListResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.category) searchParams.set('category', params.category);
+    if (params?.difficulty) searchParams.set('difficulty', params.difficulty);
+    if (params?.search) searchParams.set('search', params.search);
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.offset) searchParams.set('offset', params.offset.toString());
+    const query = searchParams.toString();
+    const response = await apiClient.get<QuestionBankListResponse>(
+      `/interviews/questions${query ? `?${query}` : ''}`
+    );
+    return response.data;
+  },
+
+  async getQuestionDetail(questionId: string): Promise<QuestionBankItem> {
+    const response = await apiClient.get<QuestionBankItem>(
+      `/interviews/questions/${questionId}`
     );
     return response.data;
   },

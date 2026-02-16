@@ -142,7 +142,7 @@ export class SubscriptionsService {
         userId,
         action,
         resource,
-        metadata,
+        metadata: metadata ? JSON.parse(JSON.stringify(metadata)) : undefined,
       },
     });
   }

@@ -18,6 +18,8 @@ import {
   Eye,
   FileText,
   Clock,
+  Archive,
+  ArchiveRestore,
 } from 'lucide-react';
 
 export default function JobsPage() {
@@ -66,6 +68,40 @@ export default function JobsPage() {
     }
   };
 
+  const handleArchive = async (jobId: string) => {
+    try {
+      await jobsApi.update(jobId, { status: 'archived' } as Job);
+      toast({
+        title: '归档成功',
+        description: '岗位已归档',
+      });
+      loadJobs();
+    } catch (error) {
+      toast({
+        title: '归档失败',
+        description: '请稍后重试',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRestore = async (jobId: string) => {
+    try {
+      await jobsApi.update(jobId, { status: 'active' } as Job);
+      toast({
+        title: '恢复成功',
+        description: '岗位已恢复到活跃列表',
+      });
+      loadJobs();
+    } catch (error) {
+      toast({
+        title: '恢复失败',
+        description: '请稍后重试',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const filteredJobs = jobs.filter((job) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -78,20 +114,24 @@ export default function JobsPage() {
 
   const statusOptions = [
     { value: 'all', label: '全部状态' },
+    { value: 'active', label: '活跃' },
     { value: 'pending', label: '待处理' },
     { value: 'applied', label: '已申请' },
     { value: 'interview', label: '面试中' },
     { value: 'offer', label: '已录用' },
     { value: 'rejected', label: '已拒绝' },
+    { value: 'archived', label: '已归档' },
   ];
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { bg: string; text: string; label: string }> = {
+      active: { bg: 'bg-green-100', text: 'text-green-700', label: '活跃' },
       pending: { bg: 'bg-gray-100', text: 'text-gray-700', label: '待处理' },
       applied: { bg: 'bg-blue-100', text: 'text-blue-700', label: '已申请' },
       interview: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: '面试中' },
       offer: { bg: 'bg-green-100', text: 'text-green-700', label: '已录用' },
       rejected: { bg: 'bg-red-100', text: 'text-red-700', label: '已拒绝' },
+      archived: { bg: 'bg-gray-100', text: 'text-gray-500', label: '已归档' },
     };
     return statusMap[status] || statusMap.pending;
   };
@@ -240,6 +280,26 @@ export default function JobsPage() {
                           查看
                         </Button>
                       </Link>
+                      {job.status === 'archived' ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRestore(job.id)}
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        >
+                          <ArchiveRestore className="w-4 h-4 mr-1" />
+                          恢复
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleArchive(job.id)}
+                          className="text-gray-600 hover:text-gray-700 hover:bg-gray-50"
+                        >
+                          <Archive className="w-4 h-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"

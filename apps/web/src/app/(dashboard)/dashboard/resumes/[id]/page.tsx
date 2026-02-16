@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { resumesApi, Resume } from '@/lib/api/resumes';
+import { resumesApi, Resume, MatchAnalysis } from '@/lib/api/resumes';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,12 +14,17 @@ import {
   Sparkles,
   Loader2,
   Edit2,
-  Eye,
   FileText,
   Briefcase,
   Star,
   Copy,
   Trash2,
+  Target,
+  TrendingUp,
+  CheckCircle,
+  AlertCircle,
+  XCircle,
+  BarChart3,
 } from 'lucide-react';
 
 export default function ResumeDetailPage() {
@@ -33,6 +38,10 @@ export default function ResumeDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [matchAnalysis, setMatchAnalysis] = useState<MatchAnalysis | null>(null);
+  const [showMatchDetails, setShowMatchDetails] = useState(false);
 
   // 编辑状态
   const [editedContent, setEditedContent] = useState<Record<string, unknown>>({});
@@ -161,6 +170,51 @@ export default function ResumeDetailPage() {
     }
   };
 
+  const handleExportPdf = async () => {
+    if (!resume) return;
+    setIsExporting(true);
+    try {
+      const result = await resumesApi.exportPdf(resume.id);
+
+      // 创建 Blob 并下载
+      const blob = new Blob([result.html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.filename.replace('.pdf', '.html'); // 暂时保存为 HTML
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: '导出成功',
+        description: '简历已导出为 HTML 文件，可使用浏览器打印功能转为 PDF',
+      });
+    } catch (error) {
+      toast({ title: '导出失败', description: '请稍后重试', variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleAnalyzeMatch = async () => {
+    if (!resume) return;
+    setIsAnalyzing(true);
+    try {
+      const analysis = await resumesApi.analyzeMatch(resume.id);
+      setMatchAnalysis(analysis);
+      setShowMatchDetails(true);
+
+      // 更新简历的匹配分数
+      setResume({ ...resume, matchScore: analysis.score / 100 });
+    } catch (error) {
+      toast({ title: '分析失败', description: '请确保简历已关联岗位', variant: 'destructive' });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -214,12 +268,15 @@ export default function ResumeDetailPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               {resume.status === 'completed' && resume.matchScore && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-green-50 rounded-lg">
+                <button
+                  onClick={handleAnalyzeMatch}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-50 rounded-lg hover:bg-green-100 transition cursor-pointer"
+                >
                   <Star className="w-5 h-5 text-green-600" />
                   <span className="font-medium text-green-700">
                     {Math.round(resume.matchScore * 100)}% 岗位匹配
                   </span>
-                </div>
+                </button>
               )}
               <span
                 className={`px-3 py-1 rounded-full text-sm font-medium ${
@@ -263,6 +320,20 @@ export default function ResumeDetailPage() {
               )}
               {resume.status === 'completed' && (
                 <>
+                  {resume.jobId && (
+                    <Button
+                      variant="outline"
+                      onClick={handleAnalyzeMatch}
+                      disabled={isAnalyzing}
+                    >
+                      {isAnalyzing ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Target className="w-4 h-4 mr-2" />
+                      )}
+                      匹配分析
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     onClick={() => setIsEditing(!isEditing)}
@@ -280,15 +351,159 @@ export default function ResumeDetailPage() {
                       保存
                     </Button>
                   )}
-                  <Button variant="outline">
-                    <Download className="w-4 h-4 mr-2" />
-                    导出 PDF
+                  <Button variant="outline" onClick={handleExportPdf} disabled={isExporting}>
+                    {isExporting ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4 mr-2" />
+                    )}
+                    导出
                   </Button>
                 </>
               )}
             </div>
           </div>
         </div>
+
+        {/* 匹配度分析详情 */}
+        {showMatchDetails && matchAnalysis && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-primary" />
+                岗位匹配度分析
+              </h2>
+              <button
+                onClick={() => setShowMatchDetails(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 总分 */}
+            <div className="flex items-center gap-6 mb-6">
+              <div className="text-center">
+                <div className="text-4xl font-bold text-primary">{matchAnalysis.score}</div>
+                <div className="text-sm text-gray-500">总分</div>
+              </div>
+              <div className="flex-1">
+                <div className="h-4 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      matchAnalysis.score >= 80
+                        ? 'bg-green-500'
+                        : matchAnalysis.score >= 60
+                        ? 'bg-yellow-500'
+                        : 'bg-red-500'
+                    }`}
+                    style={{ width: `${matchAnalysis.score}%` }}
+                  />
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  {matchAnalysis.breakdown.overall.details}
+                </p>
+              </div>
+            </div>
+
+            {/* 维度分析 */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-gray-600">技能匹配</span>
+                  <span className="font-semibold text-gray-900">{matchAnalysis.breakdown.skills.score}%</span>
+                </div>
+                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full"
+                    style={{ width: `${matchAnalysis.breakdown.skills.score}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">{matchAnalysis.breakdown.skills.details}</p>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-gray-600">经历匹配</span>
+                  <span className="font-semibold text-gray-900">{matchAnalysis.breakdown.experience.score}%</span>
+                </div>
+                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full"
+                    style={{ width: `${matchAnalysis.breakdown.experience.score}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">{matchAnalysis.breakdown.experience.details}</p>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-gray-600">学历匹配</span>
+                  <span className="font-semibold text-gray-900">{matchAnalysis.breakdown.education.score}%</span>
+                </div>
+                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full"
+                    style={{ width: `${matchAnalysis.breakdown.education.score}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">{matchAnalysis.breakdown.education.details}</p>
+              </div>
+            </div>
+
+            {/* 匹配的技能 */}
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+                <CheckCircle className="w-4 h-4 text-green-500" />
+                匹配的技能
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {matchAnalysis.matchedSkills.map((skill, index) => (
+                  <span
+                    key={index}
+                    className="px-2 py-1 bg-green-50 text-green-700 text-sm rounded"
+                  >
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* 缺失的技能 */}
+            {matchAnalysis.missingSkills.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4 text-yellow-500" />
+                  建议补充
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {matchAnalysis.missingSkills.map((skill, index) => (
+                    <span
+                      key={index}
+                      className="px-2 py-1 bg-yellow-50 text-yellow-700 text-sm rounded"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 改进建议 */}
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+                <TrendingUp className="w-4 h-4 text-blue-500" />
+                改进建议
+              </h3>
+              <ul className="space-y-1">
+                {matchAnalysis.recommendations.map((rec, index) => (
+                  <li key={index} className="text-sm text-gray-600 flex items-start gap-2">
+                    <span className="text-primary mt-1">•</span>
+                    {rec}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
 
         {/* 简历内容 */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">

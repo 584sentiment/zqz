@@ -28,6 +28,24 @@ export interface ResumeTemplate {
   isPremium: boolean;
 }
 
+export interface MatchAnalysis {
+  score: number;
+  matchedSkills: string[];
+  missingSkills: string[];
+  recommendations: string[];
+  breakdown: {
+    skills: { score: number; details: string };
+    experience: { score: number; details: string };
+    education: { score: number; details: string };
+    overall: { score: number; details: string };
+  };
+}
+
+export interface PdfExportResult {
+  html: string;
+  filename: string;
+}
+
 export const resumesApi = {
   async getList(params?: { jobId?: string; status?: string }): Promise<Resume[]> {
     const searchParams = new URLSearchParams();
@@ -70,5 +88,15 @@ export const resumesApi = {
 
   async delete(id: string): Promise<void> {
     await apiClient.delete(`/resumes/${id}`);
+  },
+
+  async analyzeMatch(id: string): Promise<MatchAnalysis> {
+    const response = await apiClient.get<MatchAnalysis>(`/resumes/${id}/match`);
+    return response.data;
+  },
+
+  async exportPdf(id: string): Promise<PdfExportResult> {
+    const response = await apiClient.get<PdfExportResult>(`/resumes/${id}/export`);
+    return response.data;
   },
 };

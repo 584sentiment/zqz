@@ -78,6 +78,22 @@ export class ResumesController {
   }
 
   /**
+   * 分析匹配度
+   */
+  @Get(':id/match')
+  async analyzeMatch(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.resumesService.analyzeMatch(req.user.id, id);
+  }
+
+  /**
+   * 导出 PDF
+   */
+  @Get(':id/export')
+  async exportPdf(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.resumesService.generatePdf(req.user.id, id);
+  }
+
+  /**
    * 删除简历
    */
   @Delete(':id')

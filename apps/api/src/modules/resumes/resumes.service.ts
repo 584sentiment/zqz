@@ -1,6 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
 
+interface MatchAnalysis {
+  score: number;
+  matchedSkills: string[];
+  missingSkills: string[];
+  recommendations: string[];
+  breakdown: {
+    skills: { score: number; details: string };
+    experience: { score: number; details: string };
+    education: { score: number; details: string };
+    overall: { score: number; details: string };
+  };
+}
+
 @Injectable()
 export class ResumesService {
   constructor(private prisma: PrismaService) {}
@@ -164,5 +177,349 @@ export class ResumesService {
         isPremium: true,
       },
     ];
+  }
+
+  /**
+   * 分析简历与岗位的匹配度
+   */
+  async analyzeMatch(userId: string, resumeId: string): Promise<MatchAnalysis> {
+    const resume = await this.getOne(userId, resumeId);
+
+    if (!resume.jobId || !resume.job) {
+      throw new NotFoundException('该简历未关联岗位，无法分析匹配度');
+    }
+
+    const content = (resume.content as Record<string, unknown>) || {};
+    const jobRequirements = (resume.job.requirements as Record<string, unknown>) || {};
+    const jobDescription = resume.job.description || '';
+
+    // 提取简历中的技能
+    const resumeSkills = ((content.skills as string[]) || []).map((s) => s.toLowerCase());
+
+    // 提取岗位要求的技能（从 requirements 或 description）
+    const requiredSkills = this.extractSkillsFromJob(jobRequirements, jobDescription);
+
+    // 计算技能匹配
+    const matchedSkills = resumeSkills.filter((skill) =>
+      requiredSkills.some((req) => req.includes(skill) || skill.includes(req))
+    );
+    const missingSkills = requiredSkills.filter(
+      (req) => !resumeSkills.some((skill) => skill.includes(req) || req.includes(skill))
+    );
+
+    const skillsScore = requiredSkills.length > 0
+      ? Math.round((matchedSkills.length / requiredSkills.length) * 100)
+      : 70;
+
+    // 分析工作经历匹配度
+    const experiences = (content.experience as Array<Record<string, unknown>>) || [];
+    const experienceScore = this.calculateExperienceScore(experiences, jobDescription);
+
+    // 分析教育背景匹配度
+    const education = (content.education as Array<Record<string, unknown>>) || [];
+    const educationScore = this.calculateEducationScore(education, jobRequirements);
+
+    // 计算总分
+    const overallScore = Math.round(skillsScore * 0.5 + experienceScore * 0.35 + educationScore * 0.15);
+
+    // 生成建议
+    const recommendations = this.generateRecommendations(
+      matchedSkills,
+      missingSkills,
+      skillsScore,
+      experienceScore
+    );
+
+    // 更新简历的匹配分数
+    await this.prisma.resume.update({
+      where: { id: resumeId },
+      data: { matchScore: overallScore / 100 },
+    });
+
+    return {
+      score: overallScore,
+      matchedSkills,
+      missingSkills,
+      recommendations,
+      breakdown: {
+        skills: {
+          score: skillsScore,
+          details: `匹配 ${matchedSkills.length}/${requiredSkills.length} 项技能要求`,
+        },
+        experience: {
+          score: experienceScore,
+          details: experiences.length > 0
+            ? `${experiences.length} 段相关工作经历`
+            : '建议添加工作经历',
+        },
+        education: {
+          score: educationScore,
+          details: education.length > 0
+            ? '教育背景符合要求'
+            : '建议完善教育经历',
+        },
+        overall: {
+          score: overallScore,
+          details: overallScore >= 80
+            ? '简历与岗位高度匹配'
+            : overallScore >= 60
+            ? '简历与岗位基本匹配，建议优化'
+            : '简历与岗位匹配度较低，建议大幅调整',
+        },
+      },
+    };
+  }
+
+  /**
+   * 从岗位信息中提取技能要求
+   */
+  private extractSkillsFromJob(
+    requirements: Record<string, unknown>,
+    description: string
+  ): string[] {
+    const skills: Set<string> = new Set();
+
+    // 从 requirements.skills 提取
+    const reqSkills = requirements.skills as string[] | undefined;
+    if (reqSkills) {
+      reqSkills.forEach((s) => skills.add(s.toLowerCase()));
+    }
+
+    // 从描述中提取常见技能关键词
+    const commonSkills = [
+      'javascript', 'typescript', 'python', 'java', 'go', 'rust', 'c++',
+      'react', 'vue', 'angular', 'nextjs', 'node.js', 'express',
+      'postgresql', 'mysql', 'mongodb', 'redis',
+      'docker', 'kubernetes', 'aws', 'azure', 'gcp',
+      'git', 'linux', 'agile', 'scrum',
+      'machine learning', 'ai', 'data analysis',
+    ];
+
+    const lowerDesc = description.toLowerCase();
+    commonSkills.forEach((skill) => {
+      if (lowerDesc.includes(skill)) {
+        skills.add(skill);
+      }
+    });
+
+    return Array.from(skills);
+  }
+
+  /**
+   * 计算工作经历得分
+   */
+  private calculateExperienceScore(
+    experiences: Array<Record<string, unknown>>,
+    jobDescription: string
+  ): number {
+    if (experiences.length === 0) return 40;
+
+    let score = 60; // 基础分
+
+    // 根据经历数量加分
+    if (experiences.length >= 3) score += 10;
+    if (experiences.length >= 5) score += 5;
+
+    // 检查是否有相关经历
+    const jobKeywords = jobDescription.toLowerCase().split(/\s+/);
+    experiences.forEach((exp) => {
+      const highlights = (exp.highlights as string[]) || [];
+      const position = (exp.position as string) || '';
+
+      highlights.forEach((h) => {
+        jobKeywords.forEach((keyword) => {
+          if (h.toLowerCase().includes(keyword)) {
+            score += 2;
+          }
+        });
+      });
+
+      if (jobDescription.toLowerCase().includes(position.toLowerCase())) {
+        score += 5;
+      }
+    });
+
+    return Math.min(100, score);
+  }
+
+  /**
+   * 计算教育背景得分
+   */
+  private calculateEducationScore(
+    education: Array<Record<string, unknown>>,
+    requirements: Record<string, unknown>
+  ): number {
+    if (education.length === 0) return 50;
+
+    let score = 70;
+
+    const reqEducation = requirements.education as string | undefined;
+    if (reqEducation) {
+      education.forEach((edu) => {
+        const degree = (edu.degree as string) || '';
+        const major = (edu.major as string) || '';
+
+        if (reqEducation.includes(degree) || reqEducation.includes(major)) {
+          score += 10;
+        }
+      });
+    }
+
+    return Math.min(100, score);
+  }
+
+  /**
+   * 生成改进建议
+   */
+  private generateRecommendations(
+    matchedSkills: string[],
+    missingSkills: string[],
+    skillsScore: number,
+    experienceScore: number
+  ): string[] {
+    const recommendations: string[] = [];
+
+    if (missingSkills.length > 0 && missingSkills.length <= 5) {
+      recommendations.push(`建议补充以下技能相关经验：${missingSkills.join('、')}`);
+    }
+
+    if (skillsScore < 70) {
+      recommendations.push('技能匹配度较低，建议根据岗位要求调整技能展示顺序');
+    }
+
+    if (experienceScore < 70) {
+      recommendations.push('建议在工作经历中突出与岗位相关的项目成果');
+    }
+
+    if (matchedSkills.length > 0) {
+      recommendations.push(`技能匹配良好，建议在简历中突出展示：${matchedSkills.slice(0, 5).join('、')}`);
+    }
+
+    recommendations.push('建议使用量化数据展示工作成果');
+
+    return recommendations;
+  }
+
+  /**
+   * 生成 PDF（返回 HTML 用于前端生成 PDF）
+   */
+  async generatePdf(userId: string, resumeId: string): Promise<{ html: string; filename: string }> {
+    const resume = await this.getOne(userId, resumeId);
+
+    if (resume.status !== 'completed') {
+      throw new NotFoundException('简历尚未生成完成，无法导出');
+    }
+
+    const content = (resume.content as Record<string, unknown>) || {};
+    const filename = `${resume.name.replace(/\s+/g, '_')}_简历.pdf`;
+
+    // 生成简单的 HTML（前端可以使用 html2pdf 或类似库转换为 PDF）
+    const html = this.generateResumeHtml(resume.name, content, resume.job);
+
+    return { html, filename };
+  }
+
+  /**
+   * 生成简历 HTML
+   */
+  private generateResumeHtml(
+    name: string,
+    content: Record<string, unknown>,
+    job?: { title?: string | null; company?: string | null } | null
+  ): string {
+    const summary = (content.summary as string) || '';
+    const skills = (content.skills as string[]) || [];
+    const experiences = (content.experience as Array<Record<string, unknown>>) || [];
+    const education = (content.education as Array<Record<string, unknown>>) || [];
+
+    return `
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>${name} - 简历</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    h1 { font-size: 28px; margin-bottom: 8px; color: #1a1a1a; }
+    .subtitle { color: #666; margin-bottom: 24px; font-size: 14px; }
+    h2 {
+      font-size: 16px;
+      border-bottom: 2px solid #2563eb;
+      padding-bottom: 8px;
+      margin: 24px 0 16px;
+      color: #1a1a1a;
+    }
+    .summary { color: #555; margin-bottom: 16px; }
+    .skills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .skill {
+      background: #eff6ff;
+      color: #2563eb;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+    }
+    .experience-item, .education-item {
+      margin-bottom: 16px;
+      padding-left: 16px;
+      border-left: 3px solid #e5e7eb;
+    }
+    .experience-item h3, .education-item h3 { font-size: 15px; margin-bottom: 4px; }
+    .experience-item .meta, .education-item .meta {
+      color: #666;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    .highlights { padding-left: 20px; }
+    .highlights li { color: #555; margin-bottom: 4px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>${name}</h1>
+  ${job?.title ? `<div class="subtitle">应聘：${job.title}${job.company ? ` @ ${job.company}` : ''}</div>` : ''}
+
+  ${summary ? `<h2>个人简介</h2><p class="summary">${summary}</p>` : ''}
+
+  ${skills.length > 0 ? `
+  <h2>专业技能</h2>
+  <div class="skills">
+    ${skills.map((s) => `<span class="skill">${s}</span>`).join('')}
+  </div>
+  ` : ''}
+
+  ${experiences.length > 0 ? `
+  <h2>工作经历</h2>
+  ${experiences.map((exp) => `
+    <div class="experience-item">
+      <h3>${exp.position as string}</h3>
+      <div class="meta">${exp.company as string} | ${exp.period as string}</div>
+      ${((exp.highlights as string[]) || []).length > 0 ? `
+        <ul class="highlights">
+          ${(exp.highlights as string[]).map((h) => `<li>${h}</li>`).join('')}
+        </ul>
+      ` : ''}
+    </div>
+  `).join('')}
+  ` : ''}
+
+  ${education.length > 0 ? `
+  <h2>教育经历</h2>
+  ${education.map((edu) => `
+    <div class="education-item">
+      <h3>${edu.school as string}</h3>
+      <div class="meta">${edu.major as string} · ${edu.degree as string} | ${edu.period as string}</div>
+    </div>
+  `).join('')}
+  ` : ''}
+</body>
+</html>
+    `.trim();
   }
 }

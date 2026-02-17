@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/stores/auth';
+import { AlertCircle } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('请输入有效的邮箱地址'),
@@ -23,14 +24,23 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const { setUser, setTokens } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [rateLimitInfo, setRateLimitInfo] = useState<{
     remainingAttempts?: number;
     locked?: boolean;
     remainingMinutes?: number;
   } | null>(null);
+
+  // 检查是否是会话过期导致的重定向
+  useEffect(() => {
+    if (searchParams.get('session') === 'expired') {
+      setSessionExpired(true);
+    }
+  }, [searchParams]);
 
   const {
     register,
@@ -125,6 +135,14 @@ export default function LoginPage() {
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
+          {/* 会话过期提示 */}
+          {sessionExpired && (
+            <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <p className="text-sm">您的登录已过期，请重新登录</p>
+            </div>
+          )}
+
           <div className="space-y-4">
             <div>
               <Label htmlFor="email">邮箱</Label>

@@ -18,11 +18,13 @@ const clearTokens = () => {
   if (isBrowser()) {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('auth-storage');
   }
 };
 const redirectToLogin = () => {
   if (isBrowser()) {
-    window.location.href = '/login';
+    // 使用 Next.js 路由进行重定向
+    window.location.href = '/login?session=expired';
   }
 };
 
@@ -71,10 +73,17 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // 如果是 401 且不是刷新 token 的请求
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // 如果是 401 错误
+    if (error.response?.status === 401) {
       // 如果是刷新 token 接口本身返回 401，直接跳转登录
       if (originalRequest.url?.includes('/auth/refresh')) {
+        clearTokens();
+        redirectToLogin();
+        return Promise.reject(error);
+      }
+
+      // 如果已经重试过，直接跳转登录
+      if (originalRequest._retry) {
         clearTokens();
         redirectToLogin();
         return Promise.reject(error);
@@ -89,7 +98,10 @@ apiClient.interceptors.response.use(
             originalRequest.headers.Authorization = `Bearer ${token}`;
             return apiClient(originalRequest);
           })
-          .catch((err) => Promise.reject(err));
+          .catch(() => {
+            // 队列中的请求失败时，已经由刷新逻辑处理了重定向
+            return Promise.reject(error);
+          });
       }
 
       originalRequest._retry = true;
@@ -98,6 +110,7 @@ apiClient.interceptors.response.use(
       const refreshToken = getRefreshToken();
       if (!refreshToken) {
         isRefreshing = false;
+        clearTokens();
         redirectToLogin();
         return Promise.reject(error);
       }
@@ -110,11 +123,11 @@ apiClient.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
         processQueue(null, data.accessToken);
         return apiClient(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError as Error, null);
+      } catch {
+        processQueue(new Error('Token refresh failed'), null);
         clearTokens();
         redirectToLogin();
-        return Promise.reject(refreshError);
+        return Promise.reject(error);
       } finally {
         isRefreshing = false;
       }

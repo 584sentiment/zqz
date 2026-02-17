@@ -75,8 +75,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   };
 
-  // 从 API 获取最新用户信息
+  // 从 API 获取最新用户信息（仅在需要时）
   useEffect(() => {
+    // 在以下情况下获取最新用户信息：
+    // 1. 用户信息不完整时
+    // 2. 用户尚未验证邮箱时（可能刚验证完，需要刷新状态）
+    if (!user || (user.name && user.emailVerified)) {
+      return;
+    }
+
+    let isMounted = true;
+
     const fetchUser = async () => {
       try {
         const response = await apiClient.get<{
@@ -88,24 +97,28 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           profile?: { name?: string };
         }>('/users/me');
         const data = response.data;
-        // 更新 auth store 中的用户信息
-        setUser({
-          id: data.id,
-          email: data.email,
-          name: data.nickname || data.profile?.name || '用户',
-          avatarUrl: data.avatarUrl,
-          emailVerified: data.emailVerified,
-        });
-      } catch (error) {
+
+        if (isMounted) {
+          // 更新 auth store 中的用户信息
+          setUser({
+            id: data.id,
+            email: data.email,
+            name: data.nickname || data.profile?.name || '用户',
+            avatarUrl: data.avatarUrl,
+            emailVerified: data.emailVerified,
+          });
+        }
+      } catch {
         // 静默失败，可能是 token 过期，由 API client 处理
       }
     };
 
-    // 只在用户信息不完整时获取
-    if (!user?.name) {
-      fetchUser();
-    }
-  }, [user?.name, setUser]);
+    fetchUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, user?.name, user?.emailVerified, setUser]);
 
   // 关闭移动菜单当路由变化
   useEffect(() => {

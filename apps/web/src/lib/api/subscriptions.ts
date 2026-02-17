@@ -41,4 +41,12 @@ export const subscriptionsApi = {
     const response = await apiClient.get<PlanInfo[]>('/subscriptions/plans');
     return response.data;
   },
+
+  async updateAutoRenew(autoRenew: boolean): Promise<{ success: boolean; autoRenew: boolean }> {
+    const response = await apiClient.patch<{ success: boolean; autoRenew: boolean }>(
+      '/subscriptions/auto-renew',
+      { autoRenew },
+    );
+    return response.data;
+  },
 };

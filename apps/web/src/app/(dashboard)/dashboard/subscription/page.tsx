@@ -16,6 +16,7 @@ import {
   Zap,
   ChevronRight,
   Loader2,
+  RefreshCw,
 } from 'lucide-react';
 
 export default function SubscriptionPage() {
@@ -23,6 +24,7 @@ export default function SubscriptionPage() {
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [plans, setPlans] = useState<PlanInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUpdatingAutoRenew, setIsUpdatingAutoRenew] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -58,6 +60,31 @@ export default function SubscriptionPage() {
     if (percentage >= 90) return 'bg-red-500';
     if (percentage >= 70) return 'bg-yellow-500';
     return 'bg-primary';
+  };
+
+  const handleToggleAutoRenew = async () => {
+    if (!subscription || subscription.plan === 'free') return;
+
+    setIsUpdatingAutoRenew(true);
+    try {
+      const newAutoRenew = !subscription.autoRenew;
+      await subscriptionsApi.updateAutoRenew(newAutoRenew);
+      setSubscription({ ...subscription, autoRenew: newAutoRenew });
+      toast({
+        title: newAutoRenew ? '已开启自动续费' : '已关闭自动续费',
+        description: newAutoRenew
+          ? '套餐到期后将自动续费'
+          : '套餐到期后将降级为免费版',
+      });
+    } catch (error) {
+      toast({
+        title: '设置失败',
+        description: '无法更新自动续费设置',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdatingAutoRenew(false);
+    }
   };
 
   if (isLoading) {
@@ -189,6 +216,42 @@ export default function SubscriptionPage() {
                 ))}
               </div>
             </div>
+
+            {/* 自动续费设置 - 仅付费用户显示 */}
+            {subscription.plan !== 'free' && (
+              <div className="mt-6 pt-6 border-t border-gray-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <RefreshCw className="w-5 h-5 text-gray-400" />
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-900">自动续费</h3>
+                      <p className="text-xs text-gray-500">
+                        {subscription.autoRenew
+                          ? '套餐到期后将自动续费'
+                          : '套餐到期后将降级为免费版'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleToggleAutoRenew}
+                    disabled={isUpdatingAutoRenew}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      subscription.autoRenew ? 'bg-primary' : 'bg-gray-200'
+                    } ${isUpdatingAutoRenew ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    {isUpdatingAutoRenew ? (
+                      <Loader2 className="w-4 h-4 animate-spin absolute left-1/2 -translate-x-1/2 text-white" />
+                    ) : (
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          subscription.autoRenew ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

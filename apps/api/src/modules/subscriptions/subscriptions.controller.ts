@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Patch, Body, UseGuards, Request, BadRequestException } from '@nestjs/common';
 import { SubscriptionsService } from './subscriptions.service';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 
@@ -21,5 +21,24 @@ export class SubscriptionsController {
   @Get('plans')
   async getPlans() {
     return this.subscriptionsService.getPlans();
+  }
+
+  /**
+   * 更新自动续费设置
+   */
+  @Patch('auto-renew')
+  async updateAutoRenew(
+    @Request() req: { user: { id: string } },
+    @Body() body: { autoRenew: boolean },
+  ) {
+    if (typeof body.autoRenew !== 'boolean') {
+      throw new BadRequestException('autoRenew 必须是布尔值');
+    }
+
+    try {
+      return await this.subscriptionsService.updateAutoRenew(req.user.id, body.autoRenew);
+    } catch (error) {
+      throw new BadRequestException((error as Error).message);
+    }
   }
 }

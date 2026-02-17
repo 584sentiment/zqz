@@ -166,4 +166,34 @@ export class SubscriptionsService {
       unlimited: quota.unlimited,
     };
   }
+
+  /**
+   * 更新自动续费设置
+   */
+  async updateAutoRenew(userId: string, autoRenew: boolean) {
+    // 获取当前订阅
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+    });
+
+    if (!subscription) {
+      throw new Error('订阅不存在');
+    }
+
+    // 只有付费用户才能开启自动续费
+    if (autoRenew && subscription.plan === 'free') {
+      throw new Error('免费用户无法开启自动续费');
+    }
+
+    // 更新自动续费状态
+    const updated = await this.prisma.subscription.update({
+      where: { userId },
+      data: { autoRenew },
+    });
+
+    return {
+      success: true,
+      autoRenew: updated.autoRenew,
+    };
+  }
 }

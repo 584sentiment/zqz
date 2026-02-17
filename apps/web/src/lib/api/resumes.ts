@@ -62,6 +62,18 @@ export interface ResumeVersionDetail extends ResumeVersion {
   content: Record<string, unknown>;
 }
 
+export interface GenerateResult {
+  success: boolean;
+  content?: Record<string, unknown>;
+  matchAnalysis?: {
+    score: number;
+    strengths: string[];
+    gaps: string[];
+    suggestions: string[];
+  };
+  error?: string;
+}
+
 export const resumesApi = {
   async getList(params?: { jobId?: string; status?: string }): Promise<Resume[]> {
     const searchParams = new URLSearchParams();
@@ -133,6 +145,11 @@ export const resumesApi = {
 
   async restoreVersion(id: string, versionId: string): Promise<Resume> {
     const response = await apiClient.post<Resume>(`/resumes/${id}/versions/${versionId}/restore`);
+    return response.data;
+  },
+
+  async generate(id: string): Promise<GenerateResult> {
+    const response = await apiClient.post<GenerateResult>(`/resumes/${id}/generate`);
     return response.data;
   },
 };

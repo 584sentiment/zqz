@@ -145,6 +145,14 @@ export class ResumesController {
   }
 
   /**
+   * AI 生成简历内容
+   */
+  @Post(':id/generate')
+  async generateResume(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.resumesService.generateResume(req.user.id, id);
+  }
+
+  /**
    * 导出 PDF（需要简历配额）
    */
   @Get(':id/export')

@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { ResumeGenerationService, AIServiceError } from '@ai-job-assistant/ai';
 
 export interface MatchAnalysis {
   score: number;
@@ -17,10 +18,15 @@ export interface MatchAnalysis {
 
 @Injectable()
 export class ResumesService {
+  private readonly logger = new Logger(ResumesService.name);
+  private readonly resumeGenerationService: ResumeGenerationService;
+
   constructor(
     private prisma: PrismaService,
     private subscriptionsService: SubscriptionsService,
-  ) {}
+  ) {
+    this.resumeGenerationService = new ResumeGenerationService();
+  }
 
   /**
    * 获取用户的简历列表
@@ -802,5 +808,210 @@ export class ResumesService {
 </body>
 </html>
     `.trim();
+  }
+
+  /**
+   * 使用 AI 生成简历内容
+   */
+  async generateResume(
+    userId: string,
+    resumeId: string,
+  ): Promise<{
+    success: boolean;
+    content?: Record<string, unknown>;
+    matchAnalysis?: Record<string, unknown>;
+    error?: string;
+  }> {
+    // 获取简历和关联的岗位
+    const resume = await this.getOne(userId, resumeId);
+
+    if (!resume.jobId || !resume.job) {
+      return {
+        success: false,
+        error: '请先关联目标岗位',
+      };
+    }
+
+    // 获取用户完整档案
+    const userProfile = await this.getUserProfileForResume(userId);
+
+    // 构建岗位描述
+    const jobDescription = this.buildJobDescription(resume.job);
+
+    // 调用 AI 生成
+    try {
+      this.logger.log(`开始为用户 ${userId} 生成简历，目标岗位: ${resume.job.title}`);
+
+      const aiResult = await this.resumeGenerationService.generate(
+        JSON.stringify(userProfile, null, 2),
+        jobDescription,
+      );
+
+      // 提取匹配分析
+      const matchAnalysis = aiResult.matchAnalysis as Record<string, unknown> | undefined;
+
+      // 转换为简历内容格式
+      const content: Record<string, unknown> = {
+        summary: aiResult.summary,
+        matchedSkills: aiResult.matchedSkills,
+        skills: aiResult.skills,
+        experience: aiResult.experience,
+        projects: aiResult.projects,
+        education: aiResult.education,
+      };
+
+      // 更新简历状态和内容
+      await this.prisma.resume.update({
+        where: { id: resumeId },
+        data: {
+          status: 'completed',
+          content,
+          matchScore: (matchAnalysis?.score as number) || 0,
+          updatedAt: new Date(),
+        },
+      });
+
+      // 记录使用量
+      await this.subscriptionsService.recordUsage(userId, 'resume_generation', resumeId, {
+        jobId: resume.jobId,
+        matchScore: matchAnalysis?.score,
+      });
+
+      this.logger.log(`简历生成成功，匹配度: ${matchAnalysis?.score || 0}%`);
+
+      return {
+        success: true,
+        content,
+        matchAnalysis,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof AIServiceError
+        ? error.message
+        : '简历生成失败，请稍后重试';
+
+      this.logger.error(`简历生成失败: ${errorMessage}`, error);
+
+      // 更新简历状态为失败
+      await this.prisma.resume.update({
+        where: { id: resumeId },
+        data: {
+          status: 'failed',
+          updatedAt: new Date(),
+        },
+      });
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  /**
+   * 获取用户档案信息用于简历生成
+   */
+  private async getUserProfileForResume(userId: string): Promise<Record<string, unknown>> {
+    // 获取用户基本信息和档案
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        nickname: true,
+        email: true,
+        profile: {
+          include: {
+            skills: true,
+            experiences: {
+              orderBy: { startDate: 'desc' },
+            },
+            projects: {
+              orderBy: { startDate: 'desc' },
+            },
+            educations: {
+              orderBy: { startDate: 'desc' },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user || !user.profile) {
+      throw new NotFoundException('用户档案不存在，请先完善个人资料');
+    }
+
+    const profile = user.profile;
+
+    return {
+      name: user.nickname || '未设置',
+      email: user.email,
+      // 基本信息
+      phone: profile.phone,
+      location: profile.location,
+      desiredPosition: profile.desiredPosition,
+      desiredLocation: profile.desiredLocation,
+      // 技能
+      skills: profile.skills.map((s) => ({
+        name: s.name,
+        category: s.category,
+        level: s.level,
+        yearsOfExperience: s.yearsOfExperience,
+      })),
+      // 工作经历
+      experiences: profile.experiences.map((e) => ({
+        company: e.company,
+        position: e.position,
+        location: e.location,
+        startDate: e.startDate,
+        endDate: e.endDate,
+        current: e.current,
+        description: e.description,
+        achievements: e.achievements,
+      })),
+      // 项目经历
+      projects: profile.projects.map((p) => ({
+        name: p.name,
+        role: p.role,
+        description: p.description,
+        techStack: p.techStack,
+        startDate: p.startDate,
+        endDate: p.endDate,
+        achievements: p.achievements,
+      })),
+      // 教育经历
+      educations: profile.educations.map((e) => ({
+        school: e.school,
+        degree: e.degree,
+        major: e.major,
+        startDate: e.startDate,
+        endDate: e.endDate,
+        description: e.description,
+      })),
+    };
+  }
+
+  /**
+   * 构建岗位描述用于 AI 生成
+   */
+  private buildJobDescription(job: {
+    title?: string | null;
+    company?: string | null;
+    description?: string | null;
+    requirements?: unknown;
+  }): string {
+    const parts: string[] = [];
+
+    if (job.title) {
+      parts.push(`职位名称: ${job.title}`);
+    }
+    if (job.company) {
+      parts.push(`公司: ${job.company}`);
+    }
+    if (job.description) {
+      parts.push(`岗位描述:\n${job.description}`);
+    }
+    if (job.requirements) {
+      parts.push(`岗位要求:\n${JSON.stringify(job.requirements, null, 2)}`);
+    }
+
+    return parts.join('\n\n');
   }
 }

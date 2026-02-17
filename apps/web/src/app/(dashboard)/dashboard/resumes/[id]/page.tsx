@@ -148,53 +148,30 @@ export default function ResumeDetailPage() {
       await resumesApi.update(resume.id, { status: 'generating' });
       setResume({ ...resume, status: 'generating' });
 
-      // 模拟 AI 生成（实际应调用 AI 服务）
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // 调用 AI 生成服务
+      const result = await resumesApi.generate(resume.id);
 
-      // 生成示例内容
-      const generatedContent = {
-        summary: '资深全栈开发工程师，5年以上 Web 开发经验。精通 React、Node.js、TypeScript 等技术栈，具备良好的系统架构能力和团队协作经验。',
-        experience: [
-          {
-            company: '示例科技有限公司',
-            position: '高级前端工程师',
-            period: '2021.03 - 至今',
-            highlights: [
-              '负责公司核心产品的前端架构设计和开发',
-              '带领团队完成多个大型项目的交付',
-              '优化页面性能，加载速度提升 50%',
-            ],
-          },
-        ],
-        skills: ['React', 'TypeScript', 'Node.js', 'PostgreSQL', 'Docker'],
-        education: [
-          {
-            school: '示例大学',
-            major: '计算机科学与技术',
-            degree: '本科',
-            period: '2014.09 - 2018.06',
-          },
-        ],
-      };
+      if (!result.success) {
+        throw new Error(result.error || '简历生成失败');
+      }
 
-      await resumesApi.update(resume.id, {
-        content: generatedContent,
-        status: 'completed',
-        matchScore: 0.85,
-      });
+      // 更新简历内容
+      const updatedResume = await resumesApi.getById(resume.id);
+      setResume(updatedResume);
+      setEditedContent((updatedResume.content as Record<string, unknown>) || {});
 
-      setResume({
-        ...resume,
-        content: generatedContent,
-        status: 'completed',
-        matchScore: 0.85,
-      });
-      setEditedContent(generatedContent);
-
-      toast({
-        title: '生成完成',
-        description: '简历已根据岗位信息生成',
-      });
+      // 显示匹配分析结果（如果有）
+      if (result.matchAnalysis) {
+        toast({
+          title: '生成完成',
+          description: `简历已生成，与岗位匹配度 ${result.matchAnalysis.score}%`,
+        });
+      } else {
+        toast({
+          title: '生成完成',
+          description: '简历已根据岗位信息生成',
+        });
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '简历生成失败，请稍后重试';
       setAiError(errorMessage);

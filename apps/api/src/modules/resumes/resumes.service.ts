@@ -865,14 +865,14 @@ export class ResumesService {
         where: { id: resumeId },
         data: {
           status: 'completed',
-          content,
+          content: JSON.parse(JSON.stringify(content)),
           matchScore: (matchAnalysis?.score as number) || 0,
           updatedAt: new Date(),
         },
       });
 
       // 记录使用量
-      await this.subscriptionsService.recordUsage(userId, 'resume_generation', resumeId, {
+      await this.subscriptionsService.recordUsage(userId, 'resume_generate', resumeId, {
         jobId: resume.jobId,
         matchScore: matchAnalysis?.score,
       });
@@ -917,6 +917,7 @@ export class ResumesService {
       select: {
         nickname: true,
         email: true,
+        phone: true,
         profile: {
           include: {
             skills: true,
@@ -944,16 +945,16 @@ export class ResumesService {
       name: user.nickname || '未设置',
       email: user.email,
       // 基本信息
-      phone: profile.phone,
+      phone: user.phone,
       location: profile.location,
-      desiredPosition: profile.desiredPosition,
-      desiredLocation: profile.desiredLocation,
+      desiredPosition: profile.targetRoles,
+      desiredLocation: profile.targetLocations,
       // 技能
       skills: profile.skills.map((s) => ({
         name: s.name,
         category: s.category,
         level: s.level,
-        yearsOfExperience: s.yearsOfExperience,
+        yearsOfExperience: s.years,
       })),
       // 工作经历
       experiences: profile.experiences.map((e) => ({
@@ -964,7 +965,7 @@ export class ResumesService {
         endDate: e.endDate,
         current: e.current,
         description: e.description,
-        achievements: e.achievements,
+        achievements: e.highlights,
       })),
       // 项目经历
       projects: profile.projects.map((p) => ({

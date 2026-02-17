@@ -50,7 +50,9 @@ export default function InterviewDetailPage() {
   // 语音识别状态
   const [isRecording, setIsRecording] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
+  const [micPermission, setMicPermission] = useState<'prompt' | 'granted' | 'denied' | 'checking'>('checking');
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -151,6 +153,56 @@ export default function InterviewDetailPage() {
       }
     };
   }, [toast]);
+
+  // 主动请求麦克风权限
+  useEffect(() => {
+    const requestMicPermission = async () => {
+      try {
+        // 检查权限状态（如果浏览器支持）
+        if (navigator.permissions && navigator.permissions.query) {
+          const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+          setMicPermission(permissionStatus.state as 'prompt' | 'granted' | 'denied');
+
+          // 如果已经授权，直接获取媒体流
+          if (permissionStatus.state === 'granted') {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaStreamRef.current = stream;
+          }
+
+          // 监听权限状态变化
+          permissionStatus.onchange = () => {
+            setMicPermission(permissionStatus.state as 'prompt' | 'granted' | 'denied');
+          };
+        } else {
+          // 不支持权限 API 的浏览器，直接请求
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaStreamRef.current = stream;
+          setMicPermission('granted');
+        }
+      } catch (error) {
+        console.error('麦克风权限请求失败:', error);
+        setMicPermission('denied');
+        toast({
+          title: '麦克风权限',
+          description: '语音面试需要麦克风权限，请在浏览器设置中允许',
+          variant: 'destructive',
+        });
+      }
+    };
+
+    // 面试开始时（状态为 in_progress）请求麦克风权限
+    if (interview?.status === 'in_progress') {
+      requestMicPermission();
+    }
+
+    return () => {
+      // 清理媒体流
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+      }
+    };
+  }, [interview?.status, toast]);
 
   const toggleRecording = () => {
     if (!recognitionRef.current) return;
@@ -677,11 +729,24 @@ export default function InterviewDetailPage() {
                 {/* 语音输入按钮 */}
                 {speechSupported && (
                   <div className="mb-4 flex items-center gap-3">
+                    {/* 麦克风权限状态提示 */}
+                    {micPermission === 'checking' && (
+                      <span className="text-sm text-gray-500 flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        检查麦克风权限...
+                      </span>
+                    )}
+                    {micPermission === 'denied' && (
+                      <span className="text-sm text-red-500 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4" />
+                        麦克风权限被拒绝，语音功能不可用
+                      </span>
+                    )}
                     <Button
                       type="button"
                       variant={isRecording ? 'destructive' : 'outline'}
                       onClick={toggleRecording}
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || micPermission === 'denied'}
                       className={isRecording ? 'animate-pulse' : ''}
                     >
                       <Mic className={`w-4 h-4 mr-2 ${isRecording ? 'animate-pulse' : ''}`} />

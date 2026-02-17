@@ -257,7 +257,9 @@ export default function LoginPage() {
               variant="outline"
               type="button"
               onClick={() => {
-                window.location.href = '/api/v1/auth/github';
+                // 跳转到后端 GitHub OAuth 端点
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+                window.location.href = `${apiUrl}/auth/github`;
               }}
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">

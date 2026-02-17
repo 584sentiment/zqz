@@ -165,11 +165,24 @@ export default function InterviewDetailPage() {
     } catch (error) {
       console.error('麦克风权限请求失败:', error);
       setMicPermission('denied');
-      toast({
-        title: '麦克风权限被拒绝',
-        description: '请在浏览器地址栏左侧点击图标，允许使用麦克风',
-        variant: 'destructive',
-      });
+
+      // 检查是否是 HTTPS/localhost 问题
+      const isSecureContext = window.isSecureContext;
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+      if (!isSecureContext && !isLocalhost) {
+        toast({
+          title: '需要安全连接',
+          description: '语音功能需要 HTTPS 或 localhost 环境。请使用 http://localhost:3000 访问',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: '麦克风权限被拒绝',
+          description: '请在浏览器地址栏左侧点击图标，允许使用麦克风',
+          variant: 'destructive',
+        });
+      }
       return false;
     }
   };

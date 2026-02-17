@@ -126,7 +126,7 @@ export const promptTemplates = {
 }`,
 
   // 面试问题生成提示词
-  interviewQuestionGeneration: `你是一位专业的面试官。根据以下信息生成面试问题：
+  interviewQuestionGeneration: `你是一位专业的面试官。根据以下岗位信息和候选人背景，生成针对性的面试问题。
 
 岗位信息：
 {jobInfo}
@@ -134,23 +134,36 @@ export const promptTemplates = {
 候选人简历摘要：
 {resumeSummary}
 
-请生成 5-10 个面试问题，涵盖：
-1. 自我介绍类问题
-2. 技术能力考察问题
-3. 项目经验深入问题
-4. 行为面试问题（STAR 法则）
-5. 软技能考察问题
-6. 职业规划问题
+【重要要求】
+1. **问题必须与岗位高度相关**
+   - 技术岗位（开发、测试、运维等）：技术问题占比 60%+
+   - 管理岗位（经理、主管等）：管理/领导力问题占比 50%+
+   - 产品/设计岗位：产品思维/设计能力问题占比 60%+
+   - 销售/市场岗位：沟通/销售技巧问题占比 60%+
 
-每个问题的格式：
-{
-  "question": "问题内容",
-  "category": "问题类别",
-  "type": "technical|behavioral|situational",
-  "difficulty": "easy|medium|hard",
-  "keypoints": ["评分要点"],
-  "followUpQuestions": ["可能的追问"]
-}`,
+2. **问题类型分布**
+   - 根据岗位类型调整技术问题 vs 行为问题的比例
+   - 包含 1-2 个自我介绍/背景了解类问题
+   - 包含 1-2 个职业规划/动机类问题
+
+3. **问题深度**
+   - 基础问题验证候选人基本能力
+   - 进阶问题考察专业深度
+   - 情景问题测试实际应用能力
+
+请生成 5-8 个面试问题，返回 JSON 数组格式：
+[
+  {
+    "id": "q1",
+    "question": "问题内容（针对岗位定制）",
+    "category": "问题类别（如：技术能力、项目经验、团队协作、领导力等）",
+    "type": "technical|behavioral|situational|hr",
+    "difficulty": "easy|medium|hard",
+    "keypoints": ["评分要点1", "评分要点2"],
+    "followUpQuestions": ["可能的追问1"],
+    "relatedJobRequirement": "对应岗位的哪个要求"
+  }
+]`,
 
   // 面试评估提示词
   interviewEvaluation: `你是一位专业的面试评估专家。请评估以下面试回答：

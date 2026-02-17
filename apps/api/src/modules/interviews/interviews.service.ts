@@ -150,7 +150,58 @@ export class InterviewsService {
     jobContext: Record<string, unknown> | null,
     difficulty: string
   ): Promise<Record<string, unknown>[]> {
-    // 基于岗位上下文生成问题（这里使用预设问题，实际应调用 AI）
+    try {
+      // 构建岗位信息字符串
+      const jobInfo = jobContext
+        ? JSON.stringify({
+            title: jobContext.title,
+            company: jobContext.company,
+            description: jobContext.description,
+            requirements: jobContext.requirements,
+          }, null, 2)
+        : '通用岗位';
+
+      // 简历摘要（暂时为空，后续可从用户档案获取）
+      const resumeSummary = '候选人背景待补充';
+
+      this.logger.log('开始生成针对岗位的面试问题...');
+
+      // 调用 AI 服务生成问题
+      const aiQuestions = await this.aiInterviewService.generateQuestions(jobInfo, resumeSummary);
+
+      if (aiQuestions && Array.isArray(aiQuestions) && aiQuestions.length > 0) {
+        // 给每个问题添加 ID 和难度
+        const questions = aiQuestions.map((q: Record<string, unknown>, index: number) => ({
+          id: `q${index + 1}`,
+          ...q,
+          difficulty: q.difficulty || difficulty,
+        }));
+
+        this.logger.log(`AI 生成了 ${questions.length} 个面试问题`);
+
+        // 根据难度调整问题数量
+        if (difficulty === 'easy') {
+          return questions.slice(0, 3);
+        } else if (difficulty === 'hard') {
+          // hard 模式保持所有问题
+          return questions;
+        }
+        // medium 模式取前 5 个
+        return questions.slice(0, 5);
+      }
+    } catch (error) {
+      this.logger.warn(`AI 生成面试问题失败，使用预设问题: ${error}`);
+    }
+
+    // 回退到预设问题
+    return this.getFallbackQuestions(jobContext, difficulty);
+  }
+
+  // 预设问题（作为 AI 生成失败时的回退）
+  private getFallbackQuestions(
+    jobContext: Record<string, unknown> | null,
+    difficulty: string
+  ): Record<string, unknown>[] {
     const baseQuestions: Record<string, unknown>[] = [
       {
         id: 'q1',
@@ -196,7 +247,6 @@ export class InterviewsService {
       },
     ];
 
-    // 根据难度调整问题数量
     if (difficulty === 'easy') {
       return baseQuestions.slice(0, 3);
     } else if (difficulty === 'hard') {

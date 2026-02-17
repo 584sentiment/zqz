@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { InterviewService } from '@ai-job-assistant/ai';
 
 export interface CreateInterviewDto {
   type: string;
@@ -35,10 +36,15 @@ export interface QuestionBankItem {
 
 @Injectable()
 export class InterviewsService {
+  private readonly logger = new Logger(InterviewsService.name);
+  private readonly aiInterviewService: InterviewService;
+
   constructor(
     private prisma: PrismaService,
     private subscriptionsService: SubscriptionsService,
-  ) {}
+  ) {
+    this.aiInterviewService = new InterviewService();
+  }
 
   // 获取用户的面试列表
   async getList(userId: string, params?: { status?: string; type?: string }) {
@@ -248,6 +254,14 @@ export class InterviewsService {
     };
 
     const answers = (transcript.answers as Record<string, unknown>[]) || [];
+    const questions = interview.questions as Record<string, unknown>[];
+
+    // 获取当前问题文本
+    const currentQuestion = questions[dto.questionIndex] as Record<string, unknown> | undefined;
+    const questionText = (currentQuestion?.question as string) || '面试问题';
+
+    // 生成反馈（AI 增强版本）
+    const feedback = await this.generateFeedback(dto.answer, questionText);
 
     // 添加回答记录
     answers.push({
@@ -255,10 +269,9 @@ export class InterviewsService {
       answer: dto.answer,
       duration: dto.duration,
       timestamp: new Date().toISOString(),
-      feedback: this.generateFeedback(dto.answer),
+      feedback,
     });
 
-    const questions = interview.questions as Record<string, unknown>[];
     const isLastQuestion = dto.questionIndex >= questions.length - 1;
 
     const updated = await this.prisma.interview.update({
@@ -285,9 +298,52 @@ export class InterviewsService {
     };
   }
 
-  // 生成回答反馈
-  private generateFeedback(answer: string): Record<string, unknown> {
-    // 简单的反馈生成（实际应调用 AI）
+  // 生成回答反馈（AI 增强版本，带回退）
+  private async generateFeedback(answer: string, question?: string): Promise<Record<string, unknown>> {
+    // 首先尝试 AI 评估
+    try {
+      const aiFeedback = await this.generateAIFeedback(answer, question || '面试问题');
+      if (aiFeedback && aiFeedback.score) {
+        this.logger.log('AI 面试评估成功');
+        return aiFeedback;
+      }
+    } catch (error) {
+      this.logger.warn(`AI 评估失败，使用默认反馈: ${error}`);
+    }
+
+    // 回退到默认反馈
+    return this.generateDefaultFeedback(answer);
+  }
+
+  /**
+   * 使用 AI 生成回答反馈
+   */
+  private async generateAIFeedback(answer: string, question: string): Promise<Record<string, unknown> | null> {
+    try {
+      const result = await this.aiInterviewService.evaluateAnswer(question, answer);
+
+      if (!result) {
+        return null;
+      }
+
+      // 映射 AI 结果到标准格式
+      return {
+        score: (result.score as number) || 70,
+        strengths: (result.strengths as string[]) || ['回答基本完整'],
+        improvements: (result.improvements as string[]) || ['可以更具体地展开'],
+        suggestions: (result.suggestions as string) || '继续保持，多加练习。',
+        aiGenerated: true,
+      };
+    } catch (error) {
+      this.logger.error(`AI 评估异常: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * 默认反馈生成（回退方案）
+   */
+  private generateDefaultFeedback(answer: string): Record<string, unknown> {
     const score = Math.min(100, Math.max(60, 70 + Math.floor(Math.random() * 20)));
 
     return {
@@ -302,6 +358,7 @@ export class InterviewsService {
           : ['建议使用 STAR 原则组织回答', '可以增加更多具体细节'],
       suggestions:
         '回答整体不错，建议在描述经历时更多使用具体的数据和成果来支撑你的观点。',
+      aiGenerated: false,
     };
   }
 

@@ -10,8 +10,10 @@ export interface QuotaInfo {
 export interface SubscriptionInfo {
   plan: string;
   planName: string;
+  status: string;
   startDate: string;
   endDate: string | null;
+  canceledAt: string | null;
   autoRenew: boolean;
   quotas: {
     ai: QuotaInfo;
@@ -47,6 +49,27 @@ export const subscriptionsApi = {
       '/subscriptions/auto-renew',
       { autoRenew },
     );
+    return response.data;
+  },
+
+  async cancelSubscription(): Promise<{
+    success: boolean;
+    status: string;
+    canceledAt: string | null;
+    endDate: string | null;
+    message: string;
+  }> {
+    const response = await apiClient.post('/subscriptions/cancel');
+    return response.data;
+  },
+
+  async resumeSubscription(): Promise<{
+    success: boolean;
+    status: string;
+    autoRenew: boolean;
+    message: string;
+  }> {
+    const response = await apiClient.post('/subscriptions/resume');
     return response.data;
   },
 };

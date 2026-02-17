@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Body, UseGuards, Request, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Body, UseGuards, Request, BadRequestException } from '@nestjs/common';
 import { SubscriptionsService } from './subscriptions.service';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 
@@ -37,6 +37,30 @@ export class SubscriptionsController {
 
     try {
       return await this.subscriptionsService.updateAutoRenew(req.user.id, body.autoRenew);
+    } catch (error) {
+      throw new BadRequestException((error as Error).message);
+    }
+  }
+
+  /**
+   * 取消订阅
+   */
+  @Post('cancel')
+  async cancelSubscription(@Request() req: { user: { id: string } }) {
+    try {
+      return await this.subscriptionsService.cancelSubscription(req.user.id);
+    } catch (error) {
+      throw new BadRequestException((error as Error).message);
+    }
+  }
+
+  /**
+   * 恢复订阅
+   */
+  @Post('resume')
+  async resumeSubscription(@Request() req: { user: { id: string } }) {
+    try {
+      return await this.subscriptionsService.resumeSubscription(req.user.id);
     } catch (error) {
       throw new BadRequestException((error as Error).message);
     }

@@ -89,8 +89,10 @@ export class SubscriptionsService {
     return {
       plan: subscription.plan,
       planName: planConfig.name,
+      status: subscription.status,
       startDate: subscription.startDate,
       endDate: subscription.endDate,
+      canceledAt: subscription.canceledAt,
       autoRenew: subscription.autoRenew,
       quotas: {
         ai: {
@@ -194,6 +196,89 @@ export class SubscriptionsService {
     return {
       success: true,
       autoRenew: updated.autoRenew,
+    };
+  }
+
+  /**
+   * 取消订阅
+   */
+  async cancelSubscription(userId: string) {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+    });
+
+    if (!subscription) {
+      throw new Error('订阅不存在');
+    }
+
+    // 免费用户无需取消
+    if (subscription.plan === 'free') {
+      throw new Error('免费用户无需取消订阅');
+    }
+
+    // 已经取消的
+    if (subscription.status === 'canceled') {
+      throw new Error('订阅已取消');
+    }
+
+    // 更新订阅状态为已取消
+    const updated = await this.prisma.subscription.update({
+      where: { userId },
+      data: {
+        status: 'canceled',
+        autoRenew: false,
+        canceledAt: new Date(),
+      },
+    });
+
+    return {
+      success: true,
+      status: updated.status,
+      canceledAt: updated.canceledAt,
+      endDate: updated.endDate,
+      message: updated.endDate
+        ? `订阅已取消，将在 ${new Date(updated.endDate).toLocaleDateString('zh-CN')} 到期后降级为免费版`
+        : '订阅已取消',
+    };
+  }
+
+  /**
+   * 恢复已取消的订阅
+   */
+  async resumeSubscription(userId: string) {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+    });
+
+    if (!subscription) {
+      throw new Error('订阅不存在');
+    }
+
+    // 只有已取消的订阅才能恢复
+    if (subscription.status !== 'canceled') {
+      throw new Error('订阅未取消，无需恢复');
+    }
+
+    // 检查是否已过期
+    if (subscription.endDate && new Date(subscription.endDate) < new Date()) {
+      throw new Error('订阅已过期，无法恢复');
+    }
+
+    // 恢复订阅
+    const updated = await this.prisma.subscription.update({
+      where: { userId },
+      data: {
+        status: 'active',
+        autoRenew: true,
+        canceledAt: null,
+      },
+    });
+
+    return {
+      success: true,
+      status: updated.status,
+      autoRenew: updated.autoRenew,
+      message: '订阅已恢复',
     };
   }
 }

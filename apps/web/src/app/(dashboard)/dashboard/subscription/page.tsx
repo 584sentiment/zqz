@@ -17,6 +17,9 @@ import {
   ChevronRight,
   Loader2,
   RefreshCw,
+  XCircle,
+  RotateCcw,
+  AlertTriangle,
 } from 'lucide-react';
 
 export default function SubscriptionPage() {
@@ -25,6 +28,9 @@ export default function SubscriptionPage() {
   const [plans, setPlans] = useState<PlanInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdatingAutoRenew, setIsUpdatingAutoRenew] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -84,6 +90,51 @@ export default function SubscriptionPage() {
       });
     } finally {
       setIsUpdatingAutoRenew(false);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!subscription) return;
+
+    setIsCancelling(true);
+    try {
+      const result = await subscriptionsApi.cancelSubscription();
+      setSubscription({ ...subscription, status: 'canceled', autoRenew: false });
+      toast({
+        title: '订阅已取消',
+        description: result.message,
+      });
+      setShowCancelConfirm(false);
+    } catch (error) {
+      toast({
+        title: '取消失败',
+        description: '无法取消订阅，请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  const handleResumeSubscription = async () => {
+    if (!subscription) return;
+
+    setIsResuming(true);
+    try {
+      const result = await subscriptionsApi.resumeSubscription();
+      setSubscription({ ...subscription, status: 'active', autoRenew: result.autoRenew });
+      toast({
+        title: '订阅已恢复',
+        description: result.message,
+      });
+    } catch (error) {
+      toast({
+        title: '恢复失败',
+        description: '无法恢复订阅，请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsResuming(false);
     }
   };
 
@@ -217,39 +268,114 @@ export default function SubscriptionPage() {
               </div>
             </div>
 
-            {/* 自动续费设置 - 仅付费用户显示 */}
+            {/* 订阅状态与设置 - 仅付费用户显示 */}
             {subscription.plan !== 'free' && (
-              <div className="mt-6 pt-6 border-t border-gray-100">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <RefreshCw className="w-5 h-5 text-gray-400" />
+              <div className="mt-6 pt-6 border-t border-gray-100 space-y-4">
+                {/* 订阅状态提示 */}
+                {subscription.status === 'canceled' && (
+                  <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <AlertTriangle className="w-5 h-5 text-amber-500" />
                     <div>
-                      <h3 className="text-sm font-medium text-gray-900">自动续费</h3>
-                      <p className="text-xs text-gray-500">
-                        {subscription.autoRenew
-                          ? '套餐到期后将自动续费'
-                          : '套餐到期后将降级为免费版'}
+                      <p className="text-sm font-medium text-amber-700">订阅已取消</p>
+                      <p className="text-xs text-amber-600">
+                        {subscription.endDate
+                          ? `将在 ${new Date(subscription.endDate).toLocaleDateString('zh-CN')} 到期后降级为免费版`
+                          : '已降级为免费版'}
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={handleToggleAutoRenew}
-                    disabled={isUpdatingAutoRenew}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      subscription.autoRenew ? 'bg-primary' : 'bg-gray-200'
-                    } ${isUpdatingAutoRenew ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                  >
-                    {isUpdatingAutoRenew ? (
-                      <Loader2 className="w-4 h-4 animate-spin absolute left-1/2 -translate-x-1/2 text-white" />
-                    ) : (
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          subscription.autoRenew ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    )}
-                  </button>
+                )}
+
+                {/* 自动续费设置 */}
+                {subscription.status !== 'canceled' && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <RefreshCw className="w-5 h-5 text-gray-400" />
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-900">自动续费</h3>
+                        <p className="text-xs text-gray-500">
+                          {subscription.autoRenew
+                            ? '套餐到期后将自动续费'
+                            : '套餐到期后将降级为免费版'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleToggleAutoRenew}
+                      disabled={isUpdatingAutoRenew}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        subscription.autoRenew ? 'bg-primary' : 'bg-gray-200'
+                      } ${isUpdatingAutoRenew ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      {isUpdatingAutoRenew ? (
+                        <Loader2 className="w-4 h-4 animate-spin absolute left-1/2 -translate-x-1/2 text-white" />
+                      ) : (
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            subscription.autoRenew ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* 取消/恢复订阅按钮 */}
+                <div className="flex items-center gap-3 pt-2">
+                  {subscription.status === 'canceled' ? (
+                    <Button
+                      variant="outline"
+                      onClick={handleResumeSubscription}
+                      disabled={isResuming}
+                      className="text-primary border-primary hover:bg-primary/10"
+                    >
+                      {isResuming ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <RotateCcw className="w-4 h-4 mr-2" />
+                      )}
+                      恢复订阅
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowCancelConfirm(true)}
+                      className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                    >
+                      <XCircle className="w-4 h-4 mr-2" />
+                      取消订阅
+                    </Button>
+                  )}
                 </div>
+
+                {/* 取消确认对话框 */}
+                {showCancelConfirm && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <div className="bg-white rounded-xl p-6 max-w-md mx-4 shadow-xl">
+                      <h3 className="text-lg font-bold text-gray-900 mb-2">确认取消订阅？</h3>
+                      <p className="text-sm text-gray-600 mb-4">
+                        取消后，您的套餐将在当前计费周期结束后降级为免费版。在此期间您仍可享受付费功能。
+                      </p>
+                      <div className="flex gap-3 justify-end">
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowCancelConfirm(false)}
+                          disabled={isCancelling}
+                        >
+                          再想想
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          onClick={handleCancelSubscription}
+                          disabled={isCancelling}
+                        >
+                          {isCancelling && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                          确认取消
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

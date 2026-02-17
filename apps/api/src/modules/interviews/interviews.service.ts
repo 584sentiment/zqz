@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 export interface CreateInterviewDto {
   type: string;
@@ -34,7 +35,10 @@ export interface QuestionBankItem {
 
 @Injectable()
 export class InterviewsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private subscriptionsService: SubscriptionsService,
+  ) {}
 
   // 获取用户的面试列表
   async getList(userId: string, params?: { status?: string; type?: string }) {
@@ -193,6 +197,9 @@ export class InterviewsService {
         transcript: { messages: [], answers: [] },
       },
     });
+
+    // 记录面试使用量
+    await this.subscriptionsService.recordUsage(userId, 'interview_mock', interviewId);
 
     return updated;
   }

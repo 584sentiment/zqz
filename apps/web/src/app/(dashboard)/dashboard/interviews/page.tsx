@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { interviewsApi, Interview, InterviewStats } from '@/lib/api/interviews';
+import { subscriptionsApi } from '@/lib/api/subscriptions';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +21,8 @@ import {
   Loader2,
   FileText,
   BarChart3,
+  AlertTriangle,
+  Crown,
 } from 'lucide-react';
 
 export default function InterviewsPage() {
@@ -28,18 +31,28 @@ export default function InterviewsPage() {
   const [stats, setStats] = useState<InterviewStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [quotaInfo, setQuotaInfo] = useState<{
+    total: number;
+    used: number;
+    remaining: number;
+    unlimited: boolean;
+  } | null>(null);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [interviewsData, statsData] = await Promise.all([
+      const [interviewsData, statsData, subscriptionData] = await Promise.all([
         interviewsApi.getList(
           statusFilter === 'all' ? undefined : { status: statusFilter }
         ),
         interviewsApi.getStats(),
+        subscriptionsApi.getMySubscription().catch(() => null),
       ]);
       setInterviews(interviewsData);
       setStats(statsData);
+      if (subscriptionData?.quotas?.interview) {
+        setQuotaInfo(subscriptionData.quotas.interview);
+      }
     } catch (error) {
       toast({
         title: '加载失败',
@@ -104,6 +117,66 @@ export default function InterviewsPage() {
             </Button>
           </Link>
         </div>
+
+        {/* 配额信息栏 */}
+        {quotaInfo && !quotaInfo.unlimited && (
+          <div
+            className={`p-4 rounded-lg flex items-center justify-between ${
+              quotaInfo.remaining === 0
+                ? 'bg-red-50 border border-red-200'
+                : quotaInfo.remaining <= 1
+                ? 'bg-yellow-50 border border-yellow-200'
+                : 'bg-blue-50 border border-blue-200'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              {quotaInfo.remaining === 0 ? (
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              ) : quotaInfo.remaining <= 1 ? (
+                <AlertTriangle className="w-5 h-5 text-yellow-500" />
+              ) : (
+                <Mic className="w-5 h-5 text-blue-500" />
+              )}
+              <div>
+                <p
+                  className={`font-medium ${
+                    quotaInfo.remaining === 0
+                      ? 'text-red-700'
+                      : quotaInfo.remaining <= 1
+                      ? 'text-yellow-700'
+                      : 'text-blue-700'
+                  }`}
+                >
+                  {quotaInfo.remaining === 0
+                    ? '面试配额已用尽'
+                    : `本月剩余 ${quotaInfo.remaining} 次模拟面试机会`}
+                </p>
+                <p
+                  className={`text-sm ${
+                    quotaInfo.remaining === 0
+                      ? 'text-red-600'
+                      : quotaInfo.remaining <= 1
+                      ? 'text-yellow-600'
+                      : 'text-blue-600'
+                  }`}
+                >
+                  已使用 {quotaInfo.used} / {quotaInfo.total} 次
+                </p>
+              </div>
+            </div>
+            {(quotaInfo.remaining <= 1 || quotaInfo.remaining === 0) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => (window.location.href = '/dashboard/subscription/upgrade')}
+                className="flex items-center gap-1"
+              >
+                <Crown className="w-4 h-4" />
+                升级套餐
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* 统计卡片 */}
         {stats && (

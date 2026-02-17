@@ -7,6 +7,7 @@ import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { resumesApi, Resume, MatchAnalysis } from '@/lib/api/resumes';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
+import { useAutoSave } from '@/hooks/use-auto-save';
 import {
   ArrowLeft,
   Save,
@@ -25,6 +26,14 @@ import {
   AlertCircle,
   XCircle,
   BarChart3,
+  FileDown,
+  ChevronDown,
+  Languages,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Cloud,
+  CloudOff,
 } from 'lucide-react';
 
 export default function ResumeDetailPage() {
@@ -39,12 +48,32 @@ export default function ResumeDetailPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingWord, setIsExportingWord] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [matchAnalysis, setMatchAnalysis] = useState<MatchAnalysis | null>(null);
   const [showMatchDetails, setShowMatchDetails] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(100); // 缩放级别 50% - 200%
 
   // 编辑状态
   const [editedContent, setEditedContent] = useState<Record<string, unknown>>({});
+
+  // 自动保存
+  const {
+    isSaving: isAutoSaving,
+    hasUnsavedChanges,
+    saveStatusText,
+    save: autoSave,
+  } = useAutoSave({
+    data: editedContent,
+    onSave: async (content) => {
+      if (!resume) return;
+      await resumesApi.update(resume.id, { content });
+      setResume({ ...resume, content });
+    },
+    debounceMs: 2000,
+    enabled: isEditing && resume?.status === 'completed',
+  });
 
   const loadResume = useCallback(async () => {
     setIsLoading(true);
@@ -67,6 +96,20 @@ export default function ResumeDetailPage() {
   useEffect(() => {
     loadResume();
   }, [loadResume]);
+
+  // 点击外部关闭导出菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showExportMenu) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.relative')) {
+          setShowExportMenu(false);
+        }
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showExportMenu]);
 
   const handleSave = async () => {
     if (!resume) return;
@@ -195,6 +238,36 @@ export default function ResumeDetailPage() {
       toast({ title: '导出失败', description: '请稍后重试', variant: 'destructive' });
     } finally {
       setIsExporting(false);
+      setShowExportMenu(false);
+    }
+  };
+
+  const handleExportWord = async () => {
+    if (!resume) return;
+    setIsExportingWord(true);
+    try {
+      const result = await resumesApi.exportWord(resume.id);
+
+      // 创建 Blob 并下载
+      const blob = new Blob([result.html], { type: 'application/msword' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: '导出成功',
+        description: '简历已导出为 Word 文件',
+      });
+    } catch (error) {
+      toast({ title: '导出失败', description: '请稍后重试', variant: 'destructive' });
+    } finally {
+      setIsExportingWord(false);
+      setShowExportMenu(false);
     }
   };
 
@@ -297,6 +370,39 @@ export default function ResumeDetailPage() {
                   ? '生成失败'
                   : '草稿'}
               </span>
+              <span className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-purple-50 text-purple-700">
+                <Languages className="w-3.5 h-3.5" />
+                {resume.language === 'en' ? 'English' : '中文'}
+              </span>
+              {/* 自动保存状态 */}
+              {isEditing && (
+                <div
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${
+                    isAutoSaving
+                      ? 'bg-blue-50 text-blue-700'
+                      : hasUnsavedChanges
+                      ? 'bg-yellow-50 text-yellow-700'
+                      : 'bg-green-50 text-green-700'
+                  }`}
+                >
+                  {isAutoSaving ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>保存中...</span>
+                    </>
+                  ) : hasUnsavedChanges ? (
+                    <>
+                      <CloudOff className="w-3.5 h-3.5" />
+                      <span>未保存</span>
+                    </>
+                  ) : (
+                    <>
+                      <Cloud className="w-3.5 h-3.5" />
+                      <span>{saveStatusText || '已保存'}</span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {resume.status !== 'completed' && (
@@ -342,13 +448,20 @@ export default function ResumeDetailPage() {
                     {isEditing ? '取消编辑' : '编辑'}
                   </Button>
                   {isEditing && (
-                    <Button onClick={handleSave} disabled={isSaving}>
-                      {isSaving ? (
+                    <Button
+                      onClick={async () => {
+                        await autoSave();
+                        setIsEditing(false);
+                        toast({ title: '保存成功', description: '简历已更新' });
+                      }}
+                      disabled={isAutoSaving || isSaving}
+                    >
+                      {(isAutoSaving || isSaving) ? (
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       ) : (
                         <Save className="w-4 h-4 mr-2" />
                       )}
-                      保存
+                      完成编辑
                     </Button>
                   )}
                   <Button
@@ -363,14 +476,41 @@ export default function ResumeDetailPage() {
                     )}
                     重新生成
                   </Button>
-                  <Button variant="outline" onClick={handleExportPdf} disabled={isExporting}>
-                    {isExporting ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Download className="w-4 h-4 mr-2" />
+                  <div className="relative">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowExportMenu(!showExportMenu)}
+                      disabled={isExporting || isExportingWord}
+                    >
+                      {(isExporting || isExportingWord) ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4 mr-2" />
+                      )}
+                      导出
+                      <ChevronDown className="w-4 h-4 ml-1" />
+                    </Button>
+                    {showExportMenu && (
+                      <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-10">
+                        <button
+                          onClick={handleExportPdf}
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          disabled={isExporting}
+                        >
+                          <FileText className="w-4 h-4" />
+                          导出为 PDF
+                        </button>
+                        <button
+                          onClick={handleExportWord}
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          disabled={isExportingWord}
+                        >
+                          <FileDown className="w-4 h-4" />
+                          导出为 Word
+                        </button>
+                      </div>
                     )}
-                    导出
-                  </Button>
+                  </div>
                 </>
               )}
             </div>
@@ -518,8 +658,56 @@ export default function ResumeDetailPage() {
         )}
 
         {/* 简历内容 */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-          {resume.status === 'draft' ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          {/* 缩放控制栏 */}
+          {resume.status === 'completed' && (
+            <div className="flex items-center justify-between px-6 py-3 bg-gray-50 border-b border-gray-100">
+              <span className="text-sm font-medium text-gray-700">简历预览</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setZoomLevel(Math.max(50, zoomLevel - 10))}
+                  disabled={zoomLevel <= 50}
+                  className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="缩小"
+                >
+                  <ZoomOut className="w-4 h-4 text-gray-600" />
+                </button>
+                <div className="flex items-center gap-1 px-2">
+                  <input
+                    type="range"
+                    min="50"
+                    max="200"
+                    step="10"
+                    value={zoomLevel}
+                    onChange={(e) => setZoomLevel(parseInt(e.target.value))}
+                    className="w-24 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                  />
+                  <span className="text-xs text-gray-500 w-10 text-right">{zoomLevel}%</span>
+                </div>
+                <button
+                  onClick={() => setZoomLevel(Math.min(200, zoomLevel + 10))}
+                  disabled={zoomLevel >= 200}
+                  className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="放大"
+                >
+                  <ZoomIn className="w-4 h-4 text-gray-600" />
+                </button>
+                <button
+                  onClick={() => setZoomLevel(100)}
+                  className="p-1.5 rounded hover:bg-gray-200"
+                  title="重置缩放"
+                >
+                  <Maximize2 className="w-4 h-4 text-gray-600" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div
+            className="p-8 transition-transform origin-top"
+            style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
+          >
+            {resume.status === 'draft' ? (
             <div className="text-center py-12">
               <FileText className="w-16 h-16 text-gray-200 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">简历尚未生成</h3>
@@ -627,6 +815,7 @@ export default function ResumeDetailPage() {
               </section>
             </div>
           )}
+          </div>
         </div>
       </div>
     </DashboardLayout>

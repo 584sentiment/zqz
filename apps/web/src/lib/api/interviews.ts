@@ -20,6 +20,15 @@ export interface InterviewStats {
   avgScore: number | null;
 }
 
+// 进行中的面试（包含进度信息）
+export interface InProgressInterview extends Interview {
+  progress: {
+    answered: number;
+    total: number;
+    percentage: number;
+  };
+}
+
 export interface QuestionCategory {
   id: string;
   name: string;
@@ -107,6 +116,11 @@ export const interviewsApi = {
 
   async getStats(): Promise<InterviewStats> {
     const response = await apiClient.get<InterviewStats>('/interviews/stats');
+    return response.data;
+  },
+
+  async getInProgress(): Promise<InProgressInterview | null> {
+    const response = await apiClient.get<InProgressInterview | null>('/interviews/in-progress');
     return response.data;
   },
 

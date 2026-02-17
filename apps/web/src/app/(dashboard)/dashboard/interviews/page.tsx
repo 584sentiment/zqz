@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { interviewsApi, Interview, InterviewStats } from '@/lib/api/interviews';
+import { interviewsApi, Interview, InterviewStats, InProgressInterview } from '@/lib/api/interviews';
 import { subscriptionsApi } from '@/lib/api/subscriptions';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,8 @@ import {
   BarChart3,
   AlertTriangle,
   Crown,
+  RotateCcw,
+  ChevronRight,
 } from 'lucide-react';
 
 export default function InterviewsPage() {
@@ -37,22 +39,25 @@ export default function InterviewsPage() {
     remaining: number;
     unlimited: boolean;
   } | null>(null);
+  const [inProgressInterview, setInProgressInterview] = useState<InProgressInterview | null>(null);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [interviewsData, statsData, subscriptionData] = await Promise.all([
+      const [interviewsData, statsData, subscriptionData, inProgressData] = await Promise.all([
         interviewsApi.getList(
           statusFilter === 'all' ? undefined : { status: statusFilter }
         ),
         interviewsApi.getStats(),
         subscriptionsApi.getMySubscription().catch(() => null),
+        interviewsApi.getInProgress().catch(() => null),
       ]);
       setInterviews(interviewsData);
       setStats(statsData);
       if (subscriptionData?.quotas?.interview) {
         setQuotaInfo(subscriptionData.quotas.interview);
       }
+      setInProgressInterview(inProgressData);
     } catch (error) {
       toast({
         title: '加载失败',
@@ -102,6 +107,53 @@ export default function InterviewsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {/* 恢复面试提示横幅 */}
+        {inProgressInterview && (
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+                  <RotateCcw className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">你有一场面试正在进行中</h3>
+                  <p className="text-blue-100 text-sm mt-1">
+                    已完成 {inProgressInterview.progress.answered} / {inProgressInterview.progress.total} 题
+                    ({inProgressInterview.progress.percentage}%)
+                  </p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <div className="flex-1 h-2 bg-white/20 rounded-full overflow-hidden max-w-48">
+                      <div
+                        className="h-full bg-white rounded-full transition-all"
+                        style={{ width: `${inProgressInterview.progress.percentage}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-blue-100">
+                      {inProgressInterview.progress.percentage}% 完成
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Link href={`/dashboard/interviews/${inProgressInterview.id}`}>
+                  <Button className="bg-white text-blue-600 hover:bg-blue-50 shadow-md">
+                    <Play className="w-4 h-4 mr-2" />
+                    继续面试
+                    <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </Link>
+                <Button
+                  variant="ghost"
+                  className="text-white/80 hover:text-white hover:bg-white/10"
+                  onClick={() => setInProgressInterview(null)}
+                >
+                  稍后
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 页面标题 */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { interviewsApi, QuestionCategory } from '@/lib/api/interviews';
+import { interviewsApi, QuestionCategory, InProgressInterview } from '@/lib/api/interviews';
 import { jobsApi, Job } from '@/lib/api/jobs';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,9 @@ import {
   Loader2,
   Sparkles,
   CheckCircle,
+  AlertTriangle,
+  Play,
+  RotateCcw,
 } from 'lucide-react';
 
 export default function NewInterviewPage() {
@@ -27,6 +30,8 @@ export default function NewInterviewPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [categories, setCategories] = useState<QuestionCategory[]>([]);
+  const [inProgressInterview, setInProgressInterview] = useState<InProgressInterview | null>(null);
+  const [showResumePrompt, setShowResumePrompt] = useState(false);
 
   // 表单状态
   const [selectedJob, setSelectedJob] = useState<string>('');
@@ -36,12 +41,17 @@ export default function NewInterviewPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [jobsResponse, categoriesData] = await Promise.all([
+        const [jobsResponse, categoriesData, inProgressData] = await Promise.all([
           jobsApi.getList({ status: 'active' }),
           interviewsApi.getCategories(),
+          interviewsApi.getInProgress().catch(() => null),
         ]);
         setJobs(jobsResponse.data.slice(0, 10));
         setCategories(categoriesData);
+        if (inProgressData) {
+          setInProgressInterview(inProgressData);
+          setShowResumePrompt(true);
+        }
       } catch (error) {
         console.error('加载数据失败', error);
       }
@@ -72,6 +82,16 @@ export default function NewInterviewPage() {
     }
   };
 
+  const handleResumeInterview = () => {
+    if (inProgressInterview) {
+      router.push(`/dashboard/interviews/${inProgressInterview.id}`);
+    }
+  };
+
+  const handleStartNewAnyway = () => {
+    setShowResumePrompt(false);
+  };
+
   const difficultyOptions = [
     {
       value: 'easy',
@@ -96,6 +116,40 @@ export default function NewInterviewPage() {
   return (
     <DashboardLayout>
       <div className="max-w-2xl mx-auto">
+        {/* 恢复面试提示 */}
+        {showResumePrompt && inProgressInterview && (
+          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-6">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-6 h-6 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-amber-800">你有一场面试正在进行中</h3>
+                <p className="text-amber-700 text-sm mt-1">
+                  已完成 {inProgressInterview.progress.answered} / {inProgressInterview.progress.total} 题
+                  ({inProgressInterview.progress.percentage}%)
+                </p>
+                <div className="mt-3 flex items-center gap-3">
+                  <Button
+                    onClick={handleResumeInterview}
+                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    恢复面试
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleStartNewAnyway}
+                    className="border-amber-300 text-amber-700 hover:bg-amber-100"
+                  >
+                    开始新面试
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 返回按钮 */}
         <Link
           href="/dashboard/interviews"

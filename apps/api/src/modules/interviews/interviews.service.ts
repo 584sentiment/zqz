@@ -60,6 +60,36 @@ export class InterviewsService {
     return interviews;
   }
 
+  // 获取用户正在进行的面试（用于恢复功能）
+  async getInProgress(userId: string) {
+    const interview = await this.prisma.interview.findFirst({
+      where: {
+        userId,
+        status: 'in_progress',
+        type: 'mock', // 只获取模拟面试，不包括准备计划
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    if (!interview) {
+      return null;
+    }
+
+    // 计算进度
+    const transcript = (interview.transcript as Record<string, unknown>) || {};
+    const answers = (transcript.answers as Record<string, unknown>[]) || [];
+    const questions = (interview.questions as Record<string, unknown>[]) || [];
+
+    return {
+      ...interview,
+      progress: {
+        answered: answers.length,
+        total: questions.length,
+        percentage: questions.length > 0 ? Math.round((answers.length / questions.length) * 100) : 0,
+      },
+    };
+  }
+
   // 获取单个面试详情
   async getOne(userId: string, interviewId: string) {
     const interview = await this.prisma.interview.findFirst({

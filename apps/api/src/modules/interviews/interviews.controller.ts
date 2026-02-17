@@ -29,6 +29,12 @@ export class InterviewsController {
     return this.interviewsService.getStats(req.user.id);
   }
 
+  // 获取进行中的面试（用于恢复）
+  @Get('in-progress')
+  async getInProgress(@Request() req: { user: { id: string } }) {
+    return this.interviewsService.getInProgress(req.user.id);
+  }
+
   @Get('categories')
   async getCategories() {
     return this.interviewsService.getQuestionCategories();

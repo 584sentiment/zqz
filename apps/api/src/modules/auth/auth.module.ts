@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
+import { GitHubStrategy } from './strategies/github.strategy';
 import { LoginRateLimitGuard } from './guards/login-rate-limit.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 
@@ -17,7 +18,7 @@ import { LocalAuthGuard } from './guards/local-auth.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, LocalStrategy, LoginRateLimitGuard, LocalAuthGuard],
+  providers: [AuthService, JwtStrategy, LocalStrategy, GitHubStrategy, LoginRateLimitGuard, LocalAuthGuard],
   exports: [AuthService],
 })
 export class AuthModule {}

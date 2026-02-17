@@ -1,4 +1,6 @@
-import { Controller, Post, Body, UseGuards, Request, HttpCode, HttpStatus, Get, Query, Delete } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request, HttpCode, HttpStatus, Get, Query, Delete, Req, Res } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -92,5 +94,37 @@ export class AuthController {
     @Body() dto: DeleteAccountDto,
   ) {
     return this.authService.deleteAccount(req.user.id, dto.password);
+  }
+
+  // ============== GitHub OAuth ==============
+
+  @Get('github')
+  @UseGuards(AuthGuard('github'))
+  async githubAuth() {
+    // Passport 会自动重定向到 GitHub 授权页面
+  }
+
+  @Get('github/callback')
+  @UseGuards(AuthGuard('github'))
+  async githubAuthCallback(
+    @Req() req: { user: unknown },
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.authService.githubLogin(req.user as Parameters<AuthService['githubLogin']>[0]);
+
+      // 将 token 传递给前端（通过 URL 参数或 cookie）
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const redirectUrl = `${frontendUrl}/auth/callback?` +
+        `accessToken=${result.tokens.accessToken}&` +
+        `refreshToken=${result.tokens.refreshToken}&` +
+        `user=${encodeURIComponent(JSON.stringify(result.user))}`;
+
+      return res.redirect(redirectUrl);
+    } catch (error) {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const errorMessage = error instanceof Error ? error.message : '登录失败';
+      return res.redirect(`${frontendUrl}/login?error=${encodeURIComponent(errorMessage)}`);
+    }
   }
 }

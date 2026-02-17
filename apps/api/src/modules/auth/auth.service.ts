@@ -412,4 +412,108 @@ export class AuthService {
       message: '账户已删除',
     };
   }
+
+  /**
+   * GitHub OAuth 登录
+   */
+  async githubLogin(profile: {
+    id: string;
+    displayName: string;
+    username: string;
+    emails: Array<{ value: string; primary?: boolean; verified?: boolean }>;
+    photos: Array<{ value: string }>;
+  }) {
+    // 获取主邮箱
+    const primaryEmail = profile.emails.find((e) => e.primary)?.value ||
+      profile.emails[0]?.value;
+
+    if (!primaryEmail) {
+      throw new BadRequestException('GitHub 账户没有可用的邮箱地址');
+    }
+
+    // 查找是否已有 GitHub 关联的用户或使用相同邮箱的用户
+    let user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { oauthProvider: 'github', oauthId: profile.id },
+          { email: primaryEmail },
+        ],
+      },
+      include: { subscription: true },
+    });
+
+    if (user) {
+      // 用户已存在，更新 OAuth 信息（如果尚未关联）
+      if (!user.oauthProvider) {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            oauthProvider: 'github',
+            oauthId: profile.id,
+            // 如果用户没有头像，使用 GitHub 头像
+            avatarUrl: user.avatarUrl || profile.photos[0]?.value,
+          },
+          include: { subscription: true },
+        });
+      }
+    } else {
+      // 创建新用户
+      user = await this.prisma.user.create({
+        data: {
+          email: primaryEmail,
+          oauthProvider: 'github',
+          oauthId: profile.id,
+          passwordHash: '', // OAuth 用户不需要密码
+          nickname: profile.displayName || profile.username,
+          avatarUrl: profile.photos[0]?.value,
+          emailVerified: true, // GitHub 邮箱已验证
+          emailVerifiedAt: new Date(),
+        },
+        include: { subscription: true },
+      });
+
+      // 创建用户档案
+      await this.prisma.profile.create({
+        data: {
+          userId: user.id,
+          name: user.nickname || '',
+        },
+      });
+
+      // 创建免费订阅
+      await this.prisma.subscription.create({
+        data: {
+          userId: user.id,
+          plan: 'free',
+          aiQuota: 10,
+          resumeQuota: 3,
+          interviewQuota: 1,
+        },
+      });
+
+      // 重新获取用户（包含订阅信息）
+      user = await this.prisma.user.findUnique({
+        where: { id: user.id },
+        include: { subscription: true },
+      });
+    }
+
+    // 生成令牌
+    const tokens = await this.generateTokens(user!.id, user!.email);
+
+    return {
+      user: {
+        id: user!.id,
+        email: user!.email,
+        name: user!.nickname,
+        avatarUrl: user!.avatarUrl,
+        emailVerified: user!.emailVerified,
+        subscription: {
+          plan: user!.subscription?.plan || 'free',
+          expiresAt: user!.subscription?.endDate,
+        },
+      },
+      tokens,
+    };
+  }
 }

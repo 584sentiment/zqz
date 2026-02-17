@@ -76,6 +76,7 @@ export interface ParsedJobResult {
   salary?: string;
   experience?: string;
   education?: string;
+  description?: string;
   requirements: string[];
   niceToHave: string[];
   skills: string[];

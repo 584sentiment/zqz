@@ -25,6 +25,13 @@ import {
   Target,
   Upload,
   X,
+  AlertCircle,
+  RefreshCw,
+  WifiOff,
+  ImageOff,
+  FileQuestion,
+  Globe,
+  Clock,
 } from 'lucide-react';
 
 type ImportTab = 'text' | 'link' | 'image';
@@ -33,6 +40,14 @@ interface ParsingProgress {
   stage: string;
   progress: number;
   message: string;
+}
+
+interface ImportError {
+  type: 'network' | 'format' | 'image' | 'url' | 'server' | 'timeout' | 'unknown';
+  title: string;
+  message: string;
+  suggestion: string;
+  canRetry: boolean;
 }
 
 const PARSING_STAGES: ParsingProgress[] = [
@@ -50,6 +65,138 @@ const IMAGE_STAGES: ParsingProgress[] = [
   { stage: 'finalizing', progress: 90, message: '生成结果...' },
 ];
 
+/**
+ * 解析错误类型并返回友好的错误信息
+ */
+function parseImportError(error: unknown, context: 'text' | 'link' | 'image'): ImportError {
+  const axiosError = error as {
+    response?: { status?: number; data?: { message?: string } };
+    message?: string;
+    code?: string;
+  };
+
+  // 网络错误
+  if (axiosError.message === 'Network Error' || axiosError.code === 'ERR_NETWORK') {
+    return {
+      type: 'network',
+      title: '网络连接失败',
+      message: '无法连接到服务器，请检查您的网络连接',
+      suggestion: '请确保网络连接正常后重试',
+      canRetry: true,
+    };
+  }
+
+  // 超时错误
+  if (axiosError.message?.includes('timeout') || axiosError.code === 'ECONNABORTED') {
+    return {
+      type: 'timeout',
+      title: '请求超时',
+      message: '服务器响应时间过长',
+      suggestion: '请稍后重试，或尝试简化输入内容',
+      canRetry: true,
+    };
+  }
+
+  // 服务器返回的错误
+  if (axiosError.response) {
+    const status = axiosError.response.status;
+    const serverMessage = axiosError.response.data?.message;
+
+    // 400 - 请求格式错误
+    if (status === 400) {
+      if (context === 'image') {
+        return {
+          type: 'image',
+          title: '图片无法识别',
+          message: serverMessage || '无法从图片中识别职位信息',
+          suggestion: '请确保图片清晰、文字可读，并包含完整的职位信息',
+          canRetry: true,
+        };
+      }
+      if (context === 'link') {
+        return {
+          type: 'url',
+          title: '链接无法访问',
+          message: serverMessage || '无法从该链接获取职位信息',
+          suggestion: '请检查链接是否正确，或尝试手动复制职位描述',
+          canRetry: true,
+        };
+      }
+      return {
+        type: 'format',
+        title: '内容格式错误',
+        message: serverMessage || '无法解析输入的内容',
+        suggestion: '请确保输入的是有效的职位描述',
+        canRetry: true,
+      };
+    }
+
+    // 404 - 资源不存在
+    if (status === 404) {
+      if (context === 'link') {
+        return {
+          type: 'url',
+          title: '页面不存在',
+          message: '该链接指向的页面不存在或已被删除',
+          suggestion: '请检查链接是否正确',
+          canRetry: true,
+        };
+      }
+    }
+
+    // 413 - 内容过大
+    if (status === 413) {
+      return {
+        type: 'format',
+        title: '内容过大',
+        message: '输入的内容超出处理限制',
+        suggestion: '请精简内容后重试',
+        canRetry: true,
+      };
+    }
+
+    // 429 - 请求过于频繁
+    if (status === 429) {
+      return {
+        type: 'server',
+        title: '请求过于频繁',
+        message: '您的操作过于频繁，请稍后再试',
+        suggestion: '请等待几分钟后重试',
+        canRetry: true,
+      };
+    }
+
+    // 500+ - 服务器错误
+    if (status && status >= 500) {
+      return {
+        type: 'server',
+        title: '服务器错误',
+        message: '服务器暂时无法处理您的请求',
+        suggestion: '我们正在修复这个问题，请稍后重试',
+        canRetry: true,
+      };
+    }
+
+    // 其他服务器错误
+    return {
+      type: 'server',
+      title: '解析失败',
+      message: serverMessage || '服务器返回了未知错误',
+      suggestion: '请稍后重试',
+      canRetry: true,
+    };
+  }
+
+  // 默认未知错误
+  return {
+    type: 'unknown',
+    title: '解析失败',
+    message: '发生了未知错误',
+    suggestion: '请刷新页面后重试',
+    canRetry: true,
+  };
+}
+
 export default function JobImportPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -64,6 +211,7 @@ export default function JobImportPage() {
   const [parsedResult, setParsedResult] = useState<ParsedJobResult | null>(null);
   const [clearFormat, setClearFormat] = useState(true);
   const [parsingProgress, setParsingProgress] = useState<ParsingProgress | null>(null);
+  const [parseError, setParseError] = useState<ImportError | null>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -78,6 +226,7 @@ export default function JobImportPage() {
 
     setIsParsing(true);
     setParsedResult(null);
+    setParseError(null);
     setParsingProgress(PARSING_STAGES[0]);
 
     // 模拟进度更新
@@ -112,9 +261,11 @@ export default function JobImportPage() {
         clearInterval(progressIntervalRef.current);
       }
       setParsingProgress(null);
+      const errorInfo = parseImportError(error, 'text');
+      setParseError(errorInfo);
       toast({
-        title: '解析失败',
-        description: '请稍后重试',
+        title: errorInfo.title,
+        description: errorInfo.message,
         variant: 'destructive',
       });
     } finally {
@@ -137,7 +288,25 @@ export default function JobImportPage() {
     setIsSaving(true);
     try {
       const sourceText = activeTab === 'link' ? `来源: ${jobUrl}\n\n${jobText}` : jobText;
-      await jobsApi.importJob(sourceText, parsedResult as unknown as Record<string, unknown>);
+
+      // 确定来源类型和 URL
+      let sourceType = 'text';
+      let sourceUrl: string | undefined;
+
+      if (activeTab === 'link' && jobUrl) {
+        sourceType = 'url';
+        sourceUrl = jobUrl;
+      } else if (activeTab === 'image') {
+        sourceType = 'image';
+      }
+
+      await jobsApi.importJob(
+        sourceText,
+        parsedResult as unknown as Record<string, unknown>,
+        sourceType,
+        sourceUrl,
+      );
+
       toast({
         title: '保存成功',
         description: '岗位已添加到您的列表',
@@ -176,6 +345,7 @@ export default function JobImportPage() {
 
     setIsParsing(true);
     setParsedResult(null);
+    setParseError(null);
     setJobText('');
     setParsingProgress({ stage: 'fetching', progress: 0, message: '正在获取页面内容...' });
 
@@ -216,12 +386,11 @@ export default function JobImportPage() {
         clearInterval(progressIntervalRef.current);
       }
       setParsingProgress(null);
-      const errorMessage =
-        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        '解析失败，请检查链接是否正确';
+      const errorInfo = parseImportError(error, 'link');
+      setParseError(errorInfo);
       toast({
-        title: '解析失败',
-        description: errorMessage,
+        title: errorInfo.title,
+        description: errorInfo.message,
         variant: 'destructive',
       });
     } finally {
@@ -377,6 +546,15 @@ export default function JobImportPage() {
 
               {activeTab === 'image' && (
                 <div className="space-y-6">
+                  {/* 功能说明 */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-xs text-blue-800">
+                      <p className="font-medium mb-1">图片解析使用 OCR + AI 技术</p>
+                      <p>系统将先识别图片中的文字（OCR），然后使用 DeepSeek 进行结构化解析。需配置腾讯云 OCR 密钥。</p>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       上传截图
@@ -468,6 +646,7 @@ export default function JobImportPage() {
 
                       setIsParsing(true);
                       setParsedResult(null);
+                      setParseError(null);
                       setJobText('');
                       setParsingProgress(IMAGE_STAGES[0]);
 
@@ -501,12 +680,11 @@ export default function JobImportPage() {
                           clearInterval(progressIntervalRef.current);
                         }
                         setParsingProgress(null);
-                        const errorMessage =
-                          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-                          '图片解析失败，请确保图片清晰';
+                        const errorInfo = parseImportError(error, 'image');
+                        setParseError(errorInfo);
                         toast({
-                          title: '解析失败',
-                          description: errorMessage,
+                          title: errorInfo.title,
+                          description: errorInfo.message,
                           variant: 'destructive',
                         });
                       } finally {
@@ -556,6 +734,20 @@ export default function JobImportPage() {
                 </span>
               )}
             </h2>
+            {parsedResult && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">AI 置信度</span>
+                <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                  parsedResult.confidence >= 0.8
+                    ? 'bg-green-100 text-green-700'
+                    : parsedResult.confidence >= 0.6
+                    ? 'bg-yellow-100 text-yellow-700'
+                    : 'bg-red-100 text-red-700'
+                }`}>
+                  {Math.round(parsedResult.confidence * 100)}%
+                </div>
+              </div>
+            )}
           </div>
 
           {parsedResult ? (
@@ -713,6 +905,85 @@ export default function JobImportPage() {
                 </div>
               </div>
             </>
+          ) : parseError ? (
+            /* 错误显示区域 */
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+              <div className="max-w-md mx-auto text-center">
+                {/* 错误图标 */}
+                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-red-50 flex items-center justify-center">
+                  {parseError.type === 'network' && <WifiOff className="w-10 h-10 text-red-400" />}
+                  {parseError.type === 'timeout' && <Clock className="w-10 h-10 text-red-400" />}
+                  {parseError.type === 'image' && <ImageOff className="w-10 h-10 text-red-400" />}
+                  {parseError.type === 'url' && <Globe className="w-10 h-10 text-red-400" />}
+                  {parseError.type === 'format' && <FileQuestion className="w-10 h-10 text-red-400" />}
+                  {(parseError.type === 'server' || parseError.type === 'unknown') && (
+                    <AlertCircle className="w-10 h-10 text-red-400" />
+                  )}
+                </div>
+
+                {/* 错误信息 */}
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{parseError.title}</h3>
+                <p className="text-gray-600 mb-4">{parseError.message}</p>
+
+                {/* 建议提示 */}
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 text-left">
+                  <div className="flex gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-800 mb-1">建议</p>
+                      <p className="text-sm text-amber-700">{parseError.suggestion}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 操作按钮 */}
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  {parseError.canRetry && (
+                    <Button
+                      onClick={() => {
+                        setParseError(null);
+                        if (activeTab === 'text') handleParse();
+                        else if (activeTab === 'link') handleParseUrl();
+                        // image tab 需要用户重新点击解析按钮
+                      }}
+                      disabled={isParsing}
+                      className="gap-2"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      重试
+                    </Button>
+                  )}
+                  {parseError.type === 'url' && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setParseError(null);
+                        setActiveTab('text');
+                      }}
+                    >
+                      改用文本导入
+                    </Button>
+                  )}
+                  {parseError.type === 'image' && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setParseError(null);
+                        setActiveTab('text');
+                      }}
+                    >
+                      改用文本导入
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    onClick={() => setParseError(null)}
+                  >
+                    返回
+                  </Button>
+                </div>
+              </div>
+            </div>
           ) : parsingProgress ? (
             /* 解析进度显示 */
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">

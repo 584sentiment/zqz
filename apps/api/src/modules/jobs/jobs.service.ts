@@ -1,14 +1,22 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/common/database/prisma.service';
+import { OcrService } from '@/common/services/ocr.service';
+import { JobParsingService } from '@ai-job-assistant/ai';
 import { CreateJobDto, ParseJobTextDto, UpdateJobDto, ParsedJobResult } from './dto/job.dto';
 
 @Injectable()
 export class JobsService {
+  private readonly logger = new Logger(JobsService.name);
+  private readonly jobParsingService: JobParsingService;
+
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
-  ) {}
+    private ocrService: OcrService,
+  ) {
+    this.jobParsingService = new JobParsingService();
+  }
 
   async create(userId: string, dto: CreateJobDto) {
     return this.prisma.job.create({
@@ -101,12 +109,63 @@ export class JobsService {
   }
 
   /**
-   * 解析岗位文本（简化版本，后续可接入 AI）
+   * 解析岗位文本（AI 增强版本，带回退）
    */
   async parseJobText(dto: ParseJobTextDto): Promise<ParsedJobResult> {
     const text = dto.text;
 
-    // 简单的正则提取（后续可替换为 AI 解析）
+    // 首先尝试 AI 解析
+    try {
+      const aiResult = await this.parseWithAI(text);
+      if (aiResult && aiResult.confidence >= 0.7) {
+        this.logger.log('AI 岗位解析成功');
+        return aiResult;
+      }
+    } catch (error) {
+      this.logger.warn(`AI 解析失败，使用正则回退: ${error}`);
+    }
+
+    // 回退到正则解析
+    return this.parseWithRegex(text);
+  }
+
+  /**
+   * 使用 AI 解析岗位描述
+   */
+  private async parseWithAI(text: string): Promise<ParsedJobResult | null> {
+    try {
+      const aiResult = await this.jobParsingService.parse(text);
+
+      if (!aiResult) {
+        return null;
+      }
+
+      // 将 AI 结果映射到 ParsedJobResult 格式
+      const result: ParsedJobResult = {
+        title: this.validateField(aiResult.title as string) || '',
+        company: this.validateField(aiResult.company as string) || '',
+        location: this.validateField(aiResult.location as string) || '',
+        salary: this.validateField(aiResult.salaryRange as string),
+        experience: this.extractExperienceFromAI(aiResult),
+        education: this.extractEducationFromAI(aiResult),
+        description: this.validateField(aiResult.description as string),
+        requirements: this.extractMustHaveFromAI(aiResult),
+        niceToHave: this.extractNiceToHaveFromAI(aiResult),
+        skills: this.extractSkillsFromAI(aiResult),
+        confidence: this.calculateAIConfidence(aiResult),
+      };
+
+      return result;
+    } catch (error) {
+      this.logger.error(`AI 解析异常: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * 使用正则表达式解析（回退方案）
+   */
+  private parseWithRegex(text: string): ParsedJobResult {
     const result: ParsedJobResult = {
       title: this.extractField(text, ['职位名称', '岗位名称', '招聘职位', '职位']) || '',
       company: this.extractField(text, ['公司名称', '企业名称', '招聘企业', '公司']) || '',
@@ -129,17 +188,114 @@ export class JobsService {
     return result;
   }
 
+  /**
+   * 验证字段值，确保不为空或无效
+   */
+  private validateField(value: string | undefined | null): string | undefined {
+    if (!value || typeof value !== 'string') {
+      return undefined;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  /**
+   * 从 AI 结果中提取经验要求
+   */
+  private extractExperienceFromAI(aiResult: Record<string, unknown>): string | undefined {
+    const requirements = aiResult.requirements as Record<string, unknown> | undefined;
+    if (requirements?.experienceYears) {
+      return requirements.experienceYears as string;
+    }
+    return undefined;
+  }
+
+  /**
+   * 从 AI 结果中提取学历要求
+   */
+  private extractEducationFromAI(aiResult: Record<string, unknown>): string | undefined {
+    const requirements = aiResult.requirements as Record<string, unknown> | undefined;
+    if (requirements?.education) {
+      return requirements.education as string;
+    }
+    return undefined;
+  }
+
+  /**
+   * 从 AI 结果中提取必须具备的要求
+   */
+  private extractMustHaveFromAI(aiResult: Record<string, unknown>): string[] {
+    const requirements = aiResult.requirements as Record<string, unknown> | undefined;
+    if (requirements?.mustHave && Array.isArray(requirements.mustHave)) {
+      return requirements.mustHave.filter((r): r is string => typeof r === 'string').slice(0, 10);
+    }
+    if (aiResult.requirements && Array.isArray(aiResult.requirements)) {
+      return (aiResult.requirements as string[]).filter((r): r is string => typeof r === 'string').slice(0, 10);
+    }
+    return [];
+  }
+
+  /**
+   * 从 AI 结果中提取加分项
+   */
+  private extractNiceToHaveFromAI(aiResult: Record<string, unknown>): string[] {
+    const requirements = aiResult.requirements as Record<string, unknown> | undefined;
+    if (requirements?.niceToHave && Array.isArray(requirements.niceToHave)) {
+      return requirements.niceToHave.filter((r): r is string => typeof r === 'string').slice(0, 5);
+    }
+    return [];
+  }
+
+  /**
+   * 从 AI 结果中提取技能
+   */
+  private extractSkillsFromAI(aiResult: Record<string, unknown>): string[] {
+    const requirements = aiResult.requirements as Record<string, unknown> | undefined;
+    if (requirements?.skills && Array.isArray(requirements.skills)) {
+      return requirements.skills.filter((s): s is string => typeof s === 'string');
+    }
+    return [];
+  }
+
+  /**
+   * 计算 AI 解析的置信度
+   */
+  private calculateAIConfidence(aiResult: Record<string, unknown>): number {
+    let confidence = 0.5;
+
+    // 根据提取到的关键字段调整置信度
+    if (aiResult.title) confidence += 0.15;
+    if (aiResult.company) confidence += 0.15;
+    if (aiResult.location) confidence += 0.05;
+    if (aiResult.salaryRange) confidence += 0.05;
+
+    const requirements = aiResult.requirements as Record<string, unknown> | undefined;
+    if (requirements?.skills && Array.isArray(requirements.skills) && requirements.skills.length > 0) {
+      confidence += 0.1;
+    }
+
+    return Math.min(confidence, 0.95);
+  }
+
   private extractField(text: string, keywords: string[]): string | undefined {
     for (const keyword of keywords) {
       const patterns = [
+        // 【关键词】值 格式
+        new RegExp(`【${keyword}】\\s*([^\\n【】]+)`, 'i'),
+        // 关键词: 值 或 关键词：值 格式
         new RegExp(`${keyword}[:：]\\s*([^\\n]+)`, 'i'),
-        new RegExp(`${keyword}\\s*[:：]?\\s*([^\\n]+)`, 'i'),
+        // 关键词 值 格式
+        new RegExp(`${keyword}\\s+([^\\n]+)`, 'i'),
       ];
 
       for (const pattern of patterns) {
         const match = text.match(pattern);
         if (match && match[1]) {
-          return match[1].trim();
+          const value = match[1].trim();
+          // 确保返回值不为空
+          if (value.length > 0) {
+            return value;
+          }
         }
       }
     }
@@ -196,14 +352,21 @@ export class JobsService {
   /**
    * 创建解析后的岗位
    */
-  async createFromParsed(userId: string, parsed: ParsedJobResult, sourceText: string) {
+  async createFromParsed(
+    userId: string,
+    parsed: ParsedJobResult,
+    sourceText: string,
+    sourceType?: string,
+    sourceUrl?: string,
+  ) {
     return this.prisma.job.create({
       data: {
         userId,
         title: parsed.title,
         company: parsed.company,
         location: parsed.location,
-        sourceType: 'text',
+        sourceType: sourceType || 'text',
+        sourceUrl: sourceUrl || null,
         description: sourceText,
         requirements: {
           mustHave: parsed.requirements,
@@ -230,19 +393,40 @@ export class JobsService {
       throw new BadRequestException('无效的 URL');
     }
 
+    // 检测已知的需要特殊处理的招聘网站
+    const problematicSites = [
+      'zhipin.com',      // Boss 直聘 - 需要登录 + JS 渲染
+      'liepin.com',      // 猎聘 - 需要登录
+      '51job.com',       // 前程无忧 - 反爬虫严格
+      'zhaopin.com',     // 智联招聘 - 反爬虫严格
+    ];
+
+    const isProblematicSite = problematicSites.some((site) => url.includes(site));
+
+    if (isProblematicSite) {
+      throw new BadRequestException(
+        '该招聘网站需要登录或使用动态加载，无法直接解析。请复制职位描述内容，使用"文本导入"功能。',
+      );
+    }
+
     // 抓取网页内容
     let html: string;
     try {
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
           'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+          'Accept-Encoding': 'gzip, deflate, br',
+          Connection: 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
         },
+        redirect: 'follow',
       });
 
       if (!response.ok) {
-        throw new BadRequestException(`无法访问该页面: ${response.status}`);
+        throw new BadRequestException(`无法访问该页面: HTTP ${response.status}`);
       }
 
       html = await response.text();
@@ -250,14 +434,16 @@ export class JobsService {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new BadRequestException('无法抓取该页面，请检查链接是否正确');
+      throw new BadRequestException('无法抓取该页面，请检查链接是否正确或尝试使用文本导入');
     }
 
     // 从 HTML 中提取文本内容
     const text = this.extractTextFromHtml(html);
 
-    if (text.length < 50) {
-      throw new BadRequestException('页面内容太少，无法解析');
+    if (text.length < 100) {
+      throw new BadRequestException(
+        '页面内容太少，可能是该网站使用了动态加载。请复制职位描述内容，使用"文本导入"功能。',
+      );
     }
 
     // 使用现有的文本解析方法
@@ -312,29 +498,63 @@ export class JobsService {
   }
 
   /**
-   * 从图片解析岗位信息（使用 OpenAI Vision API）
+   * 从图片解析岗位信息
+   * 流程：OCR 识别文字 → DeepSeek 结构化解析
    */
   async parseJobImage(imageBase64: string): Promise<ParsedJobResult> {
-    const openaiApiKey = this.configService.get<string>('OPENAI_API_KEY');
-
-    if (!openaiApiKey) {
-      throw new BadRequestException('图片解析功能未配置，请联系管理员');
+    // 检查 OCR 服务是否可用
+    if (!this.ocrService.isEnabled()) {
+      throw new BadRequestException(
+        '图片解析功能需要配置腾讯云 OCR。请在 .env 文件中配置 TENCENT_SECRET_ID 和 TENCENT_SECRET_KEY，' +
+        '或使用"文本导入"功能直接粘贴职位描述。',
+      );
     }
 
     try {
-      // 调用 OpenAI Vision API
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openaiApiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: `你是一个专业的招聘信息解析助手。请从图片中提取招聘信息，并以JSON格式返回。
+      // 步骤 1: 使用 OCR 识别图片中的文字
+      this.logger.log('开始 OCR 识别...');
+      const ocrResult = await this.ocrService.recognizeFromBase64(imageBase64);
+
+      if (!ocrResult.text || ocrResult.text.trim().length < 50) {
+        throw new BadRequestException('图片中未检测到足够的文字内容，请确保图片包含清晰的职位描述');
+      }
+
+      this.logger.log(`OCR 识别完成，提取到 ${ocrResult.text.length} 个字符，置信度 ${((ocrResult.confidence || 0) * 100).toFixed(1)}%`);
+
+      // 步骤 2: 使用 DeepSeek 对识别出的文字进行结构化解析
+      this.logger.log('开始 AI 结构化解析...');
+      const parsedResult = await this.parseTextWithAI(ocrResult.text);
+
+      // 综合 OCR 置信度和 AI 置信度
+      const ocrConfidence = ocrResult.confidence || 0.8;
+      parsedResult.confidence = Math.min(parsedResult.confidence || 0.7, ocrConfidence);
+
+      this.logger.log(`图片解析完成，职位: ${parsedResult.title || '未知'}`);
+      return parsedResult;
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(`图片解析失败: ${error}`);
+      throw new BadRequestException(
+        `图片解析失败: ${error instanceof Error ? error.message : '未知错误'}。请确保图片清晰且包含职位信息。`,
+      );
+    }
+  }
+
+  /**
+   * 使用 DeepSeek 对文本进行结构化解析
+   */
+  private async parseTextWithAI(text: string): Promise<ParsedJobResult> {
+    const deepseekApiKey = process.env.DEEPSEEK_API_KEY || this.configService.get<string>('DEEPSEEK_API_KEY');
+
+    if (!deepseekApiKey || deepseekApiKey === 'sk-your-deepseek-api-key') {
+      // 如果没有配置 DeepSeek，使用本地正则解析
+      this.logger.warn('DeepSeek API Key 未配置，使用本地正则解析');
+      return this.parseJobText({ text });
+    }
+
+    const systemPrompt = `你是一个专业的招聘信息解析助手。请从给定的文本中提取招聘信息，并以JSON格式返回。
 返回格式要求：
 {
   "title": "职位名称",
@@ -348,45 +568,51 @@ export class JobsService {
   "skills": ["技能1", "技能2"],
   "confidence": 0.8
 }
-confidence 是解析置信度，0-1之间。如果图片不清晰或信息不完整，置信度应较低。`,
+confidence 是解析置信度，0-1之间。如果信息不完整或格式不标准，置信度应较低。
+只返回 JSON，不要有其他文字。`;
+
+    try {
+      const response = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${deepseekApiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt,
             },
             {
               role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: '请从这张招聘截图或图片中提取职位信息。',
-                },
-                {
-                  type: 'image_url',
-                  image_url: {
-                    url: `data:image/jpeg;base64,${imageBase64}`,
-                  },
-                },
-              ],
+              content: text,
             },
           ],
           max_tokens: 2000,
+          temperature: 0.1,
         }),
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        console.error('OpenAI API error:', error);
-        throw new BadRequestException('图片解析失败，请稍后重试');
+        const errorText = await response.text();
+        this.logger.error(`DeepSeek API error: ${errorText}`);
+        throw new Error(`DeepSeek API 调用失败 (${response.status})`);
       }
 
       const data = await response.json();
-      const content = data.choices[0]?.message?.content;
+      const content = data.choices?.[0]?.message?.content;
 
       if (!content) {
-        throw new BadRequestException('无法解析图片内容');
+        throw new Error('DeepSeek 未返回有效响应');
       }
 
       // 提取 JSON
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        throw new BadRequestException('无法从图片中识别招聘信息');
+        this.logger.error(`DeepSeek response: ${content}`);
+        throw new Error('无法从 DeepSeek 响应中解析 JSON');
       }
 
       const result: ParsedJobResult = JSON.parse(jsonMatch[0]);
@@ -399,11 +625,10 @@ confidence 是解析置信度，0-1之间。如果图片不清晰或信息不完
 
       return result;
     } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      console.error('Image parsing error:', error);
-      throw new BadRequestException('图片解析失败，请确保图片清晰');
+      this.logger.error(`AI 解析失败: ${error}`);
+      // 降级到本地正则解析
+      this.logger.warn('AI 解析失败，降级到本地正则解析');
+      return this.parseJobText({ text });
     }
   }
 }

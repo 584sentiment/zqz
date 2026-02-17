@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { subscriptionsApi, SubscriptionInfo, PlanInfo } from '@/lib/api/subscriptions';
+import { paymentsApi, PaymentHistory } from '@/lib/api/payments';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +21,9 @@ import {
   XCircle,
   RotateCcw,
   AlertTriangle,
+  Receipt,
+  Clock,
+  CheckCircle2,
 } from 'lucide-react';
 
 export default function SubscriptionPage() {
@@ -31,16 +35,19 @@ export default function SubscriptionPage() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [isResuming, setIsResuming] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>([]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [subData, plansData] = await Promise.all([
+      const [subData, plansData, historyData] = await Promise.all([
         subscriptionsApi.getMySubscription(),
         subscriptionsApi.getPlans(),
+        paymentsApi.getPaymentHistory(),
       ]);
       setSubscription(subData);
       setPlans(plansData);
+      setPaymentHistory(historyData);
     } catch (error) {
       toast({
         title: '加载失败',
@@ -378,6 +385,60 @@ export default function SubscriptionPage() {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* 订单记录 */}
+        {paymentHistory.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center gap-2 mb-6">
+              <Receipt className="w-5 h-5 text-gray-600" />
+              <h2 className="text-xl font-bold text-gray-900">订单记录</h2>
+            </div>
+            <div className="space-y-4">
+              {paymentHistory.map((payment) => (
+                <div
+                  key={payment.orderNo}
+                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`p-2 rounded-full ${
+                      payment.status === 'paid' ? 'bg-green-100' :
+                      payment.status === 'pending' ? 'bg-yellow-100' : 'bg-gray-100'
+                    }`}>
+                      {payment.status === 'paid' ? (
+                        <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      ) : payment.status === 'pending' ? (
+                        <Clock className="w-5 h-5 text-yellow-600" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-gray-400" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{payment.subject}</p>
+                      <p className="text-sm text-gray-500">
+                        订单号: {payment.orderNo}
+                        {payment.paidAt && (
+                          <span className="ml-4">
+                            支付时间: {new Date(payment.paidAt).toLocaleString('zh-CN')}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-gray-900">¥{payment.amount}</p>
+                    <p className={`text-xs ${
+                      payment.status === 'paid' ? 'text-green-600' :
+                      payment.status === 'pending' ? 'text-yellow-600' : 'text-gray-400'
+                    }`}>
+                      {payment.status === 'paid' ? '已支付' :
+                       payment.status === 'pending' ? '待支付' : '已关闭'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

@@ -18,6 +18,7 @@ import { SkillsModule } from './modules/skills/skills.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -73,6 +74,7 @@ import { HealthController } from './health.controller';
     SubscriptionsModule,
     NotificationsModule,
     AdminModule,
+    PaymentsModule,
   ],
   controllers: [HealthController],
   providers: [

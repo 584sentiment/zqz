@@ -49,6 +49,7 @@ model User {
   interviews     Interview[]
   skillSessions  SkillDiscoverySession[]
   usageLogs      UsageLog[]
+  payments       Payment[]
 
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
@@ -396,4 +397,36 @@ model UsageLog {
   @@index([userId, createdAt(sort: Desc)])
   @@index([action])
   @@map("usage_logs")
+}
+
+// ============== 支付相关 ==============
+
+model Payment {
+  id              String    @id @default(cuid())
+  userId          String    @map("user_id")
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  orderNo         String    @unique @map("order_no")
+  outTradeNo      String?   @unique @map("out_trade_no")
+
+  plan            String    // basic, pro
+  period          Int       @default(1) // 购买月数
+  amount          Decimal   @db.Decimal(10, 2)
+
+  status          String    @default("pending") // pending, paid, closed
+  paymentMethod   String    @default("alipay") @map("payment_method")
+
+  paidAt          DateTime? @map("paid_at")
+  expiredAt       DateTime? @map("expired_at")
+  notifyData      Json?     @map("notify_data")
+
+  subject         String    // 订单标题
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("payments")
 }

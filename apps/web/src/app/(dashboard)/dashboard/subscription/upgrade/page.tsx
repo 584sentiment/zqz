@@ -7,7 +7,7 @@ import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuthStore } from '@/stores/auth';
-import { subscriptionsApi } from '@/lib/api/subscriptions';
+import { paymentsApi } from '@/lib/api/payments';
 import {
   Check,
   Zap,
@@ -19,29 +19,16 @@ import {
 
 const plans = [
   {
-    id: 'free',
-    name: '免费版',
-    price: 0,
-    description: '适合初次体验的用户',
-    features: [
-      '10 次 AI 对话',
-      '3 份简历生成',
-      '1 次模拟面试',
-      '基础岗位解析',
-    ],
-    highlighted: false,
-  },
-  {
     id: 'basic',
     name: '基础版',
     price: 29,
     description: '适合求职中的用户',
     features: [
-      '100 次 AI 对话',
-      '20 份简历生成',
-      '10 次模拟面试',
+      '50 次 AI 对话',
+      '10 份简历生成',
+      '5 次模拟面试',
       '高级岗位解析',
-      '简历模板选择',
+      'AI 技能发掘',
     ],
     highlighted: true,
   },
@@ -62,28 +49,44 @@ const plans = [
   },
 ];
 
+const periodOptions = [
+  { value: 1, label: '1 个月', discount: '' },
+  { value: 3, label: '3 个月', discount: '省 ¥29' },
+  { value: 6, label: '6 个月', discount: '省 ¥88' },
+  { value: 12, label: '12 个月', discount: '省 ¥200' },
+];
+
 export default function UpgradePage() {
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useAuthStore();
-  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<string>('basic');
+  const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
+  const [loading, setLoading] = useState(false);
 
-  const handleSelectPlan = async (planId: string) => {
-    if (planId === 'free') {
-      router.push('/dashboard/subscription');
-      return;
-    }
-
-    setLoadingPlan(planId);
+  const handlePay = async () => {
+    setLoading(true);
     try {
-      // TODO: 集成支付
+      const result = await paymentsApi.createPayment(selectedPlan, selectedPeriod);
+
+      // 跳转到支付宝支付页面
+      window.location.href = result.paymentUrl;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : '支付创建失败，请稍后重试';
       toast({
-        title: '功能开发中',
-        description: '支付功能即将上线，敬请期待',
+        title: '支付失败',
+        description: errorMessage,
+        variant: 'destructive',
       });
     } finally {
-      setLoadingPlan(null);
+      setLoading(false);
     }
+  };
+
+  const calculateTotal = () => {
+    const plan = plans.find((p) => p.id === selectedPlan);
+    if (!plan) return 0;
+    return plan.price * selectedPeriod;
   };
 
   return (
@@ -102,18 +105,19 @@ export default function UpgradePage() {
           <p className="text-gray-500 mt-1">选择最适合您的套餐，解锁全部功能</p>
         </div>
 
-        {/* Plans */}
-        <div className="grid md:grid-cols-3 gap-6">
+        {/* Plans Selection */}
+        <div className="grid md:grid-cols-2 gap-6 mb-8">
           {plans.map((plan) => (
             <div
               key={plan.id}
-              className={`relative rounded-2xl p-6 ${
-                plan.highlighted
+              onClick={() => setSelectedPlan(plan.id)}
+              className={`relative cursor-pointer rounded-2xl p-6 transition-all ${
+                selectedPlan === plan.id
                   ? 'bg-primary text-white ring-2 ring-primary ring-offset-2'
-                  : 'bg-white border border-gray-200'
+                  : 'bg-white border border-gray-200 hover:border-primary/50'
               }`}
             >
-              {plan.highlighted && (
+              {plan.highlighted && selectedPlan === plan.id && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <span className="inline-flex items-center gap-1 px-3 py-1 bg-yellow-400 text-yellow-900 text-xs font-medium rounded-full">
                     <Sparkles className="w-3 h-3" />
@@ -125,20 +129,18 @@ export default function UpgradePage() {
               <div className="text-center mb-6">
                 <div
                   className={`inline-flex items-center justify-center w-12 h-12 rounded-full mb-3 ${
-                    plan.highlighted ? 'bg-white/20' : 'bg-primary/10'
+                    selectedPlan === plan.id ? 'bg-white/20' : 'bg-primary/10'
                   }`}
                 >
                   {plan.id === 'pro' ? (
-                    <Crown className={plan.highlighted ? 'text-white' : 'text-primary'} />
-                  ) : plan.id === 'basic' ? (
-                    <Zap className={plan.highlighted ? 'text-white' : 'text-primary'} />
+                    <Crown className={selectedPlan === plan.id ? 'text-white' : 'text-primary'} />
                   ) : (
-                    <Sparkles className={plan.highlighted ? 'text-white' : 'text-primary'} />
+                    <Zap className={selectedPlan === plan.id ? 'text-white' : 'text-primary'} />
                   )}
                 </div>
                 <h3 className="text-lg font-semibold">{plan.name}</h3>
                 <p
-                  className={`text-sm ${plan.highlighted ? 'text-white/70' : 'text-gray-500'}`}
+                  className={`text-sm ${selectedPlan === plan.id ? 'text-white/70' : 'text-gray-500'}`}
                 >
                   {plan.description}
                 </p>
@@ -147,7 +149,7 @@ export default function UpgradePage() {
               <div className="text-center mb-6">
                 <span className="text-4xl font-bold">¥{plan.price}</span>
                 <span
-                  className={`text-sm ${plan.highlighted ? 'text-white/70' : 'text-gray-500'}`}
+                  className={`text-sm ${selectedPlan === plan.id ? 'text-white/70' : 'text-gray-500'}`}
                 >
                   /月
                 </span>
@@ -158,7 +160,7 @@ export default function UpgradePage() {
                   <li key={index} className="flex items-center gap-2 text-sm">
                     <Check
                       className={`w-4 h-4 flex-shrink-0 ${
-                        plan.highlighted ? 'text-white' : 'text-green-500'
+                        selectedPlan === plan.id ? 'text-white' : 'text-green-500'
                       }`}
                     />
                     {feature}
@@ -166,26 +168,84 @@ export default function UpgradePage() {
                 ))}
               </ul>
 
-              <Button
-                className="w-full"
-                variant={plan.highlighted ? 'secondary' : 'default'}
-                onClick={() => handleSelectPlan(plan.id)}
-                disabled={loadingPlan !== null}
+              <div
+                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mx-auto ${
+                  selectedPlan === plan.id
+                    ? 'border-white bg-white'
+                    : 'border-gray-300'
+                }`}
               >
-                {loadingPlan === plan.id ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    处理中...
-                  </>
-                ) : plan.id === 'free' ? (
-                  '当前套餐'
-                ) : (
-                  '选择套餐'
+                {selectedPlan === plan.id && (
+                  <Check className="w-4 h-4 text-primary" />
                 )}
-              </Button>
+              </div>
             </div>
           ))}
         </div>
+
+        {/* Period Selection */}
+        <div className="bg-white rounded-xl p-6 border border-gray-200 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">选择购买时长</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {periodOptions.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setSelectedPeriod(option.value)}
+                className={`relative p-4 rounded-xl border-2 text-center transition-all ${
+                  selectedPeriod === option.value
+                    ? 'border-primary bg-primary/5'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                {option.discount && (
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                    {option.discount}
+                  </span>
+                )}
+                <div className="font-medium text-gray-900">{option.label}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Payment Summary */}
+        <div className="bg-white rounded-xl p-6 border border-gray-200 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-gray-600">套餐</span>
+            <span className="font-medium text-gray-900">
+              {plans.find((p) => p.id === selectedPlan)?.name} × {selectedPeriod} 个月
+            </span>
+          </div>
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-gray-600">支付方式</span>
+            <span className="font-medium text-gray-900">支付宝</span>
+          </div>
+          <div className="border-t pt-4 flex items-center justify-between">
+            <span className="text-lg font-semibold text-gray-900">应付金额</span>
+            <span className="text-2xl font-bold text-primary">¥{calculateTotal()}</span>
+          </div>
+        </div>
+
+        {/* Pay Button */}
+        <Button
+          size="lg"
+          className="w-full text-lg py-6"
+          onClick={handlePay}
+          disabled={loading}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              正在跳转到支付...
+            </>
+          ) : (
+            `立即支付 ¥${calculateTotal()}`
+          )}
+        </Button>
+
+        <p className="text-center text-sm text-gray-500 mt-4">
+          点击支付即表示您同意我们的服务条款和隐私政策
+        </p>
 
         {/* FAQ */}
         <div className="mt-12 bg-white rounded-xl p-6 border border-gray-200">
@@ -197,7 +257,7 @@ export default function UpgradePage() {
             </div>
             <div>
               <h3 className="font-medium text-gray-900">支持哪些支付方式？</h3>
-              <p className="mt-1">我们支持支付宝和微信支付。</p>
+              <p className="mt-1">目前支持支付宝支付。</p>
             </div>
             <div>
               <h3 className="font-medium text-gray-900">配额如何计算？</h3>

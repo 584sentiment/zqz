@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 export interface MatchAnalysis {
   score: number;
@@ -16,7 +17,10 @@ export interface MatchAnalysis {
 
 @Injectable()
 export class ResumesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private subscriptionsService: SubscriptionsService,
+  ) {}
 
   /**
    * 获取用户的简历列表
@@ -416,7 +420,187 @@ export class ResumesService {
     // 生成简单的 HTML（前端可以使用 html2pdf 或类似库转换为 PDF）
     const html = this.generateResumeHtml(resume.name, content, resume.job);
 
+    // 记录导出使用量
+    await this.subscriptionsService.recordUsage(userId, 'resume_export', resumeId, {
+      format: 'pdf',
+      resumeName: resume.name,
+    });
+
     return { html, filename };
+  }
+
+  /**
+   * 生成 Word 文档（返回 Word 兼容的 HTML）
+   */
+  async generateWord(userId: string, resumeId: string): Promise<{ html: string; filename: string }> {
+    const resume = await this.getOne(userId, resumeId);
+
+    if (resume.status !== 'completed') {
+      throw new NotFoundException('简历尚未生成完成，无法导出');
+    }
+
+    const content = (resume.content as Record<string, unknown>) || {};
+    const filename = `${resume.name.replace(/\s+/g, '_')}_简历.doc`;
+
+    // 生成 Word 兼容的 HTML
+    const html = this.generateWordHtml(resume.name, content, resume.job);
+
+    // 记录导出使用量
+    await this.subscriptionsService.recordUsage(userId, 'resume_export', resumeId, {
+      format: 'word',
+      resumeName: resume.name,
+    });
+
+    return { html, filename };
+  }
+
+  /**
+   * 生成 Word 兼容的 HTML 格式
+   */
+  private generateWordHtml(
+    name: string,
+    content: Record<string, unknown>,
+    job?: { title?: string | null; company?: string | null } | null
+  ): string {
+    const summary = (content.summary as string) || '';
+    const skills = (content.skills as string[]) || [];
+    const experiences = (content.experience as Array<Record<string, unknown>>) || [];
+    const education = (content.education as Array<Record<string, unknown>>) || [];
+
+    // Word 兼容的 HTML 格式（使用 mso 命名空间的样式）
+    return `
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <!--[if gte mso 9]>
+  <xml>
+    <w:WordDocument>
+      <w:View>Print</w:View>
+      <w:Zoom>100</w:Zoom>
+      <w:DoNotOptimizeForBrowser/>
+    </w:WordDocument>
+  </xml>
+  <![endif]-->
+  <style>
+    @page {
+      size: A4;
+      margin: 2.54cm;
+    }
+    body {
+      font-family: "微软雅黑", "Microsoft YaHei", Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.6;
+      color: #333333;
+    }
+    h1 {
+      font-size: 22pt;
+      font-weight: bold;
+      color: #1a1a1a;
+      margin-bottom: 6pt;
+      text-align: center;
+    }
+    .subtitle {
+      font-size: 11pt;
+      color: #666666;
+      text-align: center;
+      margin-bottom: 18pt;
+    }
+    h2 {
+      font-size: 13pt;
+      font-weight: bold;
+      color: #2563eb;
+      border-bottom: 1.5pt solid #2563eb;
+      padding-bottom: 4pt;
+      margin-top: 14pt;
+      margin-bottom: 8pt;
+    }
+    .summary {
+      color: #555555;
+      margin-bottom: 10pt;
+      text-align: justify;
+    }
+    .skills {
+      margin-bottom: 10pt;
+    }
+    .skill {
+      display: inline-block;
+      background-color: #eff6ff;
+      color: #2563eb;
+      padding: 2pt 8pt;
+      margin: 2pt;
+      border-radius: 10pt;
+      font-size: 10pt;
+    }
+    .experience-item, .education-item {
+      margin-bottom: 12pt;
+      padding-left: 10pt;
+      border-left: 2pt solid #e5e7eb;
+    }
+    .experience-item h3, .education-item h3 {
+      font-size: 12pt;
+      font-weight: bold;
+      margin-bottom: 2pt;
+      color: #1a1a1a;
+    }
+    .meta {
+      color: #666666;
+      font-size: 10pt;
+      margin-bottom: 4pt;
+    }
+    .highlights {
+      margin-left: 15pt;
+      margin-top: 4pt;
+    }
+    .highlights li {
+      color: #555555;
+      margin-bottom: 2pt;
+      font-size: 10pt;
+    }
+  </style>
+</head>
+<body>
+  <h1>${name}</h1>
+  ${job?.title ? `<div class="subtitle">应聘：${job.title}${job.company ? ` @ ${job.company}` : ''}</div>` : ''}
+
+  ${summary ? `<h2>个人简介</h2><p class="summary">${summary}</p>` : ''}
+
+  ${skills.length > 0 ? `
+  <h2>专业技能</h2>
+  <div class="skills">
+    ${skills.map((s) => `<span class="skill">${s}</span>`).join('')}
+  </div>
+  ` : ''}
+
+  ${experiences.length > 0 ? `
+  <h2>工作经历</h2>
+  ${experiences.map((exp) => `
+    <div class="experience-item">
+      <h3>${exp.position as string}</h3>
+      <div class="meta">${exp.company as string} | ${exp.period as string}</div>
+      ${((exp.highlights as string[]) || []).length > 0 ? `
+        <ul class="highlights">
+          ${(exp.highlights as string[]).map((h) => `<li>${h}</li>`).join('')}
+        </ul>
+      ` : ''}
+    </div>
+  `).join('')}
+  ` : ''}
+
+  ${education.length > 0 ? `
+  <h2>教育经历</h2>
+  ${education.map((edu) => `
+    <div class="education-item">
+      <h3>${edu.school as string}</h3>
+      <div class="meta">${edu.major as string} · ${edu.degree as string} | ${edu.period as string}</div>
+    </div>
+  `).join('')}
+  ` : ''}
+</body>
+</html>
+    `.trim();
   }
 
   /**

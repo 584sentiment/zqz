@@ -234,8 +234,17 @@ export default function ResumeDetailPage() {
         title: '导出成功',
         description: '简历已导出为 HTML 文件，可使用浏览器打印功能转为 PDF',
       });
-    } catch (error) {
-      toast({ title: '导出失败', description: '请稍后重试', variant: 'destructive' });
+    } catch (error: unknown) {
+      const errorResponse = error as { response?: { status?: number; data?: { data?: { upgradeRequired?: boolean } } } };
+      if (errorResponse.response?.status === 403 && errorResponse.response?.data?.data?.upgradeRequired) {
+        toast({
+          title: '导出配额已用尽',
+          description: '本月简历导出次数已用完，请升级套餐',
+          variant: 'destructive',
+        });
+      } else {
+        toast({ title: '导出失败', description: '请稍后重试', variant: 'destructive' });
+      }
     } finally {
       setIsExporting(false);
       setShowExportMenu(false);
@@ -263,8 +272,17 @@ export default function ResumeDetailPage() {
         title: '导出成功',
         description: '简历已导出为 Word 文件',
       });
-    } catch (error) {
-      toast({ title: '导出失败', description: '请稍后重试', variant: 'destructive' });
+    } catch (error: unknown) {
+      const errorResponse = error as { response?: { status?: number; data?: { data?: { upgradeRequired?: boolean } } } };
+      if (errorResponse.response?.status === 403 && errorResponse.response?.data?.data?.upgradeRequired) {
+        toast({
+          title: '导出配额已用尽',
+          description: '本月简历导出次数已用完，请升级套餐',
+          variant: 'destructive',
+        });
+      } else {
+        toast({ title: '导出失败', description: '请稍后重试', variant: 'destructive' });
+      }
     } finally {
       setIsExportingWord(false);
       setShowExportMenu(false);

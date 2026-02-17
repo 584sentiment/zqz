@@ -88,17 +88,19 @@ export class ResumesController {
   }
 
   /**
-   * 导出 PDF
+   * 导出 PDF（需要简历配额）
    */
   @Get(':id/export')
+  @RequireQuota('resume')
   async exportPdf(@Request() req: { user: { id: string } }, @Param('id') id: string) {
     return this.resumesService.generatePdf(req.user.id, id);
   }
 
   /**
-   * 导出 Word
+   * 导出 Word（需要简历配额）
    */
   @Get(':id/export-word')
+  @RequireQuota('resume')
   async exportWord(@Request() req: { user: { id: string } }, @Param('id') id: string) {
     return this.resumesService.generateWord(req.user.id, id);
   }

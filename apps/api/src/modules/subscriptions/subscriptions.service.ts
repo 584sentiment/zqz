@@ -76,7 +76,10 @@ export class SubscriptionsService {
 
     for (const log of usageLogs) {
       if (log.action === 'ai_chat') usage.ai = log._count;
-      if (log.action === 'resume_generate') usage.resume = log._count;
+      // 简历配额包含生成和导出
+      if (log.action === 'resume_generate' || log.action === 'resume_export') {
+        usage.resume += log._count;
+      }
       if (log.action === 'interview_mock') usage.interview = log._count;
     }
 
@@ -133,7 +136,7 @@ export class SubscriptionsService {
    */
   async recordUsage(
     userId: string,
-    action: 'ai_chat' | 'resume_generate' | 'interview_mock',
+    action: 'ai_chat' | 'resume_generate' | 'resume_export' | 'interview_mock',
     resource?: string,
     metadata?: Record<string, unknown>,
   ) {

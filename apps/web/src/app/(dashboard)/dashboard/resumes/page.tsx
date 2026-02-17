@@ -165,7 +165,7 @@ export default function ResumesPage() {
                 >
                   {quotaInfo.remaining === 0
                     ? '简历配额已用尽'
-                    : `本月剩余 ${quotaInfo.remaining} 次简历生成机会`}
+                    : `本月剩余 ${quotaInfo.remaining} 次简历操作机会（生成/导出）`}
                 </p>
                 <p
                   className={`text-sm ${
@@ -176,7 +176,7 @@ export default function ResumesPage() {
                       : 'text-blue-600'
                   }`}
                 >
-                  已使用 {quotaInfo.used} / {quotaInfo.total} 次
+                  已使用 {quotaInfo.used} / {quotaInfo.total} 次（包含生成和导出）
                 </p>
               </div>
             </div>

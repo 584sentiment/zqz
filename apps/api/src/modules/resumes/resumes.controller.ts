@@ -9,15 +9,23 @@ import {
   Query,
   UseGuards,
   Request,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ResumesService } from './resumes.service';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { RequireQuota } from '@/common/decorators/quota.decorator';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+
+// 高级模板 ID 列表
+const PREMIUM_TEMPLATES = ['creative', 'executive'];
 
 @Controller('resumes')
 @UseGuards(JwtAuthGuard)
 export class ResumesController {
-  constructor(private resumesService: ResumesService) {}
+  constructor(
+    private resumesService: ResumesService,
+    private subscriptionsService: SubscriptionsService,
+  ) {}
 
   /**
    * 获取简历列表
@@ -56,6 +64,23 @@ export class ResumesController {
     @Request() req: { user: { id: string } },
     @Body() body: { name: string; jobId?: string; templateId?: string; language?: string },
   ) {
+    // 检查高级模板权限
+    if (body.templateId && PREMIUM_TEMPLATES.includes(body.templateId)) {
+      const subscription = await this.subscriptionsService.getSubscription(req.user.id);
+      if (subscription.plan === 'free') {
+        throw new ForbiddenException({
+          statusCode: 403,
+          message: '高级模板仅限付费用户使用',
+          error: 'Premium Template Required',
+          data: {
+            templateId: body.templateId,
+            upgradeRequired: true,
+            currentPlan: subscription.plan,
+          },
+        });
+      }
+    }
+
     return this.resumesService.create(req.user.id, body);
   }
 

@@ -44,6 +44,7 @@ export default function ResumesPage() {
     remaining: number;
     unlimited: boolean;
   } | null>(null);
+  const [userPlan, setUserPlan] = useState<string>('free');
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -57,6 +58,9 @@ export default function ResumesPage() {
       setTemplates(templatesData);
       if (subscriptionData?.quotas?.resume) {
         setQuotaInfo(subscriptionData.quotas.resume);
+      }
+      if (subscriptionData?.plan) {
+        setUserPlan(subscriptionData.plan);
       }
     } catch (error) {
       toast({
@@ -384,6 +388,27 @@ export default function ResumesPage() {
                 <button
                   key={template.id}
                   onClick={async () => {
+                    // 前端检查高级模板权限
+                    if (template.isPremium && userPlan === 'free') {
+                      toast({
+                        title: '高级模板',
+                        description: '该模板仅限付费用户使用，请升级套餐',
+                        variant: 'default',
+                        action: (
+                          <button
+                            onClick={() => {
+                              window.location.href = '/dashboard/subscription/upgrade';
+                            }}
+                            className="flex items-center gap-1 px-3 py-1 bg-primary text-white rounded-md text-sm hover:bg-primary/90"
+                          >
+                            <Crown className="w-4 h-4" />
+                            升级套餐
+                          </button>
+                        ),
+                      });
+                      return;
+                    }
+
                     try {
                       const resume = await resumesApi.create({
                         name: resumeName || '未命名简历',
@@ -408,7 +433,7 @@ export default function ResumesPage() {
                         };
                       };
 
-                      // 检查是否是配额用尽
+                      // 检查是否是配额用尽或高级模板权限
                       if (axiosError.response?.data?.data?.upgradeRequired) {
                         const quotaName = axiosError.response.data.data.quotaName || '功能';
                         toast({
@@ -436,14 +461,25 @@ export default function ResumesPage() {
                       }
                     }
                   }}
-                  className="p-4 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition text-left"
+                  className={`p-4 border rounded-lg transition text-left ${
+                    template.isPremium && userPlan === 'free'
+                      ? 'border-yellow-300 bg-yellow-50/50 hover:border-yellow-400'
+                      : 'border-gray-200 hover:border-primary hover:bg-primary/5'
+                  }`}
                 >
-                  <div className="h-20 bg-gray-100 rounded mb-2 flex items-center justify-center">
+                  <div className="h-20 bg-gray-100 rounded mb-2 flex items-center justify-center relative">
                     <FileText className="w-8 h-8 text-gray-300" />
+                    {template.isPremium && (
+                      <div className="absolute top-1 right-1">
+                        <Crown className="w-4 h-4 text-yellow-500" />
+                      </div>
+                    )}
                   </div>
                   <p className="text-sm font-medium text-gray-900">{template.name}</p>
                   {template.isPremium && (
-                    <span className="text-xs text-yellow-600">高级模板</span>
+                    <span className={`text-xs ${userPlan === 'free' ? 'text-yellow-600' : 'text-green-600'}`}>
+                      {userPlan === 'free' ? '高级模板' : '已解锁'}
+                    </span>
                   )}
                 </button>
               ))}

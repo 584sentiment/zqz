@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { jobsApi, Job } from '@/lib/api/jobs';
+import { interviewsApi, PredictedQuestion } from '@/lib/api/interviews';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,6 +30,8 @@ import {
   Globe,
   Link2,
   ImageIcon,
+  Target,
+  Lightbulb,
 } from 'lucide-react';
 
 interface PageProps {
@@ -52,6 +55,11 @@ export default function JobDetailPage({ params }: PageProps) {
     status: 'pending' as string,
     notes: '',
   });
+
+  // 预测面试题状态
+  const [predictedQuestions, setPredictedQuestions] = useState<PredictedQuestion[]>([]);
+  const [isPredicting, setIsPredicting] = useState(false);
+  const [showPredictionModal, setShowPredictionModal] = useState(false);
 
   const loadJob = useCallback(async () => {
     if (!id) return;
@@ -134,6 +142,26 @@ export default function JobDetailPage({ params }: PageProps) {
       });
     }
     setIsEditing(false);
+  };
+
+  // 预测面试题
+  const handlePredictQuestions = async () => {
+    if (!job) return;
+
+    setIsPredicting(true);
+    try {
+      const result = await interviewsApi.predictQuestions(job.id);
+      setPredictedQuestions(result.questions);
+      setShowPredictionModal(true);
+    } catch (error) {
+      toast({
+        title: '预测失败',
+        description: '无法生成面试题预测，请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsPredicting(false);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -384,7 +412,7 @@ export default function JobDetailPage({ params }: PageProps) {
         </div>
 
         {/* 快捷操作 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <button className="flex items-center gap-4 p-5 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-primary/20 transition-all group">
             <div className="p-3 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors">
               <FileText className="w-6 h-6" />
@@ -392,6 +420,20 @@ export default function JobDetailPage({ params }: PageProps) {
             <div className="text-left">
               <h3 className="font-semibold text-gray-900">生成定制简历</h3>
               <p className="text-sm text-gray-500">针对此岗位优化</p>
+            </div>
+          </button>
+
+          <button
+            onClick={handlePredictQuestions}
+            disabled={isPredicting}
+            className="flex items-center gap-4 p-5 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-purple-200 transition-all group disabled:opacity-50"
+          >
+            <div className="p-3 rounded-lg bg-purple-100 text-purple-600 group-hover:bg-purple-500 group-hover:text-white transition-colors">
+              {isPredicting ? <Loader2 className="w-6 h-6 animate-spin" /> : <Target className="w-6 h-6" />}
+            </div>
+            <div className="text-left">
+              <h3 className="font-semibold text-gray-900">预测面试题</h3>
+              <p className="text-sm text-gray-500">AI 智能预测</p>
             </div>
           </button>
 
@@ -508,6 +550,87 @@ export default function JobDetailPage({ params }: PageProps) {
           </div>
         )}
       </div>
+
+      {/* 预测面试题模态框 */}
+      {showPredictionModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">预测面试题</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  基于「{job?.title}」岗位的 AI 智能预测
+                </p>
+              </div>
+              <button
+                onClick={() => setShowPredictionModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
+              <div className="space-y-4">
+                {predictedQuestions.map((q, index) => (
+                  <div
+                    key={q.id}
+                    className="p-4 bg-gray-50 rounded-xl border border-gray-100"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-semibold text-sm">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            q.type === 'technical' ? 'bg-blue-100 text-blue-700' :
+                            q.type === 'behavioral' ? 'bg-green-100 text-green-700' :
+                            q.type === 'hr' ? 'bg-orange-100 text-orange-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {q.category}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-xs ${
+                            q.difficulty === 'easy' ? 'bg-green-50 text-green-600' :
+                            q.difficulty === 'hard' ? 'bg-red-50 text-red-600' :
+                            'bg-yellow-50 text-yellow-600'
+                          }`}>
+                            {q.difficulty === 'easy' ? '简单' : q.difficulty === 'hard' ? '困难' : '中等'}
+                          </span>
+                          <span className="text-xs text-gray-400">{q.source}</span>
+                        </div>
+                        <p className="text-gray-900 font-medium mb-3">{q.question}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {q.keypoints.map((point, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-white rounded-md text-xs text-gray-600 border border-gray-200"
+                            >
+                              <Lightbulb className="w-3 h-3 text-yellow-500" />
+                              {point}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="p-4 border-t border-gray-100 flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowPredictionModal(false)}>
+                关闭
+              </Button>
+              <Button onClick={() => {
+                setShowPredictionModal(false);
+                router.push(`/dashboard/interviews/new?jobId=${job?.id}`);
+              }}>
+                开始模拟面试
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

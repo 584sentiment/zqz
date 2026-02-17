@@ -97,6 +97,13 @@ export class InterviewsController {
     return this.interviewsService.delete(req.user.id, id);
   }
 
+  // ============== 面试题预测 ==============
+
+  @Post('predict-questions')
+  async predictQuestions(@Body() body: { jobId: string }) {
+    return this.interviewsService.predictInterviewQuestions(body.jobId);
+  }
+
   // ============== 面试准备计划 ==============
 
   @Get('preparations')

@@ -935,4 +935,221 @@ export class InterviewsService {
     });
     return { success: true };
   }
+
+  /**
+   * 根据岗位预测面试题（AI 增强版本）
+   */
+  async predictInterviewQuestions(jobId: string) {
+    // 获取岗位信息
+    const job = await this.prisma.job.findUnique({
+      where: { id: jobId },
+    });
+
+    if (!job) {
+      throw new NotFoundException('岗位不存在');
+    }
+
+    // 基于岗位信息生成预测问题
+    const questions = await this.generatePredictedQuestions(job);
+
+    return {
+      jobId: job.id,
+      jobTitle: job.title,
+      company: job.company,
+      questions,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * 生成预测的面试问题
+   */
+  private async generatePredictedQuestions(job: Record<string, unknown>): Promise<Record<string, unknown>[]> {
+    const title = job.title as string || '目标岗位';
+    const description = job.description as string || '';
+    const requirements = job.requirements as Record<string, unknown> || {};
+
+    // 提取技能关键词
+    const skills = this.extractSkillsFromJob(requirements, description);
+
+    // 生成不同类型的预测问题
+    const questions: Record<string, unknown>[] = [
+      // 自我介绍类
+      {
+        id: 'predict-1',
+        type: 'behavioral',
+        category: '自我介绍',
+        question: `请介绍一下你自己，重点说明你为什么适合${title}这个岗位？`,
+        keypoints: ['突出相关经验', '展示对岗位的理解', '简洁有力'],
+        difficulty: 'medium',
+        source: '岗位匹配',
+      },
+      // 技术能力类
+      {
+        id: 'predict-2',
+        type: 'technical',
+        category: '技术能力',
+        question: `作为${title}，你认为最重要的技术能力是什么？请结合你的经验说明。`,
+        keypoints: ['技术深度', '实践经验', '持续学习'],
+        difficulty: 'medium',
+        source: '岗位要求',
+      },
+      // 项目经验类
+      {
+        id: 'predict-3',
+        type: 'behavioral',
+        category: '项目经验',
+        question: `请描述一个你认为最能体现你${title}能力的项目，你的角色和贡献是什么？`,
+        keypoints: ['STAR 原则', '量化成果', '团队协作'],
+        difficulty: 'medium',
+        source: '能力验证',
+      },
+    ];
+
+    // 根据技能生成针对性问题
+    if (skills.length > 0) {
+      const topSkills = skills.slice(0, 3);
+
+      for (let i = 0; i < topSkills.length; i++) {
+        questions.push({
+          id: `predict-skill-${i + 1}`,
+          type: 'technical',
+          category: '技能考察',
+          question: `关于${topSkills[i]}，请分享你在实际项目中如何应用这项技能？遇到过什么挑战？`,
+          keypoints: ['实际应用', '问题解决', '经验总结'],
+          difficulty: 'medium',
+          source: '技能要求',
+        });
+      }
+    }
+
+    // 根据岗位类型添加特定问题
+    if (title.includes('前端') || title.includes('Frontend')) {
+      questions.push(
+        {
+          id: 'predict-fe-1',
+          type: 'technical',
+          category: '前端专项',
+          question: '请谈谈你对前端性能优化的理解，有哪些具体的优化方法？',
+          keypoints: ['性能指标', '优化策略', '实践经验'],
+          difficulty: 'medium',
+          source: '岗位专业',
+        },
+        {
+          id: 'predict-fe-2',
+          type: 'technical',
+          category: '前端专项',
+          question: '请解释 React/Vue 的核心原理，以及你选择使用它的原因？',
+          keypoints: ['框架理解', '技术选型', '深入原理'],
+          difficulty: 'hard',
+          source: '岗位专业',
+        }
+      );
+    } else if (title.includes('后端') || title.includes('Backend')) {
+      questions.push(
+        {
+          id: 'predict-be-1',
+          type: 'technical',
+          category: '后端专项',
+          question: '请谈谈你对高并发系统设计的理解，有哪些关键点需要注意？',
+          keypoints: ['架构设计', '性能优化', '容错处理'],
+          difficulty: 'hard',
+          source: '岗位专业',
+        },
+        {
+          id: 'predict-be-2',
+          type: 'technical',
+          category: '后端专项',
+          question: '请描述数据库索引的原理，以及如何进行 SQL 优化？',
+          keypoints: ['索引原理', '查询优化', '实践经验'],
+          difficulty: 'medium',
+          source: '岗位专业',
+        }
+      );
+    } else if (title.includes('产品') || title.includes('PM')) {
+      questions.push(
+        {
+          id: 'predict-pm-1',
+          type: 'behavioral',
+          category: '产品思维',
+          question: '请描述你是如何进行需求分析和产品设计的？',
+          keypoints: ['需求挖掘', '用户视角', '数据驱动'],
+          difficulty: 'medium',
+          source: '岗位专业',
+        },
+        {
+          id: 'predict-pm-2',
+          type: 'situational',
+          category: '产品决策',
+          question: '如果开发资源有限，你会如何进行功能优先级排序？',
+          keypoints: ['价值评估', '资源分配', '决策逻辑'],
+          difficulty: 'medium',
+          source: '岗位专业',
+        }
+      );
+    }
+
+    // 添加通用 HR 问题
+    questions.push(
+      {
+        id: 'predict-hr-1',
+        type: 'hr',
+        category: '职业规划',
+        question: `你为什么对我们公司感兴趣？你期望的薪资范围是多少？`,
+        keypoints: ['公司了解', '价值观匹配', '期望合理'],
+        difficulty: 'easy',
+        source: 'HR 必问',
+      },
+      {
+        id: 'predict-hr-2',
+        type: 'hr',
+        category: '自我评价',
+        question: '你认为自己的优势和需要改进的地方分别是什么？',
+        keypoints: ['自我认知', '成长心态', '改进计划'],
+        difficulty: 'medium',
+        source: 'HR 常问',
+      },
+      {
+        id: 'predict-hr-3',
+        type: 'behavioral',
+        category: '团队协作',
+        question: '请举例说明你在团队中如何处理意见分歧或冲突？',
+        keypoints: ['沟通技巧', '妥协与坚持', '结果导向'],
+        difficulty: 'medium',
+        source: '软技能考察',
+      }
+    );
+
+    return questions;
+  }
+
+  /**
+   * 从岗位信息中提取技能
+   */
+  private extractSkillsFromJob(requirements: Record<string, unknown>, description: string): string[] {
+    const skills: Set<string> = new Set();
+
+    // 从 requirements 中提取
+    if (requirements.skills && Array.isArray(requirements.skills)) {
+      requirements.skills.forEach((s: string) => skills.add(s));
+    }
+
+    // 从描述中匹配常见技能
+    const skillPatterns = [
+      /JavaScript|TypeScript|React|Vue|Angular|Node\.js|Python|Java|Go|Rust|PHP/gi,
+      /MySQL|PostgreSQL|MongoDB|Redis|Elasticsearch/gi,
+      /Docker|Kubernetes|AWS|Azure|GCP|CI\/CD/gi,
+      /Git|Linux|Nginx/gi,
+      /机器学习|深度学习|NLP|CV|数据分析/gi,
+    ];
+
+    for (const pattern of skillPatterns) {
+      const matches = description.match(pattern);
+      if (matches) {
+        matches.forEach((m: string) => skills.add(m));
+      }
+    }
+
+    return Array.from(skills);
+  }
 }

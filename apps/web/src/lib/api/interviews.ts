@@ -99,6 +99,25 @@ export interface QuestionBankListResponse {
   };
 }
 
+// 预测面试题相关类型
+export interface PredictedQuestion {
+  id: string;
+  type: string;
+  category: string;
+  question: string;
+  keypoints: string[];
+  difficulty: string;
+  source: string;
+}
+
+export interface PredictedQuestionsResponse {
+  jobId: string;
+  jobTitle: string;
+  company: string;
+  questions: PredictedQuestion[];
+  generatedAt: string;
+}
+
 export const interviewsApi = {
   async getList(params?: { status?: string; type?: string }): Promise<Interview[]> {
     const searchParams = new URLSearchParams();
@@ -237,6 +256,15 @@ export const interviewsApi = {
   async getQuestionDetail(questionId: string): Promise<QuestionBankItem> {
     const response = await apiClient.get<QuestionBankItem>(
       `/interviews/questions/${questionId}`
+    );
+    return response.data;
+  },
+
+  // 预测面试题
+  async predictQuestions(jobId: string): Promise<PredictedQuestionsResponse> {
+    const response = await apiClient.post<PredictedQuestionsResponse>(
+      '/interviews/predict-questions',
+      { jobId }
     );
     return response.data;
   },

@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/auth';
 import { apiClient } from '@/lib/api/client';
+import { authApi } from '@/lib/api/auth';
 import {
   User,
   Mail,
@@ -15,6 +16,8 @@ import {
   Eye,
   EyeOff,
   Shield,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface UserProfile {
@@ -47,6 +50,12 @@ export default function SettingsPage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  // 删除账户状态
+  const [showDeleteSection, setShowDeleteSection] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const loadUser = useCallback(async () => {
     setIsLoading(true);
@@ -158,6 +167,44 @@ export default function SettingsPage() {
       });
     } finally {
       setIsChangingPassword(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword) {
+      toast({
+        title: '请输入密码',
+        description: '为了安全起见，请输入您的密码以确认删除',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!confirm('确定要删除账户吗？此操作不可撤销，所有数据将被永久删除！')) {
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      await authApi.deleteAccount(deletePassword);
+
+      toast({
+        title: '账户已删除',
+        description: '您的账户和所有相关数据已被永久删除',
+      });
+
+      // 清除本地状态并跳转到首页
+      setAuthUser(null);
+      window.location.href = '/';
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast({
+        title: '删除失败',
+        description: err.response?.data?.message || '密码错误或服务器异常',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -406,6 +453,103 @@ export default function SettingsPage() {
                       </>
                     ) : (
                       '确认修改'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 危险区域卡片 */}
+        <div className="bg-white rounded-xl shadow-sm border border-red-200 p-6">
+          <h2 className="text-lg font-semibold text-red-600 mb-6 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5" />
+            危险区域
+          </h2>
+
+          <div className="space-y-4">
+            {/* 删除账户入口 */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-gray-900">删除账户</h3>
+                <p className="text-sm text-gray-500">永久删除您的账户和所有数据，此操作不可撤销</p>
+              </div>
+              <Button
+                variant="outline"
+                className="text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700"
+                onClick={() => setShowDeleteSection(!showDeleteSection)}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                删除账户
+              </Button>
+            </div>
+
+            {/* 删除账户表单 */}
+            {showDeleteSection && (
+              <div className="mt-4 p-4 bg-red-50 rounded-lg space-y-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-red-700">
+                      警告：删除账户将永久丢失以下数据
+                    </p>
+                    <ul className="text-sm text-red-600 mt-1 list-disc list-inside">
+                      <li>所有简历和岗位信息</li>
+                      <li>面试记录和准备计划</li>
+                      <li>个人档案和技能信息</li>
+                      <li>订阅和配额信息</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    请输入密码确认删除
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showDeletePassword ? 'text' : 'password'}
+                      value={deletePassword}
+                      onChange={(e) => setDeletePassword(e.target.value)}
+                      placeholder="请输入您的密码"
+                      className="w-full px-4 py-2.5 pr-10 border border-red-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowDeletePassword(!showDeletePassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showDeletePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowDeleteSection(false);
+                      setDeletePassword('');
+                    }}
+                  >
+                    取消
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleDeleteAccount}
+                    disabled={isDeletingAccount || !deletePassword}
+                  >
+                    {isDeletingAccount ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        删除中...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        确认删除
+                      </>
                     )}
                   </Button>
                 </div>

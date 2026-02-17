@@ -80,4 +80,12 @@ export const authApi = {
     );
     return response.data;
   },
+
+  async deleteAccount(password: string): Promise<{ success: boolean; message: string }> {
+    const response = await apiClient.delete<{ success: boolean; message: string }>(
+      '/auth/account',
+      { data: { password } }
+    );
+    return response.data;
+  },
 };

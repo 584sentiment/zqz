@@ -381,4 +381,35 @@ export class AuthService {
       message: '密码重置成功',
     };
   }
+
+  /**
+   * 删除用户账户
+   */
+  async deleteAccount(userId: string, password: string) {
+    // 查找用户
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('用户不存在');
+    }
+
+    // 验证密码
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('密码错误');
+    }
+
+    // 删除用户（级联删除相关数据）
+    // 由于 Prisma schema 中设置了 onDelete: Cascade，相关数据会自动删除
+    await this.prisma.user.delete({
+      where: { id: userId },
+    });
+
+    return {
+      success: true,
+      message: '账户已删除',
+    };
+  }
 }

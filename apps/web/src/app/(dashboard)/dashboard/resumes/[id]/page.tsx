@@ -8,6 +8,7 @@ import { resumesApi, Resume, MatchAnalysis, ResumeVersion } from '@/lib/api/resu
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { useAutoSave } from '@/hooks/use-auto-save';
+import { AIErrorState } from '@/components/ai-error-state';
 import {
   ArrowLeft,
   Save,
@@ -56,6 +57,9 @@ export default function ResumeDetailPage() {
   const [showMatchDetails, setShowMatchDetails] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100); // 缩放级别 50% - 200%
+
+  // AI 错误状态
+  const [aiError, setAiError] = useState<string | null>(null);
 
   // 版本历史
   const [showVersionHistory, setShowVersionHistory] = useState(false);
@@ -137,6 +141,8 @@ export default function ResumeDetailPage() {
   const handleGenerate = async () => {
     if (!resume) return;
     setIsGenerating(true);
+    setAiError(null); // 清除之前的错误
+
     try {
       // 更新状态为生成中
       await resumesApi.update(resume.id, { status: 'generating' });
@@ -190,9 +196,15 @@ export default function ResumeDetailPage() {
         description: '简历已根据岗位信息生成',
       });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '简历生成失败，请稍后重试';
+      setAiError(errorMessage);
       await resumesApi.update(resume.id, { status: 'failed' });
       setResume({ ...resume, status: 'failed' });
-      toast({ title: '生成失败', description: '请稍后重试', variant: 'destructive' });
+      toast({
+        title: '生成失败',
+        description: errorMessage,
+        variant: 'destructive',
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -789,6 +801,12 @@ export default function ResumeDetailPage() {
                 AI 生成简历
               </Button>
             </div>
+          ) : resume.status === 'failed' ? (
+            <AIErrorState
+              error={aiError || '简历生成失败，请稍后重试'}
+              onRetry={handleGenerate}
+              isRetrying={isGenerating}
+            />
           ) : resume.status === 'generating' ? (
             <div className="text-center py-12">
               <Loader2 className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />

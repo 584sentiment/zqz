@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth';
 import { apiClient } from '@/lib/api/client';
 import { authApi } from '@/lib/api/auth';
 import { useToast } from '@/components/ui/use-toast';
+import { ThemeToggle } from '@/components/theme-toggle';
 import {
   LayoutDashboard,
   FileText,
@@ -112,9 +113,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [pathname]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Navigation */}
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             {/* Left: Logo + Nav */}
@@ -123,7 +124,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-sm">智</span>
                 </div>
-                <span className="font-bold text-xl text-gray-900">智求职</span>
+                <span className="font-bold text-xl text-gray-900 dark:text-white">智求职</span>
               </Link>
 
               {/* Desktop Nav */}
@@ -136,7 +137,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                       key={item.href}
                       href={item.href}
                       className={`flex items-center gap-2 text-sm font-medium transition ${
-                        isActive ? 'text-primary' : 'text-gray-500 hover:text-gray-900'
+                        isActive ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                       }`}
                     >
                       <Icon className="w-4 h-4" />
@@ -155,29 +156,32 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <input
                   type="search"
                   placeholder="搜索职位、公司..."
-                  className="w-64 pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                  className="w-64 pl-10 pr-4 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                 />
               </div>
 
               {/* Search - Mobile */}
-              <button className="lg:hidden p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg transition">
+              <button className="lg:hidden p-2 text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition">
                 <Search className="w-5 h-5" />
               </button>
 
               {/* Notifications */}
-              <button className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg transition">
+              <button className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition">
                 <Bell className="w-5 h-5" />
               </button>
+
+              {/* Theme Toggle */}
+              <ThemeToggle />
 
               {/* User Menu */}
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center gap-2 sm:gap-3 sm:pl-4 sm:border-l sm:border-gray-200"
+                  className="flex items-center gap-2 sm:gap-3 sm:pl-4 sm:border-l sm:border-gray-200 dark:sm:border-gray-700"
                 >
                   <div className="text-right hidden sm:block">
-                    <p className="text-sm font-medium text-gray-900">{user?.name || '用户'}</p>
-                    <p className="text-xs text-gray-500">免费会员</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{user?.name || '用户'}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">免费会员</p>
                   </div>
                   <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
                     {user?.avatarUrl ? (
@@ -190,10 +194,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 </button>
 
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50">
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-100 dark:border-gray-700 py-1 z-50">
                     <Link
                       href="/dashboard/settings"
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                       onClick={() => setShowUserMenu(false)}
                     >
                       <Settings className="w-4 h-4" />
@@ -204,7 +208,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         logout();
                         setShowUserMenu(false);
                       }}
-                      className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
+                      className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-50 dark:hover:bg-gray-700"
                     >
                       <LogOut className="w-4 h-4" />
                       退出登录
@@ -216,7 +220,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               {/* Mobile Menu Button */}
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
-                className="md:hidden p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg transition"
+                className="md:hidden p-2 text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
               >
                 {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
@@ -226,7 +230,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
         {/* Mobile Menu */}
         {showMobileMenu && (
-          <div className="md:hidden border-t border-gray-200 bg-white">
+          <div className="md:hidden border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
             <div className="px-4 py-3 space-y-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -238,7 +242,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
                       isActive
                         ? 'bg-primary/10 text-primary'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
                     }`}
                     onClick={() => setShowMobileMenu(false)}
                   >
@@ -254,12 +258,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Email Verification Banner */}
       {showVerificationBanner && (
-        <div className="bg-yellow-50 border-b border-yellow-200">
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <Mail className="w-5 h-5 text-yellow-600" />
-                <p className="text-sm text-yellow-700">
+                <Mail className="w-5 h-5 text-yellow-600 dark:text-yellow-500" />
+                <p className="text-sm text-yellow-700 dark:text-yellow-300">
                   <span className="font-medium">您的邮箱尚未验证</span>
                   <span className="hidden sm:inline">，验证后可使用全部功能</span>
                 </p>
@@ -267,7 +271,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <button
                 onClick={handleResendVerification}
                 disabled={isResending}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-yellow-700 bg-yellow-100 hover:bg-yellow-200 rounded-md transition disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-yellow-700 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-800 hover:bg-yellow-200 dark:hover:bg-yellow-700 rounded-md transition disabled:opacity-50"
               >
                 {isResending ? (
                   <>

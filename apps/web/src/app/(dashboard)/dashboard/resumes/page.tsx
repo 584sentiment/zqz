@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { resumesApi, Resume, ResumeTemplate } from '@/lib/api/resumes';
+import { subscriptionsApi } from '@/lib/api/subscriptions';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,6 +22,10 @@ import {
   Briefcase,
   Clock,
   CheckCircle,
+  Languages,
+  Globe,
+  AlertTriangle,
+  Crown,
 } from 'lucide-react';
 
 export default function ResumesPage() {
@@ -31,16 +36,28 @@ export default function ResumesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState<'zh' | 'en'>('zh');
+  const [resumeName, setResumeName] = useState('');
+  const [quotaInfo, setQuotaInfo] = useState<{
+    total: number;
+    used: number;
+    remaining: number;
+    unlimited: boolean;
+  } | null>(null);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [resumesData, templatesData] = await Promise.all([
+      const [resumesData, templatesData, subscriptionData] = await Promise.all([
         resumesApi.getList(statusFilter === 'all' ? undefined : { status: statusFilter }),
         resumesApi.getTemplates(),
+        subscriptionsApi.getMySubscription().catch(() => null),
       ]);
       setResumes(resumesData);
       setTemplates(templatesData);
+      if (subscriptionData?.quotas?.resume) {
+        setQuotaInfo(subscriptionData.quotas.resume);
+      }
     } catch (error) {
       toast({
         title: '加载失败',
@@ -117,6 +134,66 @@ export default function ResumesPage() {
           </Button>
         </div>
 
+        {/* 配额信息栏 */}
+        {quotaInfo && !quotaInfo.unlimited && (
+          <div
+            className={`p-4 rounded-lg flex items-center justify-between ${
+              quotaInfo.remaining === 0
+                ? 'bg-red-50 border border-red-200'
+                : quotaInfo.remaining <= 1
+                ? 'bg-yellow-50 border border-yellow-200'
+                : 'bg-blue-50 border border-blue-200'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              {quotaInfo.remaining === 0 ? (
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              ) : quotaInfo.remaining <= 1 ? (
+                <AlertTriangle className="w-5 h-5 text-yellow-500" />
+              ) : (
+                <FileText className="w-5 h-5 text-blue-500" />
+              )}
+              <div>
+                <p
+                  className={`font-medium ${
+                    quotaInfo.remaining === 0
+                      ? 'text-red-700'
+                      : quotaInfo.remaining <= 1
+                      ? 'text-yellow-700'
+                      : 'text-blue-700'
+                  }`}
+                >
+                  {quotaInfo.remaining === 0
+                    ? '简历配额已用尽'
+                    : `本月剩余 ${quotaInfo.remaining} 次简历生成机会`}
+                </p>
+                <p
+                  className={`text-sm ${
+                    quotaInfo.remaining === 0
+                      ? 'text-red-600'
+                      : quotaInfo.remaining <= 1
+                      ? 'text-yellow-600'
+                      : 'text-blue-600'
+                  }`}
+                >
+                  已使用 {quotaInfo.used} / {quotaInfo.total} 次
+                </p>
+              </div>
+            </div>
+            {(quotaInfo.remaining <= 1 || quotaInfo.remaining === 0) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => (window.location.href = '/dashboard/subscription/upgrade')}
+                className="flex items-center gap-1"
+              >
+                <Crown className="w-4 h-4" />
+                升级套餐
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* 搜索和筛选 */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
@@ -181,6 +258,11 @@ export default function ResumesPage() {
                       <StatusIcon className={`w-3 h-3 ${resume.status === 'generating' ? 'animate-spin' : ''}`} />
                       {statusBadge.label}
                     </span>
+                    {/* 语言标签 */}
+                    <span className="absolute top-3 left-3 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 flex items-center gap-1">
+                      <Globe className="w-3 h-3" />
+                      {resume.language === 'en' ? 'EN' : '中'}
+                    </span>
                     {resume.matchScore && (
                       <div className="absolute bottom-3 left-3 flex items-center gap-1 px-2 py-1 bg-primary/10 rounded-full">
                         <Star className="w-3 h-3 text-primary" />
@@ -244,13 +326,59 @@ export default function ResumesPage() {
         )}
       </div>
 
-      {/* 创建简历模态框（简化版） */}
+      {/* 创建简历模态框 */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-lg w-full p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">创建新简历</h2>
-            <p className="text-gray-500 mb-6">选择一个模板开始创建您的简历</p>
 
+            {/* 简历名称 */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">简历名称</label>
+              <input
+                type="text"
+                value={resumeName}
+                onChange={(e) => setResumeName(e.target.value)}
+                placeholder="例如：前端工程师简历"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-sm"
+              />
+            </div>
+
+            {/* 语言选择 */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Languages className="w-4 h-4 inline mr-1" />
+                简历语言
+              </label>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setSelectedLanguage('zh')}
+                  className={`flex-1 py-3 px-4 rounded-lg border transition-all ${
+                    selectedLanguage === 'zh'
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <span className="text-lg mb-1 block">中文</span>
+                  <span className="text-xs text-gray-500">简体中文简历</span>
+                </button>
+                <button
+                  onClick={() => setSelectedLanguage('en')}
+                  className={`flex-1 py-3 px-4 rounded-lg border transition-all ${
+                    selectedLanguage === 'en'
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <span className="text-lg mb-1 block">English</span>
+                  <span className="text-xs text-gray-500">英文简历</span>
+                </button>
+              </div>
+            </div>
+
+            <p className="text-gray-500 mb-4 text-sm">选择一个模板开始创建您的简历</p>
+
+            {/* 模板选择 */}
             <div className="grid grid-cols-2 gap-3 mb-6">
               {templates.slice(0, 4).map((template) => (
                 <button
@@ -258,17 +386,54 @@ export default function ResumesPage() {
                   onClick={async () => {
                     try {
                       const resume = await resumesApi.create({
-                        name: '未命名简历',
+                        name: resumeName || '未命名简历',
                         templateId: template.id,
+                        language: selectedLanguage,
                       });
                       setShowCreateModal(false);
+                      setResumeName('');
+                      setSelectedLanguage('zh');
                       window.location.href = `/dashboard/resumes/${resume.id}`;
-                    } catch (error) {
-                      toast({
-                        title: '创建失败',
-                        description: '请稍后重试',
-                        variant: 'destructive',
-                      });
+                    } catch (error: unknown) {
+                      const axiosError = error as {
+                        response?: {
+                          status?: number;
+                          data?: {
+                            message?: string;
+                            data?: {
+                              upgradeRequired?: boolean;
+                              quotaName?: string;
+                            };
+                          };
+                        };
+                      };
+
+                      // 检查是否是配额用尽
+                      if (axiosError.response?.data?.data?.upgradeRequired) {
+                        const quotaName = axiosError.response.data.data.quotaName || '功能';
+                        toast({
+                          title: `${quotaName}配额已用尽`,
+                          description: '您的配额已用完，请升级套餐以继续使用',
+                          variant: 'destructive',
+                          action: (
+                            <button
+                              onClick={() => {
+                                window.location.href = '/dashboard/subscription/upgrade';
+                              }}
+                              className="flex items-center gap-1 px-3 py-1 bg-primary text-white rounded-md text-sm hover:bg-primary/90"
+                            >
+                              <Crown className="w-4 h-4" />
+                              升级套餐
+                            </button>
+                          ),
+                        });
+                      } else {
+                        toast({
+                          title: '创建失败',
+                          description: axiosError.response?.data?.message || '请稍后重试',
+                          variant: 'destructive',
+                        });
+                      }
                     }
                   }}
                   className="p-4 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition text-left"
@@ -285,7 +450,14 @@ export default function ResumesPage() {
             </div>
 
             <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setShowCreateModal(false)}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setResumeName('');
+                  setSelectedLanguage('zh');
+                }}
+              >
                 取消
               </Button>
             </div>

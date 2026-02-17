@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ResumesService } from './resumes.service';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
+import { RequireQuota } from '@/common/decorators/quota.decorator';
 
 @Controller('resumes')
 @UseGuards(JwtAuthGuard)
@@ -47,9 +48,10 @@ export class ResumesController {
   }
 
   /**
-   * 创建简历
+   * 创建简历（需要简历配额）
    */
   @Post()
+  @RequireQuota('resume')
   async create(
     @Request() req: { user: { id: string } },
     @Body() body: { name: string; jobId?: string; templateId?: string; language?: string },
@@ -58,7 +60,7 @@ export class ResumesController {
   }
 
   /**
-   * 更新简历
+   * 更新简历（如果更新为 generating 状态需要检查配额）
    */
   @Put(':id')
   async update(
@@ -91,6 +93,14 @@ export class ResumesController {
   @Get(':id/export')
   async exportPdf(@Request() req: { user: { id: string } }, @Param('id') id: string) {
     return this.resumesService.generatePdf(req.user.id, id);
+  }
+
+  /**
+   * 导出 Word
+   */
+  @Get(':id/export-word')
+  async exportWord(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.resumesService.generateWord(req.user.id, id);
   }
 
   /**

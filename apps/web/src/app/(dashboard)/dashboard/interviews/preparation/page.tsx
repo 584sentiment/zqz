@@ -11,6 +11,7 @@ import {
   DailyPlan,
 } from '@/lib/api/interviews';
 import { jobsApi, Job } from '@/lib/api/jobs';
+import { notificationsApi } from '@/lib/api/notifications';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +27,8 @@ import {
   Briefcase,
   X,
   Sparkles,
+  Bell,
+  BellOff,
 } from 'lucide-react';
 
 export default function InterviewPreparationPage() {
@@ -43,15 +46,21 @@ export default function InterviewPreparationPage() {
   const [preparationDays, setPreparationDays] = useState(7);
   const [isCreating, setIsCreating] = useState(false);
 
+  // 提醒设置状态
+  const [dailyReminder, setDailyReminder] = useState(false);
+  const [isLoadingReminder, setIsLoadingReminder] = useState(false);
+
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [plansData, jobsResponse] = await Promise.all([
+      const [plansData, jobsResponse, reminderSettings] = await Promise.all([
         interviewsApi.getPreparationPlans(),
         jobsApi.getList({ status: 'active' }),
+        notificationsApi.getReminderSettings().catch(() => ({ dailyReminder: false })),
       ]);
       setPlans(plansData);
       setJobs(jobsResponse.data);
+      setDailyReminder(reminderSettings.dailyReminder);
     } catch (error) {
       toast({
         title: '加载失败',
@@ -149,6 +158,29 @@ export default function InterviewPreparationPage() {
     }
   };
 
+  const handleToggleReminder = async () => {
+    setIsLoadingReminder(true);
+    try {
+      const newValue = !dailyReminder;
+      await notificationsApi.updateReminderSettings({ dailyReminder: newValue });
+      setDailyReminder(newValue);
+      toast({
+        title: newValue ? '已开启每日提醒' : '已关闭每日提醒',
+        description: newValue
+          ? '每天早上 9 点会收到邮件提醒'
+          : '将不再收到每日任务提醒',
+      });
+    } catch (error) {
+      toast({
+        title: '设置失败',
+        description: '请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingReminder(false);
+    }
+  };
+
   const getFocusAreaLabel = (area: string): string => {
     const labels: Record<string, string> = {
       technical: '技术能力',
@@ -199,10 +231,32 @@ export default function InterviewPreparationPage() {
               制定系统化的面试准备计划，每天完成指定任务
             </p>
           </div>
-          <Button onClick={() => setShowCreateModal(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            创建计划
-          </Button>
+          <div className="flex items-center gap-3">
+            {/* 每日提醒开关 */}
+            <button
+              onClick={handleToggleReminder}
+              disabled={isLoadingReminder}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
+                dailyReminder
+                  ? 'bg-primary/10 text-primary border border-primary/20'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-transparent'
+              }`}
+              title={dailyReminder ? '点击关闭每日提醒' : '点击开启每日提醒'}
+            >
+              {isLoadingReminder ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : dailyReminder ? (
+                <Bell className="w-4 h-4" />
+              ) : (
+                <BellOff className="w-4 h-4" />
+              )}
+              {dailyReminder ? '每日提醒已开启' : '开启每日提醒'}
+            </button>
+            <Button onClick={() => setShowCreateModal(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              创建计划
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

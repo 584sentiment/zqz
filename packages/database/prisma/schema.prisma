@@ -38,6 +38,9 @@ model User {
   // 软删除
   deletedAt      DateTime? @map("deleted_at")
 
+  // 用户偏好设置
+  preferences    Json?    @map("preferences")
+
   // 关系
   profile        Profile?
   subscription   Subscription?

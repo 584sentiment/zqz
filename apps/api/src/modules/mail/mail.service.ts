@@ -1,7 +1,24 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+
+// 尝试多个可能的 .env 文件路径
+const envPaths = [
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(__dirname, '../../../.env'),
+  path.resolve(__dirname, '../../../../.env'),
+];
+
+for (const envPath of envPaths) {
+  const result = dotenv.config({ path: envPath });
+  if (!result.error) {
+    console.log(`[MailService] 已加载 .env 文件: ${envPath}`);
+    break;
+  }
+}
 
 @Injectable()
 export class MailService {
@@ -11,16 +28,28 @@ export class MailService {
   private readonly frontendUrl: string;
 
   constructor(private configService: ConfigService) {
-    this.fromEmail = this.configService.get<string>('SMTP_FROM') || 'noreply@example.com';
-    this.frontendUrl = this.configService.get<string>('NEXT_PUBLIC_API_URL')?.replace(':3001', ':3000') || 'http://localhost:3000';
+    // 优先使用 process.env
+    this.fromEmail = process.env.SMTP_FROM || this.configService.get<string>('SMTP_FROM') || 'noreply@example.com';
+
+    // 正确获取前端 URL（去掉 /api/v1 后缀）
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || this.configService.get<string>('NEXT_PUBLIC_API_URL') || 'http://localhost:3001/api/v1';
+    this.frontendUrl = apiUrl.replace(/:\d+/, ':3000').replace(/\/api\/v\d+$/, '');
+
+    this.logger.debug(`Frontend URL: ${this.frontendUrl}`);
     this.initTransporter();
   }
 
   private initTransporter() {
-    const smtpHost = this.configService.get<string>('SMTP_HOST');
-    const smtpPort = this.configService.get<number>('SMTP_PORT');
-    const smtpUser = this.configService.get<string>('SMTP_USER');
-    const smtpPass = this.configService.get<string>('SMTP_PASS');
+    // 优先使用 process.env
+    const smtpHost = process.env.SMTP_HOST || this.configService.get<string>('SMTP_HOST');
+    const smtpPortStr = process.env.SMTP_PORT || this.configService.get<string>('SMTP_PORT');
+    const smtpUser = process.env.SMTP_USER || this.configService.get<string>('SMTP_USER');
+    const smtpPass = process.env.SMTP_PASS || this.configService.get<string>('SMTP_PASS');
+
+    // 转换端口号
+    const smtpPort = smtpPortStr ? parseInt(smtpPortStr, 10) : undefined;
+
+    this.logger.debug(`SMTP 配置: host=${smtpHost}, port=${smtpPort}, user=${smtpUser ? '已设置' : '未设置'}`);
 
     if (smtpHost && smtpPort) {
       this.transporter = nodemailer.createTransport({
@@ -29,9 +58,10 @@ export class MailService {
         secure: smtpPort === 465,
         auth: smtpUser && smtpPass ? { user: smtpUser, pass: smtpPass } : undefined,
       });
-      this.logger.log('SMTP 邮件服务已初始化');
+      this.logger.log(`SMTP 邮件服务已初始化 (${smtpHost}:${smtpPort})`);
     } else {
       this.logger.warn('SMTP 未配置，邮件将仅记录到日志');
+      this.logger.debug(`SMTP_HOST: ${smtpHost}, SMTP_PORT: ${smtpPort}`);
     }
   }
 
@@ -65,6 +95,13 @@ export class MailService {
     const html = this.getPasswordResetEmailHtml(resetUrl, userName);
 
     return this.sendMail(email, subject, html);
+  }
+
+  /**
+   * 发送自定义邮件（用于通知等场景）
+   */
+  async sendCustomEmail(to: string, subject: string, html: string): Promise<boolean> {
+    return this.sendMail(to, subject, html);
   }
 
   /**

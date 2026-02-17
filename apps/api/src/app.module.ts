@@ -4,6 +4,8 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
+import * as path from 'path';
 
 import { PrismaModule } from './common/database/prisma.module';
 import { MailModule } from './modules/mail/mail.module';
@@ -14,14 +16,18 @@ import { ResumesModule } from './modules/resumes/resumes.module';
 import { InterviewsModule } from './modules/interviews/interviews.module';
 import { SkillsModule } from './modules/skills/skills.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { HealthController } from './health.controller';
 
 @Module({
   imports: [
-    // 配置模块
+    // 配置模块 - 指向根目录的 .env 文件
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env.local', '.env'],
+      envFilePath: [
+        path.resolve(__dirname, '../../.env.local'),
+        path.resolve(__dirname, '../../.env'),
+      ],
     }),
 
     // 速率限制
@@ -31,6 +37,9 @@ import { HealthController } from './health.controller';
         limit: 100, // 每分钟最多 100 次请求
       },
     ]),
+
+    // 定时任务模块
+    ScheduleModule.forRoot(),
 
     // 数据库模块
     PrismaModule,
@@ -61,6 +70,7 @@ import { HealthController } from './health.controller';
     InterviewsModule,
     SkillsModule,
     SubscriptionsModule,
+    NotificationsModule,
   ],
   controllers: [HealthController],
   providers: [

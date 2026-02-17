@@ -46,6 +46,22 @@ export interface PdfExportResult {
   filename: string;
 }
 
+export interface WordExportResult {
+  html: string;
+  filename: string;
+}
+
+export interface ResumeVersion {
+  id: string;
+  version: number;
+  changeNote: string | null;
+  createdAt: string;
+}
+
+export interface ResumeVersionDetail extends ResumeVersion {
+  content: Record<string, unknown>;
+}
+
 export const resumesApi = {
   async getList(params?: { jobId?: string; status?: string }): Promise<Resume[]> {
     const searchParams = new URLSearchParams();
@@ -97,6 +113,26 @@ export const resumesApi = {
 
   async exportPdf(id: string): Promise<PdfExportResult> {
     const response = await apiClient.get<PdfExportResult>(`/resumes/${id}/export`);
+    return response.data;
+  },
+
+  async exportWord(id: string): Promise<WordExportResult> {
+    const response = await apiClient.get<WordExportResult>(`/resumes/${id}/export-word`);
+    return response.data;
+  },
+
+  async getVersionHistory(id: string): Promise<ResumeVersion[]> {
+    const response = await apiClient.get<ResumeVersion[]>(`/resumes/${id}/versions`);
+    return response.data;
+  },
+
+  async getVersion(id: string, versionId: string): Promise<ResumeVersionDetail> {
+    const response = await apiClient.get<ResumeVersionDetail>(`/resumes/${id}/versions/${versionId}`);
+    return response.data;
+  },
+
+  async restoreVersion(id: string, versionId: string): Promise<Resume> {
+    const response = await apiClient.post<Resume>(`/resumes/${id}/versions/${versionId}/restore`);
     return response.data;
   },
 };

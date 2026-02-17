@@ -56,6 +56,38 @@ export class ResumesController {
   }
 
   /**
+   * 获取简历版本历史
+   */
+  @Get(':id/versions')
+  async getVersionHistory(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.resumesService.getVersionHistory(req.user.id, id);
+  }
+
+  /**
+   * 获取特定版本内容
+   */
+  @Get(':id/versions/:versionId')
+  async getVersion(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Param('versionId') versionId: string,
+  ) {
+    return this.resumesService.getVersion(req.user.id, id, versionId);
+  }
+
+  /**
+   * 恢复到历史版本
+   */
+  @Post(':id/versions/:versionId/restore')
+  async restoreVersion(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Param('versionId') versionId: string,
+  ) {
+    return this.resumesService.restoreVersion(req.user.id, id, versionId);
+  }
+
+  /**
    * 创建简历（需要简历配额）
    */
   @Post()

@@ -90,7 +90,29 @@ export class ResumesService {
    */
   async update(userId: string, resumeId: string, data: Record<string, unknown>) {
     // 先验证简历存在
-    await this.getOne(userId, resumeId);
+    const resume = await this.getOne(userId, resumeId);
+
+    // 如果更新了内容，创建版本快照
+    if (data.content && resume.content) {
+      // 获取当前最大版本号
+      const latestVersion = await this.prisma.resumeVersion.findFirst({
+        where: { resumeId },
+        orderBy: { version: 'desc' },
+        select: { version: true },
+      });
+
+      const nextVersion = (latestVersion?.version || 0) + 1;
+
+      // 创建版本快照
+      await this.prisma.resumeVersion.create({
+        data: {
+          resumeId,
+          version: nextVersion,
+          content: JSON.parse(JSON.stringify(resume.content)),
+          changeNote: data.changeNote as string | undefined,
+        },
+      });
+    }
 
     return this.prisma.resume.update({
       where: { id: resumeId },
@@ -117,6 +139,81 @@ export class ResumesService {
 
     return this.prisma.resume.delete({
       where: { id: resumeId },
+    });
+  }
+
+  /**
+   * 获取简历版本历史
+   */
+  async getVersionHistory(userId: string, resumeId: string) {
+    // 先验证简历存在
+    await this.getOne(userId, resumeId);
+
+    const versions = await this.prisma.resumeVersion.findMany({
+      where: { resumeId },
+      orderBy: { version: 'desc' },
+      select: {
+        id: true,
+        version: true,
+        changeNote: true,
+        createdAt: true,
+      },
+    });
+
+    return versions;
+  }
+
+  /**
+   * 获取特定版本内容
+   */
+  async getVersion(userId: string, resumeId: string, versionId: string) {
+    // 先验证简历存在
+    await this.getOne(userId, resumeId);
+
+    const version = await this.prisma.resumeVersion.findFirst({
+      where: { id: versionId, resumeId },
+    });
+
+    if (!version) {
+      throw new NotFoundException('版本不存在');
+    }
+
+    return version;
+  }
+
+  /**
+   * 恢复到历史版本
+   */
+  async restoreVersion(userId: string, resumeId: string, versionId: string) {
+    // 获取历史版本
+    const version = await this.getVersion(userId, resumeId, versionId);
+
+    // 先保存当前内容为新版本
+    const resume = await this.getOne(userId, resumeId);
+    if (resume.content) {
+      const latestVersion = await this.prisma.resumeVersion.findFirst({
+        where: { resumeId },
+        orderBy: { version: 'desc' },
+        select: { version: true },
+      });
+
+      await this.prisma.resumeVersion.create({
+        data: {
+          resumeId,
+          version: (latestVersion?.version || 0) + 1,
+          content: JSON.parse(JSON.stringify(resume.content)),
+          changeNote: '恢复前自动备份',
+        },
+      });
+    }
+
+    // 恢复历史版本内容
+    return this.prisma.resume.update({
+      where: { id: resumeId },
+      data: {
+        content: JSON.parse(JSON.stringify(version.content)),
+        updatedAt: new Date(),
+      },
     });
   }
 

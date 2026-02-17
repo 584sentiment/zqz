@@ -229,12 +229,31 @@ model Resume {
   status          String   @default("draft") // draft, generating, completed, failed
   matchScore      Decimal? @map("match_score") @db.Decimal(5, 2)
 
+  // 关系
+  versions        ResumeVersion[]
+
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@index([userId])
   @@index([jobId])
   @@map("resumes")
+}
+
+model ResumeVersion {
+  id              String   @id @default(cuid())
+  resumeId        String   @map("resume_id")
+  resume          Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  version         Int      @default(1)
+  content         Json
+  changeNote      String?  @map("change_note")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@unique([resumeId, version])
+  @@index([resumeId])
+  @@map("resume_versions")
 }
 
 model ResumeTemplate {

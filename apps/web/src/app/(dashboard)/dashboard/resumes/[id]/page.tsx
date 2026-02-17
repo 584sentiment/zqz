@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { resumesApi, Resume, MatchAnalysis } from '@/lib/api/resumes';
+import { resumesApi, Resume, MatchAnalysis, ResumeVersion } from '@/lib/api/resumes';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { useAutoSave } from '@/hooks/use-auto-save';
@@ -34,6 +34,8 @@ import {
   Maximize2,
   Cloud,
   CloudOff,
+  History,
+  RotateCcw,
 } from 'lucide-react';
 
 export default function ResumeDetailPage() {
@@ -54,6 +56,12 @@ export default function ResumeDetailPage() {
   const [showMatchDetails, setShowMatchDetails] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100); // 缩放级别 50% - 200%
+
+  // 版本历史
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [versions, setVersions] = useState<ResumeVersion[]>([]);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+  const [isRestoringVersion, setIsRestoringVersion] = useState(false);
 
   // 编辑状态
   const [editedContent, setEditedContent] = useState<Record<string, unknown>>({});
@@ -306,6 +314,40 @@ export default function ResumeDetailPage() {
     }
   };
 
+  const handleLoadVersionHistory = async () => {
+    if (!resume) return;
+    setIsLoadingVersions(true);
+    try {
+      const versionHistory = await resumesApi.getVersionHistory(resume.id);
+      setVersions(versionHistory);
+      setShowVersionHistory(true);
+    } catch (error) {
+      toast({ title: '加载失败', description: '无法加载版本历史', variant: 'destructive' });
+    } finally {
+      setIsLoadingVersions(false);
+    }
+  };
+
+  const handleRestoreVersion = async (versionId: string) => {
+    if (!resume) return;
+    if (!confirm('确定要恢复到此版本吗？当前内容将被保存为新版本。')) return;
+
+    setIsRestoringVersion(true);
+    try {
+      const updatedResume = await resumesApi.restoreVersion(resume.id, versionId);
+      setResume(updatedResume);
+      setEditedContent((updatedResume.content as Record<string, unknown>) || {});
+      setShowVersionHistory(false);
+      toast({ title: '恢复成功', description: '已恢复到历史版本' });
+      // 重新加载版本历史
+      handleLoadVersionHistory();
+    } catch (error) {
+      toast({ title: '恢复失败', description: '请稍后重试', variant: 'destructive' });
+    } finally {
+      setIsRestoringVersion(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -464,6 +506,18 @@ export default function ResumeDetailPage() {
                   >
                     <Edit2 className="w-4 h-4 mr-2" />
                     {isEditing ? '取消编辑' : '编辑'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleLoadVersionHistory}
+                    disabled={isLoadingVersions}
+                  >
+                    {isLoadingVersions ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <History className="w-4 h-4 mr-2" />
+                    )}
+                    版本历史
                   </Button>
                   {isEditing && (
                     <Button
@@ -836,6 +890,84 @@ export default function ResumeDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* 版本历史弹窗 */}
+      {showVersionHistory && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <History className="w-5 h-5" />
+                版本历史
+              </h2>
+              <button
+                onClick={() => setShowVersionHistory(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {versions.length === 0 ? (
+              <div className="text-center py-8">
+                <History className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">暂无版本历史</p>
+                <p className="text-sm text-gray-400 mt-1">编辑并保存简历后会自动创建版本</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {versions.map((version) => (
+                  <div
+                    key={version.id}
+                    className="p-4 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          版本 {version.version}
+                          {version.changeNote && (
+                            <span className="text-sm text-gray-500 ml-2">
+                              · {version.changeNote}
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {new Date(version.createdAt).toLocaleString('zh-CN', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRestoreVersion(version.id)}
+                        disabled={isRestoringVersion}
+                      >
+                        {isRestoringVersion ? (
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                        ) : (
+                          <RotateCcw className="w-3 h-3 mr-1" />
+                        )}
+                        恢复
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex justify-end mt-6 pt-4 border-t border-gray-100">
+              <Button variant="outline" onClick={() => setShowVersionHistory(false)}>
+                关闭
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

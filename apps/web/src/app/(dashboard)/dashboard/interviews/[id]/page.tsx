@@ -47,6 +47,11 @@ export default function InterviewDetailPage() {
   const [isCompleted, setIsCompleted] = useState(false);
   const [report, setReport] = useState<Record<string, unknown> | null>(null);
 
+  // 语音识别状态
+  const [isRecording, setIsRecording] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const loadInterview = useCallback(async () => {
@@ -91,6 +96,74 @@ export default function InterviewDetailPage() {
       setStartTime(Date.now());
     }
   }, [showFeedback, isCompleted, currentQuestionIndex]);
+
+  // 检查语音识别支持
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      setSpeechSupported(true);
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'zh-CN';
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        // 更新回答文本
+        if (finalTranscript) {
+          setAnswer((prev) => prev + finalTranscript);
+        }
+      };
+
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed') {
+          toast({
+            title: '麦克风权限被拒绝',
+            description: '请在浏览器设置中允许使用麦克风',
+            variant: 'destructive',
+          });
+        }
+        setIsRecording(false);
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [toast]);
+
+  const toggleRecording = () => {
+    if (!recognitionRef.current) return;
+
+    if (isRecording) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    } else {
+      setAnswer(''); // 清空之前的内容，开始新的语音输入
+      recognitionRef.current.start();
+      setIsRecording(true);
+    }
+  };
 
   const handleSubmitAnswer = async () => {
     if (!answer.trim() || !interview) return;
@@ -601,12 +674,36 @@ export default function InterviewDetailPage() {
 
               {/* 回答区域 */}
               <div className="p-6">
+                {/* 语音输入按钮 */}
+                {speechSupported && (
+                  <div className="mb-4 flex items-center gap-3">
+                    <Button
+                      type="button"
+                      variant={isRecording ? 'destructive' : 'outline'}
+                      onClick={toggleRecording}
+                      disabled={isSubmitting}
+                      className={isRecording ? 'animate-pulse' : ''}
+                    >
+                      <Mic className={`w-4 h-4 mr-2 ${isRecording ? 'animate-pulse' : ''}`} />
+                      {isRecording ? '停止录音' : '语音输入'}
+                    </Button>
+                    {isRecording && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                        <span className="text-sm text-red-600">正在录音...</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <textarea
                   ref={textareaRef}
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value)}
-                  placeholder="在此输入你的回答..."
-                  className="w-full h-48 p-4 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-none"
+                  placeholder={isRecording ? "正在识别语音，请说话..." : "在此输入你的回答，或点击上方按钮使用语音输入..."}
+                  className={`w-full h-48 p-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-none ${
+                    isRecording ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                  }`}
                   disabled={isSubmitting}
                 />
 

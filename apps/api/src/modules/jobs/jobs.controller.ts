@@ -14,6 +14,7 @@ import { IsString, IsNotEmpty } from 'class-validator';
 import { JobsService } from './jobs.service';
 import { CreateJobDto, ParseJobTextDto, UpdateJobDto } from './dto/job.dto';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
+import { ContentSafetyGuard } from '@/common/guards/content-safety.guard';
 
 class ParseImageDto {
   @IsString()
@@ -32,6 +33,7 @@ export class JobsController {
   }
 
   @Post('parse')
+  @UseGuards(ContentSafetyGuard)
   async parseJobText(@Body() dto: ParseJobTextDto) {
     return this.jobsService.parseJobText(dto);
   }

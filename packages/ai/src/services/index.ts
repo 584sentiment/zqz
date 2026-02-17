@@ -7,6 +7,136 @@ import { PromptTemplate } from '@langchain/core/prompts';
 import { HumanMessage, SystemMessage, AIMessage, BaseMessage } from '@langchain/core/messages';
 
 /**
+ * 性能监控结果
+ */
+export interface PerformanceMetrics {
+  firstByteTime: number; // 首字节时间（毫秒）
+  totalTime: number; // 总响应时间（毫秒）
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * AI 调用性能监控器
+ */
+export class AIPerformanceMonitor {
+  private static metrics: PerformanceMetrics[] = [];
+  private static readonly MAX_METRICS = 1000;
+
+  /**
+   * 记录性能指标
+   */
+  static recordMetric(metric: PerformanceMetrics): void {
+    this.metrics.push(metric);
+    // 保持最近 1000 条记录
+    if (this.metrics.length > this.MAX_METRICS) {
+      this.metrics.shift();
+    }
+  }
+
+  /**
+   * 获取平均性能指标
+   */
+  static getAverageMetrics(): {
+    avgFirstByteTime: number;
+    avgTotalTime: number;
+    successRate: number;
+    p95TotalTime: number;
+  } {
+    if (this.metrics.length === 0) {
+      return { avgFirstByteTime: 0, avgTotalTime: 0, successRate: 0, p95TotalTime: 0 };
+    }
+
+    const successMetrics = this.metrics.filter((m) => m.success);
+    const totalFirstByte = successMetrics.reduce((sum, m) => sum + m.firstByteTime, 0);
+    const totalTime = successMetrics.reduce((sum, m) => sum + m.totalTime, 0);
+
+    // 计算 P95
+    const sortedTimes = [...successMetrics.map((m) => m.totalTime)].sort((a, b) => a - b);
+    const p95Index = Math.floor(sortedTimes.length * 0.95);
+    const p95TotalTime = sortedTimes[p95Index] || 0;
+
+    return {
+      avgFirstByteTime: successMetrics.length > 0 ? totalFirstByte / successMetrics.length : 0,
+      avgTotalTime: successMetrics.length > 0 ? totalTime / successMetrics.length : 0,
+      successRate: this.metrics.filter((m) => m.success).length / this.metrics.length,
+      p95TotalTime,
+    };
+  }
+
+  /**
+   * 清除历史指标
+   */
+  static clearMetrics(): void {
+    this.metrics = [];
+  }
+}
+
+/**
+ * 带超时和性能监控的 AI 调用包装器
+ */
+export async function withTimeoutAndMetrics<T>(
+  operation: string,
+  promise: Promise<T>,
+  timeout: number = 30000,
+  firstByteTimeout: number = 3000
+): Promise<{ result: T; metrics: PerformanceMetrics }> {
+  const startTime = Date.now();
+  let firstByteTime = 0;
+
+  // 创建超时 Promise
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      reject(new AIServiceError(
+        `${operation}超时（${timeout}ms）`,
+        AIServiceErrorCode.TIMEOUT,
+        true
+      ));
+    }, timeout);
+  });
+
+  try {
+    // 竞速执行
+    const result = await Promise.race([promise, timeoutPromise]);
+
+    // 记录首字节时间（对于流式响应，这应该是第一个数据块到达的时间）
+    firstByteTime = Date.now() - startTime;
+    const totalTime = Date.now() - startTime;
+
+    const metrics: PerformanceMetrics = {
+      firstByteTime,
+      totalTime,
+      success: true,
+    };
+
+    // 检查首字节时间
+    if (firstByteTime > firstByteTimeout) {
+      console.warn(`[AI Performance] ${operation} 首字节响应时间过长: ${firstByteTime}ms (阈值: ${firstByteTimeout}ms)`);
+    }
+
+    // 检查总响应时间
+    if (totalTime > timeout * 0.8) {
+      console.warn(`[AI Performance] ${operation} 总响应时间接近超时: ${totalTime}ms (阈值: ${timeout}ms)`);
+    }
+
+    AIPerformanceMonitor.recordMetric(metrics);
+
+    return { result, metrics };
+  } catch (error) {
+    const totalTime = Date.now() - startTime;
+    const metrics: PerformanceMetrics = {
+      firstByteTime: totalTime,
+      totalTime,
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+
+    AIPerformanceMonitor.recordMetric(metrics);
+    throw error;
+  }
+}
+
+/**
  * AI 服务错误类型
  */
 export class AIServiceError extends Error {
@@ -28,7 +158,177 @@ export enum AIServiceErrorCode {
   NETWORK_ERROR = 'NETWORK_ERROR',
   INVALID_RESPONSE = 'INVALID_RESPONSE',
   SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE',
+  CONTENT_UNSAFE = 'CONTENT_UNSAFE',
   UNKNOWN = 'UNKNOWN',
+}
+
+/**
+ * 内容安全检查结果
+ */
+export interface ContentSafetyResult {
+  isSafe: boolean;
+  severity: 'none' | 'low' | 'medium' | 'high' | 'critical';
+  categories: string[];
+  flaggedContent?: string;
+  suggestion?: string;
+}
+
+/**
+ * 内容安全服务
+ * 用于检测和过滤敏感内容
+ */
+export class ContentSafetyService {
+  // 敏感词列表（基础版）
+  private static readonly SENSITIVE_PATTERNS: Array<{
+    pattern: RegExp;
+    category: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+  }> = [
+    // 暴力相关
+    { pattern: /暴力|杀戮|凶杀|谋杀|恐怖袭击/i, category: 'violence', severity: 'high' },
+    { pattern: /炸弹|爆炸|武器|枪支|弹药/i, category: 'violence', severity: 'high' },
+
+    // 违法内容
+    { pattern: /毒品|贩毒|走私|洗钱|诈骗/i, category: 'illegal', severity: 'critical' },
+    { pattern: /赌博|博彩|非法集资/i, category: 'illegal', severity: 'high' },
+
+    // 个人信息泄露
+    { pattern: /身份证号[：:]\s*\d{17}[\dXx]/i, category: 'privacy', severity: 'medium' },
+    { pattern: /银行卡[号]?[：:]\s*\d{16,19}/i, category: 'privacy', severity: 'high' },
+    { pattern: /密码[：:]\s*\S{6,}/i, category: 'privacy', severity: 'high' },
+
+    // 歧视性内容
+    { pattern: /种族歧视|民族歧视|地域歧视/i, category: 'discrimination', severity: 'high' },
+
+    // 骚扰内容
+    { pattern: /性骚扰|骚扰电话|恶意骚扰/i, category: 'harassment', severity: 'medium' },
+  ];
+
+  // PII 检测模式
+  private static readonly PII_PATTERNS = [
+    { pattern: /\b\d{17}[\dXx]\b/g, type: 'chinese_id', description: '中国身份证号' },
+    { pattern: /\b1[3-9]\d{9}\b/g, type: 'phone', description: '手机号码' },
+    { pattern: /\b[\w.-]+@[\w.-]+\.\w+\b/g, type: 'email', description: '邮箱地址' },
+    { pattern: /\b\d{16,19}\b/g, type: 'bank_card', description: '银行卡号' },
+  ];
+
+  /**
+   * 检查内容安全性
+   */
+  checkContent(content: string): ContentSafetyResult {
+    if (!content || content.trim().length === 0) {
+      return {
+        isSafe: true,
+        severity: 'none',
+        categories: [],
+      };
+    }
+
+    const flaggedCategories: string[] = [];
+    let maxSeverity: ContentSafetyResult['severity'] = 'none';
+    let flaggedContent = '';
+
+    // 检查敏感词
+    for (const { pattern, category, severity } of ContentSafetyService.SENSITIVE_PATTERNS) {
+      const match = content.match(pattern);
+      if (match) {
+        flaggedCategories.push(category);
+        if (this.severityLevel(severity) > this.severityLevel(maxSeverity)) {
+          maxSeverity = severity;
+          flaggedContent = match[0];
+        }
+      }
+    }
+
+    // 检查 PII 泄露风险
+    const piiCheck = this.checkPII(content);
+    if (piiCheck.hasPII) {
+      flaggedCategories.push('pii_risk');
+      if (this.severityLevel('medium') > this.severityLevel(maxSeverity)) {
+        maxSeverity = 'medium';
+        flaggedContent = piiCheck.detected;
+      }
+    }
+
+    const isSafe = maxSeverity === 'none' || maxSeverity === 'low';
+
+    return {
+      isSafe,
+      severity: maxSeverity,
+      categories: [...new Set(flaggedCategories)],
+      flaggedContent: flaggedContent || undefined,
+      suggestion: this.getSuggestion(maxSeverity),
+    };
+  }
+
+  /**
+   * 检查 PII（个人身份信息）
+   */
+  private checkPII(content: string): { hasPII: boolean; detected: string } {
+    for (const { pattern, type } of ContentSafetyService.PII_PATTERNS) {
+      const matches = content.match(pattern);
+      if (matches && matches.length > 0) {
+        // 排除邮箱（在求职场景中邮箱是正常的）
+        if (type === 'email') continue;
+        return { hasPII: true, detected: `[${type}]: ${matches[0].substring(0, 4)}...` };
+      }
+    }
+    return { hasPII: false, detected: '' };
+  }
+
+  /**
+   * 脱敏处理
+   */
+  sanitizeContent(content: string): string {
+    let sanitized = content;
+
+    // 脱敏身份证号
+    sanitized = sanitized.replace(
+      /\b(\d{6})\d{8}(\d{4})\b/g,
+      '$1********$2'
+    );
+
+    // 脱敏手机号
+    sanitized = sanitized.replace(
+      /\b(\d{3})\d{4}(\d{4})\b/g,
+      '$1****$2'
+    );
+
+    // 脱敏银行卡号
+    sanitized = sanitized.replace(
+      /\b(\d{4})\d{8,12}(\d{4})\b/g,
+      '$1********$2'
+    );
+
+    return sanitized;
+  }
+
+  /**
+   * 获取严重程度等级数值
+   */
+  private severityLevel(severity: ContentSafetyResult['severity']): number {
+    const levels: Record<ContentSafetyResult['severity'], number> = {
+      none: 0,
+      low: 1,
+      medium: 2,
+      high: 3,
+      critical: 4,
+    };
+    return levels[severity] || 0;
+  }
+
+  /**
+   * 获取建议
+   */
+  private getSuggestion(severity: ContentSafetyResult['severity']): string | undefined {
+    const suggestions: Record<string, string> = {
+      low: '内容可能包含敏感信息，建议检查',
+      medium: '内容包含可能敏感的信息，请检查是否需要修改',
+      high: '内容包含敏感信息，请修改后再提交',
+      critical: '内容包含严重违规信息，禁止提交',
+    };
+    return suggestions[severity];
+  }
 }
 
 /**
@@ -107,7 +407,13 @@ export class JobParsingService {
 
       const chain = prompt.pipe(llm).pipe(new StringOutputParser());
 
-      const result = await chain.invoke({ jobDescription });
+      // 使用性能监控包装
+      const { result } = await withTimeoutAndMetrics(
+        '岗位解析',
+        chain.invoke({ jobDescription }),
+        30000, // 30 秒超时
+        3000   // 3 秒首字节阈值
+      );
 
       try {
         return JSON.parse(result);
@@ -140,7 +446,13 @@ export class ResumeGenerationService {
 
       const chain = prompt.pipe(llm).pipe(new StringOutputParser());
 
-      const result = await chain.invoke({ userProfile, jobDescription });
+      // 使用性能监控包装
+      const { result } = await withTimeoutAndMetrics(
+        '简历生成',
+        chain.invoke({ userProfile, jobDescription }),
+        30000, // 30 秒超时
+        3000   // 3 秒首字节阈值
+      );
 
       try {
         return JSON.parse(result);
@@ -187,7 +499,13 @@ export class SkillDiscoveryService {
         new HumanMessage(message),
       ];
 
-      const result = await llm.invoke(messages);
+      // 使用性能监控包装
+      const { result } = await withTimeoutAndMetrics(
+        '技能发掘',
+        llm.invoke(messages),
+        30000, // 30 秒超时
+        3000   // 3 秒首字节阈值
+      );
 
       try {
         const parsed = JSON.parse(result.content as string);
@@ -220,7 +538,13 @@ export class InterviewService {
 
       const chain = prompt.pipe(llm).pipe(new StringOutputParser());
 
-      const result = await chain.invoke({ jobInfo, resumeSummary });
+      // 使用性能监控包装
+      const { result } = await withTimeoutAndMetrics(
+        '面试问题生成',
+        chain.invoke({ jobInfo, resumeSummary }),
+        30000, // 30 秒超时
+        3000   // 3 秒首字节阈值
+      );
 
       try {
         return JSON.parse(result);
@@ -247,7 +571,13 @@ export class InterviewService {
 
       const chain = prompt.pipe(llm).pipe(new StringOutputParser());
 
-      const result = await chain.invoke({ question, answer });
+      // 使用性能监控包装
+      const { result } = await withTimeoutAndMetrics(
+        '答案评估',
+        chain.invoke({ question, answer }),
+        30000, // 30 秒超时
+        3000   // 3 秒首字节阈值
+      );
 
       try {
         return JSON.parse(result);

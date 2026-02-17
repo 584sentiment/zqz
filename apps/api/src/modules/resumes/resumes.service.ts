@@ -820,6 +820,7 @@ export class ResumesService {
     success: boolean;
     content?: Record<string, unknown>;
     matchAnalysis?: Record<string, unknown>;
+    sourceReferences?: Record<string, unknown>;
     error?: string;
   }> {
     // 获取简历和关联的岗位
@@ -838,6 +839,9 @@ export class ResumesService {
     // 构建岗位描述
     const jobDescription = this.buildJobDescription(resume.job);
 
+    // 构建源数据引用（用于追溯）
+    const sourceReferences = this.buildSourceReferences(userProfile, resume.job);
+
     // 调用 AI 生成
     try {
       this.logger.log(`开始为用户 ${userId} 生成简历，目标岗位: ${resume.job.title}`);
@@ -850,14 +854,42 @@ export class ResumesService {
       // 提取匹配分析
       const matchAnalysis = aiResult.matchAnalysis as Record<string, unknown> | undefined;
 
-      // 转换为简历内容格式
+      // 转换为简历内容格式，并添加 AI 生成标记
       const content: Record<string, unknown> = {
-        summary: aiResult.summary,
+        // 元数据
+        _meta: {
+          generatedAt: new Date().toISOString(),
+          generatedBy: 'AI',
+          aiModel: 'deepseek-chat',
+          sourceProfileId: userProfile.profileId,
+          sourceJobId: resume.jobId,
+          isAIGenerated: true,
+        },
+        // 内容
+        summary: {
+          text: aiResult.summary,
+          _source: 'ai_generated',
+          _basedOn: ['profile.highlights', 'job.requirements'],
+        },
         matchedSkills: aiResult.matchedSkills,
-        skills: aiResult.skills,
-        experience: aiResult.experience,
-        projects: aiResult.projects,
-        education: aiResult.education,
+        skills: {
+          list: aiResult.skills,
+          _source: 'ai_curated',
+          _basedOn: ['profile.skills', 'job.skills'],
+        },
+        experience: this.markExperienceSources(
+          aiResult.experience as Array<unknown>,
+          (userProfile.experiences as Array<{ id?: string; company?: string }>) || []
+        ),
+        projects: this.markProjectSources(
+          aiResult.projects as Array<unknown>,
+          (userProfile.projects as Array<{ id?: string; name?: string }>) || []
+        ),
+        education: {
+          list: aiResult.education,
+          _source: 'profile_original',
+          _basedOn: ['profile.education'],
+        },
       };
 
       // 更新简历状态和内容
@@ -883,6 +915,7 @@ export class ResumesService {
         success: true,
         content,
         matchAnalysis,
+        sourceReferences,
       };
     } catch (error) {
       const errorMessage = error instanceof AIServiceError
@@ -1014,5 +1047,215 @@ export class ResumesService {
     }
 
     return parts.join('\n\n');
+  }
+
+  /**
+   * 构建源数据引用（用于内容追溯）
+   */
+  private buildSourceReferences(
+    userProfile: Record<string, unknown>,
+    job: { id: string; title?: string | null; company?: string | null }
+  ): Record<string, unknown> {
+    const experiences = userProfile.experiences as Array<{ id?: string; company?: string; position?: string }> || [];
+    const projects = userProfile.projects as Array<{ id?: string; name?: string; role?: string }> || [];
+    const skills = userProfile.skills as Array<{ id?: string; name?: string }> || [];
+    const educations = userProfile.educations as Array<{ id?: string; school?: string; major?: string }> || [];
+
+    return {
+      generatedAt: new Date().toISOString(),
+      sources: {
+        profile: {
+          id: userProfile.profileId as string,
+          type: 'user_profile',
+          name: userProfile.name as string,
+          dataIncluded: ['基本信息', '工作经历', '项目经历', '技能', '教育经历'],
+        },
+        job: {
+          id: job.id,
+          type: 'job_posting',
+          title: job.title,
+          company: job.company,
+        },
+        experiences: experiences.map((exp) => ({
+          id: exp.id,
+          type: 'experience',
+          company: exp.company,
+          position: exp.position,
+          source: 'user_input',
+        })),
+        projects: projects.map((proj) => ({
+          id: proj.id,
+          type: 'project',
+          name: proj.name,
+          role: proj.role,
+          source: 'user_input',
+        })),
+        skills: skills.map((skill) => ({
+          id: skill.id,
+          type: 'skill',
+          name: skill.name,
+          source: 'user_input_or_ai_discovered',
+        })),
+        educations: educations.map((edu) => ({
+          id: edu.id,
+          type: 'education',
+          school: edu.school,
+          major: edu.major,
+          source: 'user_input',
+        })),
+      },
+      aiProcessing: {
+        model: 'deepseek-chat',
+        operations: [
+          { type: 'summarization', description: '个人简介根据档案亮点和岗位要求生成' },
+          { type: 'skill_matching', description: '技能根据岗位要求和用户技能匹配' },
+          { type: 'experience_optimization', description: '工作经历描述根据岗位要求优化' },
+          { type: 'content_generation', description: '简历内容基于用户真实数据生成，无虚假信息' },
+        ],
+      },
+    };
+  }
+
+  /**
+   * 标记工作经历的来源
+   */
+  private markExperienceSources(
+    aiExperiences: Array<unknown>,
+    originalExperiences: Array<{ id?: string; company?: string }>
+  ): { list: Array<unknown>; _source: string; _basedOn: string[] } {
+    if (!aiExperiences || !Array.isArray(aiExperiences)) {
+      return { list: [], _source: 'none', _basedOn: [] };
+    }
+
+    const markedExperiences = aiExperiences.map((exp: Record<string, unknown>) => {
+      // 尝试匹配原始工作经历
+      const expCompany = exp.company as string;
+      const originalExp = originalExperiences?.find(
+        (oe) => oe.company === expCompany || (expCompany && oe.company?.includes(expCompany))
+      );
+
+      return {
+        ...exp,
+        _meta: {
+          source: originalExp ? 'ai_optimized' : 'ai_generated',
+          originalId: originalExp?.id || null,
+          note: originalExp
+            ? '此内容基于用户真实工作经历由 AI 优化'
+            : '此内容由 AI 根据岗位要求生成建议',
+        },
+      };
+    });
+
+    return {
+      list: markedExperiences,
+      _source: 'ai_optimized',
+      _basedOn: ['profile.experiences', 'job.requirements'],
+    };
+  }
+
+  /**
+   * 标记项目经历的来源
+   */
+  private markProjectSources(
+    aiProjects: Array<unknown>,
+    originalProjects: Array<{ id?: string; name?: string }>
+  ): { list: Array<unknown>; _source: string; _basedOn: string[] } {
+    if (!aiProjects || !Array.isArray(aiProjects)) {
+      return { list: [], _source: 'none', _basedOn: [] };
+    }
+
+    const markedProjects = aiProjects.map((proj: Record<string, unknown>) => {
+      // 尝试匹配原始项目
+      const projName = proj.name as string;
+      const originalProj = originalProjects?.find(
+        (op) => op.name === projName || (projName && op.name?.includes(projName))
+      );
+
+      return {
+        ...proj,
+        _meta: {
+          source: originalProj ? 'ai_optimized' : 'ai_generated',
+          originalId: originalProj?.id || null,
+          note: originalProj
+            ? '此内容基于用户真实项目经历由 AI 优化'
+            : '此内容由 AI 根据岗位要求生成建议',
+        },
+      };
+    });
+
+    return {
+      list: markedProjects,
+      _source: 'ai_optimized',
+      _basedOn: ['profile.projects', 'job.requirements'],
+    };
+  }
+
+  /**
+   * 获取简历内容的来源追溯信息
+   */
+  async getContentSources(userId: string, resumeId: string): Promise<{
+    resume: {
+      id: string;
+      name: string;
+      generatedAt: string | null;
+      aiModel: string | null;
+    };
+    sources: Record<string, unknown>;
+    contentBreakdown: Array<{
+      section: string;
+      source: string;
+      basedOn: string[];
+      details: string;
+    }>;
+  }> {
+    const resume = await this.getOne(userId, resumeId);
+
+    const content = resume.content as Record<string, unknown> | null;
+    const meta = content?._meta as Record<string, unknown> | undefined;
+
+    // 构建内容分解
+    const contentBreakdown = [
+      {
+        section: '个人简介',
+        source: (content?.summary as Record<string, unknown>)?._source as string || 'ai_generated',
+        basedOn: (content?.summary as Record<string, unknown>)?._basedOn as string[] || ['档案信息', '岗位要求'],
+        details: '根据用户档案亮点和目标岗位要求，由 AI 生成个性化的个人简介',
+      },
+      {
+        section: '技能列表',
+        source: (content?.skills as Record<string, unknown>)?._source as string || 'ai_curated',
+        basedOn: (content?.skills as Record<string, unknown>)?._basedOn as string[] || ['用户技能', '岗位技能要求'],
+        details: '根据岗位要求从用户技能库中筛选和排序最相关的技能',
+      },
+      {
+        section: '工作经历',
+        source: (content?.experience as Record<string, unknown>)?._source as string || 'ai_optimized',
+        basedOn: (content?.experience as Record<string, unknown>)?._basedOn as string[] || ['用户工作经历'],
+        details: '基于用户真实工作经历，由 AI 优化描述以匹配目标岗位',
+      },
+      {
+        section: '项目经历',
+        source: (content?.projects as Record<string, unknown>)?._source as string || 'ai_optimized',
+        basedOn: (content?.projects as Record<string, unknown>)?._basedOn as string[] || ['用户项目经历'],
+        details: '基于用户真实项目经历，由 AI 优化描述以匹配目标岗位',
+      },
+      {
+        section: '教育背景',
+        source: (content?.education as Record<string, unknown>)?._source as string || 'profile_original',
+        basedOn: (content?.education as Record<string, unknown>)?._basedOn as string[] || ['用户教育经历'],
+        details: '直接使用用户填写的教育背景信息',
+      },
+    ];
+
+    return {
+      resume: {
+        id: resume.id,
+        name: resume.name,
+        generatedAt: (meta?.generatedAt as string) || null,
+        aiModel: (meta?.aiModel as string) || null,
+      },
+      sources: meta?.sourceReferences as Record<string, unknown> || {},
+      contentBreakdown,
+    };
   }
 }

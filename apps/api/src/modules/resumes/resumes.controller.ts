@@ -14,6 +14,7 @@ import {
 import { ResumesService } from './resumes.service';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { RequireQuota } from '@/common/decorators/quota.decorator';
+import { ContentSafetyGuard } from '@/common/guards/content-safety.guard';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 // 高级模板 ID 列表
@@ -53,6 +54,14 @@ export class ResumesController {
   @Get(':id')
   async getOne(@Request() req: { user: { id: string } }, @Param('id') id: string) {
     return this.resumesService.getOne(req.user.id, id);
+  }
+
+  /**
+   * 获取简历内容来源追溯信息
+   */
+  @Get(':id/sources')
+  async getContentSources(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.resumesService.getContentSources(req.user.id, id);
   }
 
   /**
@@ -120,6 +129,7 @@ export class ResumesController {
    * 更新简历（如果更新为 generating 状态需要检查配额）
    */
   @Put(':id')
+  @UseGuards(ContentSafetyGuard)
   async update(
     @Request() req: { user: { id: string } },
     @Param('id') id: string,

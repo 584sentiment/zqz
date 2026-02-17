@@ -15,6 +15,7 @@ export interface SubscriptionInfo {
   endDate: string | null;
   canceledAt: string | null;
   autoRenew: boolean;
+  quotaResetAt: string;
   quotas: {
     ai: QuotaInfo;
     resume: QuotaInfo;
@@ -70,6 +71,15 @@ export const subscriptionsApi = {
     message: string;
   }> {
     const response = await apiClient.post('/subscriptions/resume');
+    return response.data;
+  },
+
+  async resetQuota(): Promise<{
+    success: boolean;
+    message: string;
+    resetAt: string;
+  }> {
+    const response = await apiClient.post('/subscriptions/reset-quota');
     return response.data;
   },
 };

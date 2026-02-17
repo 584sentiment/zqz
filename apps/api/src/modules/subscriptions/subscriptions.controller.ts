@@ -65,4 +65,21 @@ export class SubscriptionsController {
       throw new BadRequestException((error as Error).message);
     }
   }
+
+  /**
+   * 重置配额（手动触发，用于测试或特殊情况）
+   */
+  @Post('reset-quota')
+  async resetQuota(@Request() req: { user: { id: string } }) {
+    try {
+      const result = await this.subscriptionsService.resetUserQuota(req.user.id);
+      return {
+        success: true,
+        message: '配额已重置',
+        resetAt: result.resetAt,
+      };
+    } catch (error) {
+      throw new BadRequestException((error as Error).message);
+    }
+  }
 }

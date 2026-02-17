@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 // 套餐定义
 export const PLAN_CONFIGS = {
@@ -31,6 +32,8 @@ export const PLAN_CONFIGS = {
 
 @Injectable()
 export class SubscriptionsService {
+  private readonly logger = new Logger(SubscriptionsService.name);
+
   constructor(private prisma: PrismaService) {}
 
   /**
@@ -54,15 +57,28 @@ export class SubscriptionsService {
       });
     }
 
-    // 获取本月使用情况
+    // 检查是否需要重置配额（如果 quotaResetAt 是上个月或更早）
     const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const quotaResetAt = subscription.quotaResetAt;
+    const needsReset = this.needsQuotaReset(quotaResetAt, now);
 
+    if (needsReset) {
+      await this.resetUserQuota(userId);
+      // 重新获取订阅信息
+      const updatedSubscription = await this.prisma.subscription.findUnique({
+        where: { userId },
+      });
+      if (updatedSubscription) {
+        subscription = updatedSubscription;
+      }
+    }
+
+    // 获取当前计费周期的使用情况
     const usageLogs = await this.prisma.usageLog.groupBy({
       by: ['action'],
       where: {
         userId,
-        createdAt: { gte: monthStart },
+        createdAt: { gte: subscription.quotaResetAt },
       },
       _count: true,
     });
@@ -94,6 +110,7 @@ export class SubscriptionsService {
       endDate: subscription.endDate,
       canceledAt: subscription.canceledAt,
       autoRenew: subscription.autoRenew,
+      quotaResetAt: subscription.quotaResetAt,
       quotas: {
         ai: {
           total: subscription.aiQuota,
@@ -280,5 +297,134 @@ export class SubscriptionsService {
       autoRenew: updated.autoRenew,
       message: '订阅已恢复',
     };
+  }
+
+  /**
+   * 检查是否需要重置配额
+   * 如果 quotaResetAt 是上个月或更早，需要重置
+   */
+  private needsQuotaReset(quotaResetAt: Date, now: Date): boolean {
+    const resetMonth = quotaResetAt.getMonth();
+    const resetYear = quotaResetAt.getFullYear();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    // 如果年份不同，或者同年但月份不同，需要重置
+    return resetYear < currentYear || (resetYear === currentYear && resetMonth < currentMonth);
+  }
+
+  /**
+   * 重置单个用户的配额
+   */
+  async resetUserQuota(userId: string): Promise<{ success: boolean; resetAt: Date }> {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+    });
+
+    if (!subscription) {
+      throw new Error('订阅不存在');
+    }
+
+    // 获取套餐配置
+    const planConfig = PLAN_CONFIGS[subscription.plan as keyof typeof PLAN_CONFIGS];
+
+    // 重置配额到套餐默认值，并更新重置时间
+    const now = new Date();
+    const updated = await this.prisma.subscription.update({
+      where: { userId },
+      data: {
+        aiQuota: planConfig.aiQuota,
+        resumeQuota: planConfig.resumeQuota,
+        interviewQuota: planConfig.interviewQuota,
+        quotaResetAt: now,
+      },
+    });
+
+    this.logger.log(`配额已重置: userId=${userId}, plan=${subscription.plan}, resetAt=${now.toISOString()}`);
+
+    return {
+      success: true,
+      resetAt: updated.quotaResetAt,
+    };
+  }
+
+  /**
+   * 定时任务：每月 1 日凌晨 0 点重置所有用户配额
+   */
+  @Cron(CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT)
+  async handleMonthlyQuotaReset() {
+    this.logger.log('开始执行每月配额重置任务...');
+
+    try {
+      // 获取所有活跃订阅
+      const subscriptions = await this.prisma.subscription.findMany({
+        where: {
+          status: 'active',
+        },
+        select: {
+          userId: true,
+          plan: true,
+        },
+      });
+
+      let resetCount = 0;
+      let errorCount = 0;
+
+      for (const sub of subscriptions) {
+        try {
+          await this.resetUserQuota(sub.userId);
+          resetCount++;
+        } catch (error) {
+          this.logger.error(`重置配额失败: userId=${sub.userId}, error=${error}`);
+          errorCount++;
+        }
+      }
+
+      this.logger.log(`配额重置完成: 成功=${resetCount}, 失败=${errorCount}`);
+
+      return {
+        success: true,
+        resetCount,
+        errorCount,
+      };
+    } catch (error) {
+      this.logger.error('配额重置任务执行失败', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 手动触发配额重置（管理员接口）
+   */
+  async triggerQuotaReset(userId?: string): Promise<{ success: boolean; resetCount: number }> {
+    if (userId) {
+      // 重置单个用户
+      await this.resetUserQuota(userId);
+      return { success: true, resetCount: 1 };
+    }
+
+    // 重置所有需要重置的用户
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const subscriptions = await this.prisma.subscription.findMany({
+      where: {
+        status: 'active',
+        quotaResetAt: { lt: currentMonthStart },
+      },
+      select: { userId: true },
+    });
+
+    let resetCount = 0;
+    for (const sub of subscriptions) {
+      try {
+        await this.resetUserQuota(sub.userId);
+        resetCount++;
+      } catch {
+        // 忽略单个错误，继续处理其他用户
+      }
+    }
+
+    return { success: true, resetCount };
   }
 }

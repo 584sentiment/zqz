@@ -13,6 +13,7 @@ import {
 import { InterviewsService, CreateInterviewDto, SubmitAnswerDto } from './interviews.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RequireQuota } from '@/common/decorators/quota.decorator';
+import { ContentSafetyGuard } from '@/common/guards/content-safety.guard';
 
 @Controller('interviews')
 @UseGuards(JwtAuthGuard)
@@ -79,6 +80,7 @@ export class InterviewsController {
   }
 
   @Post(':id/answer')
+  @UseGuards(ContentSafetyGuard)
   async submitAnswer(
     @Request() req: { user: { id: string } },
     @Param('id') id: string,

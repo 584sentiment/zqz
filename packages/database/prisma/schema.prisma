@@ -343,6 +343,7 @@ model Subscription {
   startDate       DateTime @default(now()) @map("start_date")
   endDate         DateTime? @map("end_date")
   canceledAt      DateTime? @map("canceled_at")
+  quotaResetAt    DateTime @default(now()) @map("quota_reset_at") // 配额重置时间
 
   autoRenew       Boolean  @default(false) @map("auto_renew")
 

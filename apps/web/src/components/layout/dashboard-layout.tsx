@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth';
 import { apiClient } from '@/lib/api/client';
 import { authApi } from '@/lib/api/auth';
+import { subscriptionsApi, SubscriptionInfo } from '@/lib/api/subscriptions';
 import { useToast } from '@/components/ui/use-toast';
 import { ThemeToggle } from '@/components/theme-toggle';
 import {
@@ -23,6 +24,7 @@ import {
   X,
   Mail,
   Loader2,
+  Crown,
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -49,6 +51,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
 
   // 检查是否需要显示验证邮件提示
   const showVerificationBanner = user && !user.emailVerified && !emailSent;
@@ -120,6 +123,33 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     };
   }, [user?.id, user?.name, user?.emailVerified, setUser]);
 
+  // 获取用户订阅信息
+  useEffect(() => {
+    if (!user) {
+      setSubscription(null);
+      return;
+    }
+
+    let isMounted = true;
+
+    const fetchSubscription = async () => {
+      try {
+        const data = await subscriptionsApi.getMySubscription();
+        if (isMounted) {
+          setSubscription(data);
+        }
+      } catch {
+        // 静默失败
+      }
+    };
+
+    fetchSubscription();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
+
   // 关闭移动菜单当路由变化
   useEffect(() => {
     setShowMobileMenu(false);
@@ -130,18 +160,18 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Navigation */}
       <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
+          <div className="flex justify-between h-14 sm:h-16">
             {/* Left: Logo + Nav */}
-            <div className="flex items-center gap-4 md:gap-8">
-              <Link href="/dashboard" className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">智</span>
+            <div className="flex items-center gap-3 sm:gap-4 md:gap-8 min-w-0 flex-shrink-0">
+              <Link href="/dashboard" className="flex items-center gap-2 flex-shrink-0">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-xs sm:text-sm">智</span>
                 </div>
-                <span className="font-bold text-xl text-gray-900 dark:text-white">智求职</span>
+                <span className="font-bold text-lg sm:text-xl text-gray-900 dark:text-white hidden sm:inline">智求职</span>
               </Link>
 
-              {/* Desktop Nav */}
-              <div className="hidden md:flex items-center space-x-6">
+              {/* Desktop Nav - lg 以上显示完整文字 */}
+              <div className="hidden lg:flex items-center space-x-1 xl:space-x-6">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
@@ -149,12 +179,36 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`flex items-center gap-2 text-sm font-medium transition ${
-                        isActive ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition ${
+                        isActive
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
                       }`}
                     >
-                      <Icon className="w-4 h-4" />
-                      {item.label}
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* Tablet Nav - md 到 lg 只显示图标 */}
+              <div className="hidden md:flex lg:hidden items-center space-x-1">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`p-2 rounded-lg transition ${
+                        isActive
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                      title={item.label}
+                    >
+                      <Icon className="w-5 h-5" />
                     </Link>
                   );
                 })}
@@ -162,71 +216,102 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
 
             {/* Right: Search + Notifications + User */}
-            <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-1 sm:gap-2 lg:gap-4 flex-shrink-0">
               {/* Search - Desktop */}
-              <div className="hidden lg:block relative">
+              <div className="hidden xl:block relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="search"
                   placeholder="搜索职位、公司..."
-                  className="w-64 pl-10 pr-4 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                  className="w-56 xl:w-64 pl-10 pr-4 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                 />
               </div>
 
-              {/* Search - Mobile */}
-              <button className="lg:hidden p-2 text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition">
+              {/* Search - Tablet & Mobile */}
+              <button className="xl:hidden p-2 text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition">
                 <Search className="w-5 h-5" />
               </button>
 
               {/* Notifications */}
-              <button className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition">
+              <button className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition relative">
                 <Bell className="w-5 h-5" />
+                {/* 通知红点 */}
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
 
-              {/* Theme Toggle */}
-              <ThemeToggle />
+              {/* Theme Toggle - 隐藏在最小屏幕 */}
+              <div className="hidden sm:block">
+                <ThemeToggle />
+              </div>
 
               {/* User Menu */}
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center gap-2 sm:gap-3 sm:pl-4 sm:border-l sm:border-gray-200 dark:sm:border-gray-700"
+                  className="flex items-center gap-2 lg:gap-3 lg:pl-4 lg:border-l lg:border-gray-200 dark:lg:border-gray-700"
                 >
-                  <div className="text-right hidden sm:block">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{user?.name || '用户'}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">免费会员</p>
+                  <div className="text-right hidden lg:block">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[100px]">{user?.name || '用户'}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{subscription?.planName || '免费会员'}</p>
                   </div>
-                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden flex-shrink-0">
                     {user?.avatarUrl ? (
                       <img src={user.avatarUrl} alt="头像" className="w-full h-full object-cover" />
                     ) : (
-                      <User className="w-5 h-5 text-primary" />
+                      <User className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                     )}
                   </div>
-                  <ChevronDown className="w-4 h-4 text-gray-400 hidden sm:block" />
+                  <ChevronDown className="w-4 h-4 text-gray-400 hidden lg:block" />
                 </button>
 
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-100 dark:border-gray-700 py-1 z-50">
-                    <Link
-                      href="/dashboard/settings"
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  <>
+                    {/* 背景遮罩 */}
+                    <div
+                      className="fixed inset-0 z-40"
                       onClick={() => setShowUserMenu(false)}
-                    >
-                      <Settings className="w-4 h-4" />
-                      设置
-                    </Link>
-                    <button
-                      onClick={() => {
-                        logout();
-                        setShowUserMenu(false);
-                      }}
-                      className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-50 dark:hover:bg-gray-700"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      退出登录
-                    </button>
-                  </div>
+                    />
+                    {/* 菜单 */}
+                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-100 dark:border-gray-700 py-1 z-50">
+                      {/* 移动端显示用户信息 */}
+                      <div className="lg:hidden px-4 py-2 border-b border-gray-100 dark:border-gray-700">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{user?.name || '用户'}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
+                      </div>
+                      <Link
+                        href="/dashboard/subscription"
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        <Crown className="w-4 h-4" />
+                        会员中心
+                      </Link>
+                      <Link
+                        href="/dashboard/settings"
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        <Settings className="w-4 h-4" />
+                        设置
+                      </Link>
+                      {/* 移动端显示主题切换 */}
+                      <div className="sm:hidden flex items-center justify-between px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                        <span className="flex items-center gap-2">
+                          <ThemeToggle showLabel />
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          logout();
+                          setShowUserMenu(false);
+                        }}
+                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        退出登录
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
 

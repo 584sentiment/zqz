@@ -63,10 +63,27 @@ export default function RegisterPage() {
         description: '欢迎加入智求职！',
       });
       router.push('/onboarding');
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error('注册错误:', error);
+      const axiosError = error as { response?: { status?: number; data?: { message?: string } }; message?: string };
+      let errorMessage = '注册失败，请稍后重试';
+
+      if (axiosError.response) {
+        // 服务器返回了错误响应
+        if (axiosError.response.status === 409) {
+          errorMessage = '该邮箱已被注册，请直接登录或使用其他邮箱';
+        } else if (axiosError.response.data?.message) {
+          errorMessage = axiosError.response.data.message;
+        }
+      } else if (axiosError.message === 'Network Error') {
+        errorMessage = '网络连接失败，请检查网络后重试';
+      } else if (axiosError.message?.includes('timeout')) {
+        errorMessage = '请求超时，请稍后重试';
+      }
+
       toast({
         title: '注册失败',
-        description: '该邮箱可能已被注册，请尝试其他邮箱',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

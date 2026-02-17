@@ -55,8 +55,18 @@ export const jobsApi = {
     return response.data;
   },
 
-  async importJob(text: string, parsedData?: Record<string, unknown>): Promise<Job> {
-    const response = await apiClient.post<Job>('/jobs/import', { text, parsedData });
+  async importJob(
+    text: string,
+    parsedData?: Record<string, unknown>,
+    sourceType?: string,
+    sourceUrl?: string,
+  ): Promise<Job> {
+    const response = await apiClient.post<Job>('/jobs/import', {
+      text,
+      parsedData,
+      sourceType,
+      sourceUrl,
+    });
     return response.data;
   },
 

@@ -26,6 +26,9 @@ import {
   ExternalLink,
   Sparkles,
   MessageSquare,
+  Globe,
+  Link2,
+  ImageIcon,
 } from 'lucide-react';
 
 interface PageProps {
@@ -340,6 +343,40 @@ export default function JobDetailPage({ params }: PageProps) {
                     <Calendar className="w-4 h-4 text-gray-400" />
                     {new Date(job.createdAt).toLocaleDateString('zh-CN')} 导入
                   </div>
+                </div>
+
+                {/* 来源信息 */}
+                <div className="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-gray-100">
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    {job.sourceType === 'url' ? (
+                      <>
+                        <Link2 className="w-4 h-4" />
+                        <span>链接导入</span>
+                      </>
+                    ) : job.sourceType === 'image' ? (
+                      <>
+                        <ImageIcon className="w-4 h-4" />
+                        <span>图片导入</span>
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-4 h-4" />
+                        <span>文本导入</span>
+                      </>
+                    )}
+                  </div>
+                  {job.sourceUrl && (
+                    <a
+                      href={job.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors"
+                    >
+                      <Globe className="w-4 h-4" />
+                      查看原始来源
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
                 </div>
               </>
             )}

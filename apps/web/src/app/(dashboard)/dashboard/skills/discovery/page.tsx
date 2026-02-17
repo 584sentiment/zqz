@@ -8,6 +8,7 @@ import { skillsApi, SkillSession } from '@/lib/api/skills';
 import { jobsApi, Job } from '@/lib/api/jobs';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
+import { useStreamingText } from '@/hooks/use-streaming-text';
 import {
   Sparkles,
   Send,
@@ -47,6 +48,27 @@ export default function SkillDiscoveryPage() {
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // 流式输出状态
+  const streamingContentRef = useRef('');
+  const { displayText, isStreaming, startStreaming } = useStreamingText({
+    charDelay: 25,
+    onComplete: () => {
+      // 流式输出完成，将内容添加到消息列表
+      if (streamingContentRef.current) {
+        setMessages((prev) => [...prev, { role: 'assistant', content: streamingContentRef.current }]);
+        streamingContentRef.current = '';
+      }
+      setIsSending(false);
+    },
+  });
+
+  // 更新流式内容引用
+  useEffect(() => {
+    if (isStreaming && displayText) {
+      streamingContentRef.current = displayText;
+    }
+  }, [displayText, isStreaming]);
+
   const loadSessions = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -73,7 +95,7 @@ export default function SkillDiscoveryPage() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, displayText]);
 
   const startNewSession = async (jobId?: string) => {
     try {
@@ -118,7 +140,7 @@ export default function SkillDiscoveryPage() {
     setIsSending(true);
 
     try {
-      // 模拟 AI 回复（实际应调用 AI 服务）
+      // 增加消息计数
       await skillsApi.incrementMessage(currentSession.id);
 
       // 模拟技能发现
@@ -132,17 +154,11 @@ export default function SkillDiscoveryPage() {
         );
       }
 
-      // 模拟 AI 响应
-      setTimeout(() => {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: generateResponse(userMessage, skills),
-          },
-        ]);
-        setIsSending(false);
-      }, 1000);
+      // 生成 AI 响应内容
+      const aiResponse = generateResponse(userMessage, skills);
+
+      // 使用流式输出显示响应
+      startStreaming(aiResponse);
     } catch (error) {
       toast({
         title: '发送失败',
@@ -497,7 +513,20 @@ export default function SkillDiscoveryPage() {
                       </div>
                     </div>
                   ))}
-                  {isSending && (
+                  {(isSending || isStreaming) && displayText && (
+                    <div className="flex gap-3">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-teal-500 flex items-center justify-center">
+                        <Bot className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="bg-gray-100 rounded-2xl rounded-tl-md px-4 py-2.5 max-w-[80%]">
+                        <p className="text-sm whitespace-pre-wrap text-gray-800">{displayText}</p>
+                        {isStreaming && (
+                          <span className="inline-block w-1.5 h-4 bg-primary animate-pulse ml-0.5" />
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {isSending && !isStreaming && !displayText && (
                     <div className="flex gap-3">
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-teal-500 flex items-center justify-center">
                         <Bot className="w-4 h-4 text-white" />

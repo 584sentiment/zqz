@@ -16,6 +16,7 @@ import { useAuthStore } from '@/stores/auth';
 const loginSchema = z.object({
   email: z.string().email('请输入有效的邮箱地址'),
   password: z.string().min(8, '密码至少8个字符'),
+  rememberMe: z.boolean().optional(),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -155,9 +156,13 @@ export default function LoginPage() {
           </div>
 
           <div className="flex items-center justify-between">
-            <label className="flex items-center">
-              <input type="checkbox" className="rounded border-gray-300" />
-              <span className="ml-2 text-sm text-gray-600">记住我</span>
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                className="rounded border-gray-300 text-primary focus:ring-primary"
+                {...register('rememberMe')}
+              />
+              <span className="ml-2 text-sm text-gray-600">记住我（30天内免登录）</span>
             </label>
             <Link href="/forgot-password" className="text-sm text-primary hover:underline">
               忘记密码？

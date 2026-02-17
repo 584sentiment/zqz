@@ -16,9 +16,16 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Request() req: { user: { id: string; email: string; nickname: string } }) {
+  async login(
+    @Request() req: { user: { id: string; email: string; nickname: string } },
+    @Body() body: LoginDto,
+  ) {
     // 用户已在 LocalAuthGuard 中验证，直接生成令牌
-    const tokens = await this.authService.generateTokens(req.user.id, req.user.email);
+    const tokens = await this.authService.generateTokens(
+      req.user.id,
+      req.user.email,
+      body.rememberMe,
+    );
     return {
       user: {
         id: req.user.id,

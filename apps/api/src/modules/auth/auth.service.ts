@@ -152,25 +152,29 @@ export class AuthService {
     };
   }
 
-  async generateTokens(userId: string, email: string) {
+  async generateTokens(userId: string, email: string, rememberMe = false) {
     const accessToken = this.jwtService.sign({
       sub: userId,
       email,
       type: 'access',
     });
 
+    // 记住我：30天，否则 7 天
+    const refreshExpiresIn = rememberMe ? '30d' : '7d';
+
     const refreshToken = this.jwtService.sign(
       {
         sub: userId,
         type: 'refresh',
       },
-      { expiresIn: '7d' },
+      { expiresIn: refreshExpiresIn },
     );
 
     return {
       accessToken,
       refreshToken,
       expiresIn: 900, // 15 分钟
+      refreshExpiresIn: rememberMe ? 30 * 24 * 60 * 60 : 7 * 24 * 60 * 60, // 秒
     };
   }
 

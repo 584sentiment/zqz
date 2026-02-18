@@ -44,6 +44,7 @@ export class PaymentsController {
 
     // 记录原始请求（调试用）
     this.logger.debug('收到支付宝回调', JSON.stringify(params));
+    console.log(JSON.stringify(params), '支付寶回調');
 
     return this.paymentsService.handleNotify(params);
   }

@@ -225,128 +225,13 @@ export class PaymentsService {
     }
 
     // 调用支付宝查询接口
-    try {
-      const queryParams = this.alipayService.buildQueryParams(orderNo);
-      const gatewayUrl = this.alipayService.getGatewayUrl();
+    this.logger.log(`开始同步订单状态: orderNo=${orderNo}`);
 
-      const response = await fetch(gatewayUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams(queryParams).toString(),
-      });
+    const queryResult = await this.alipayService.queryTrade(orderNo);
 
-      const responseText = await response.text();
-      this.logger.log(`支付宝查询响应: ${responseText}`);
-
-      // 解析响应
-      const result = JSON.parse(responseText);
-      const queryResponse = result.alipay_trade_query_response;
-
-      if (!queryResponse || queryResponse.code !== '10000') {
-        this.logger.warn(`支付宝查询失败: ${JSON.stringify(queryResponse)}`);
-        return {
-          orderNo: payment.orderNo,
-          plan: payment.plan,
-          period: payment.period,
-          amount: Number(payment.amount),
-          status: payment.status,
-          subject: payment.subject,
-          paidAt: payment.paidAt,
-          createdAt: payment.createdAt,
-          synced: false,
-          message: queryResponse?.msg || '查询失败',
-        };
-      }
-
-      const tradeStatus = queryResponse.trade_status;
-      const tradeNo = queryResponse.trade_no;
-      const totalAmount = parseFloat(queryResponse.total_amount || '0');
-
-      // 交易成功
-      if (tradeStatus === 'TRADE_SUCCESS' || tradeStatus === 'TRADE_FINISHED') {
-        // 验证金额
-        if (Math.abs(totalAmount - Number(payment.amount)) > 0.01) {
-          this.logger.error(`金额不匹配: 订单=${Number(payment.amount)}, 支付=${totalAmount}`);
-          return {
-            orderNo: payment.orderNo,
-            status: payment.status,
-            synced: false,
-            message: '金额不匹配',
-          };
-        }
-
-        // 更新订单状态
-        await this.prisma.payment.update({
-          where: { orderNo },
-          data: {
-            status: 'paid',
-            outTradeNo: tradeNo,
-            paidAt: new Date(),
-            notifyData: JSON.parse(JSON.stringify(queryResponse)),
-          },
-        });
-
-        // 升级用户订阅
-        await this.upgradeSubscription(payment.userId, payment.plan, payment.period);
-
-        this.logger.log(`订单同步成功: orderNo=${orderNo}, tradeNo=${tradeNo}`);
-
-        return {
-          orderNo: payment.orderNo,
-          plan: payment.plan,
-          period: payment.period,
-          amount: Number(payment.amount),
-          status: 'paid',
-          subject: payment.subject,
-          paidAt: new Date(),
-          createdAt: payment.createdAt,
-          synced: true,
-          message: '订单同步成功',
-        };
-      }
-
-      // 交易关闭
-      if (tradeStatus === 'TRADE_CLOSED') {
-        await this.prisma.payment.update({
-          where: { orderNo },
-          data: {
-            status: 'closed',
-            notifyData: JSON.parse(JSON.stringify(queryResponse)),
-          },
-        });
-
-        return {
-          orderNo: payment.orderNo,
-          plan: payment.plan,
-          period: payment.period,
-          amount: Number(payment.amount),
-          status: 'closed',
-          subject: payment.subject,
-          paidAt: null,
-          createdAt: payment.createdAt,
-          synced: true,
-          message: '交易已关闭',
-        };
-      }
-
-      // 等待支付
-      if (tradeStatus === 'WAIT_BUYER_PAY') {
-        return {
-          orderNo: payment.orderNo,
-          plan: payment.plan,
-          period: payment.period,
-          amount: Number(payment.amount),
-          status: 'pending',
-          subject: payment.subject,
-          paidAt: null,
-          createdAt: payment.createdAt,
-          synced: true,
-          message: '等待买家支付',
-        };
-      }
-
+    // 查询失败
+    if (!queryResult.success) {
+      this.logger.warn(`支付宝查询失败: ${queryResult.msg}`);
       return {
         orderNo: payment.orderNo,
         plan: payment.plan,
@@ -356,13 +241,109 @@ export class PaymentsService {
         subject: payment.subject,
         paidAt: payment.paidAt,
         createdAt: payment.createdAt,
-        synced: true,
-        message: `交易状态: ${tradeStatus}`,
+        synced: false,
+        message: queryResult.msg || '查询失败',
       };
-    } catch (error) {
-      this.logger.error(`同步订单状态失败: ${error}`);
-      throw new Error('同步订单状态失败，请稍后重试');
     }
+
+    const { tradeStatus, tradeNo, totalAmount } = queryResult;
+
+    // 交易成功
+    if (tradeStatus === 'TRADE_SUCCESS' || tradeStatus === 'TRADE_FINISHED') {
+      // 验证金额
+      if (totalAmount && Math.abs(totalAmount - Number(payment.amount)) > 0.01) {
+        this.logger.error(`金额不匹配: 订单=${Number(payment.amount)}, 支付=${totalAmount}`);
+        return {
+          orderNo: payment.orderNo,
+          status: payment.status,
+          synced: false,
+          message: '金额不匹配',
+        };
+      }
+
+      // 更新订单状态
+      await this.prisma.payment.update({
+        where: { orderNo },
+        data: {
+          status: 'paid',
+          outTradeNo: tradeNo,
+          paidAt: new Date(),
+          notifyData: JSON.parse(JSON.stringify(queryResult.rawResponse)),
+        },
+      });
+
+      // 升级用户订阅
+      await this.upgradeSubscription(payment.userId, payment.plan, payment.period);
+
+      this.logger.log(`订单同步成功: orderNo=${orderNo}, tradeNo=${tradeNo}`);
+
+      return {
+        orderNo: payment.orderNo,
+        plan: payment.plan,
+        period: payment.period,
+        amount: Number(payment.amount),
+        status: 'paid',
+        subject: payment.subject,
+        paidAt: new Date(),
+        createdAt: payment.createdAt,
+        synced: true,
+        message: '订单同步成功',
+      };
+    }
+
+    // 交易关闭
+    if (tradeStatus === 'TRADE_CLOSED') {
+      await this.prisma.payment.update({
+        where: { orderNo },
+        data: {
+          status: 'closed',
+          notifyData: JSON.parse(JSON.stringify(queryResult.rawResponse)),
+        },
+      });
+
+      return {
+        orderNo: payment.orderNo,
+        plan: payment.plan,
+        period: payment.period,
+        amount: Number(payment.amount),
+        status: 'closed',
+        subject: payment.subject,
+        paidAt: null,
+        createdAt: payment.createdAt,
+        synced: true,
+        message: '交易已关闭',
+      };
+    }
+
+    // 等待支付
+    if (tradeStatus === 'WAIT_BUYER_PAY') {
+      return {
+        orderNo: payment.orderNo,
+        plan: payment.plan,
+        period: payment.period,
+        amount: Number(payment.amount),
+        status: 'pending',
+        subject: payment.subject,
+        paidAt: null,
+        createdAt: payment.createdAt,
+        synced: true,
+        message: '等待买家支付',
+      };
+    }
+
+    // 其他状态
+    return {
+      orderNo: payment.orderNo,
+      plan: payment.plan,
+      period: payment.period,
+      amount: Number(payment.amount),
+      status: payment.status,
+      subject: payment.subject,
+      paidAt: payment.paidAt,
+      createdAt: payment.createdAt,
+      synced: true,
+      message: `交易状态: ${tradeStatus}`,
+    };
   }
 
   /**

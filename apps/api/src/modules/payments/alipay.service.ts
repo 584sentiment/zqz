@@ -10,7 +10,7 @@ import * as crypto from 'crypto';
 export class AlipayService {
   private readonly logger = new Logger(AlipayService.name);
 
-  // 沙箱网关地址
+  // 沙箱网关地址（新版）
   private readonly sandboxGateway = 'https://openapi-sandbox.dl.alipaydev.com/gateway.do';
 
   // 支付宝配置
@@ -43,11 +43,6 @@ export class AlipayService {
 
   /**
    * 生成支付 URL
-   * @param orderNo 订单号
-   * @param amount 金额
-   * @param subject 订单标题
-   * @param returnUrl 同步跳转地址
-   * @param notifyUrl 异步通知地址
    */
   createPaymentUrl(
     orderNo: string,
@@ -61,7 +56,7 @@ export class AlipayService {
     }
 
     // 公共请求参数
-    const commonParams = {
+    const params: Record<string, string> = {
       app_id: this.appId,
       method: 'alipay.trade.page.pay',
       format: 'JSON',
@@ -80,35 +75,38 @@ export class AlipayService {
     };
 
     // 生成签名
-    const sign = this.generateSign(commonParams);
+    const sign = this.generateSign(params);
+    params.sign = sign;
 
     // 构建完整 URL
-    const params = new URLSearchParams();
-    for (const [key, value] of Object.entries(commonParams)) {
-      params.append(key, value as string);
+    const urlParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      urlParams.append(key, value);
     }
-    params.append('sign', sign);
 
-    return `${this.sandboxGateway}?${params.toString()}`;
+    return `${this.sandboxGateway}?${urlParams.toString()}`;
   }
 
   /**
-   * 查询支付宝订单状态（用于主动同步）
-   * @param orderNo 商户订单号
-   * @returns 支付宝查询结果
+   * 查询支付宝订单状态
+   * 文档: https://opendocs.alipay.com/apis/api_1/alipay.trade.query
    */
-  queryPayment(orderNo: string): { tradeStatus: string; tradeNo: string; totalAmount: string } | null {
+  async queryTrade(orderNo: string): Promise<{
+    success: boolean;
+    code?: string;
+    msg?: string;
+    tradeStatus?: string;
+    tradeNo?: string;
+    totalAmount?: number;
+    rawResponse?: unknown;
+  }> {
     if (!this.isConfigured()) {
-      return null;
+      return { success: false, msg: '支付宝配置不完整' };
     }
 
     try {
-      // 构建查询请求参数
-      const bizContent = JSON.stringify({
-        out_trade_no: orderNo,
-      });
-
-      const commonParams = {
+      // 构建请求参数
+      const params: Record<string, string> = {
         app_id: this.appId,
         method: 'alipay.trade.query',
         format: 'JSON',
@@ -116,26 +114,88 @@ export class AlipayService {
         sign_type: 'RSA2',
         timestamp: this.formatTime(new Date()),
         version: '1.0',
-        biz_content: bizContent,
+        biz_content: JSON.stringify({
+          out_trade_no: orderNo,
+        }),
       };
 
       // 生成签名
-      const sign = this.generateSign(commonParams);
+      const sign = this.generateSign(params);
+      params.sign = sign;
 
-      // 构建请求 URL
-      const params = new URLSearchParams();
-      for (const [key, value] of Object.entries(commonParams)) {
-        params.append(key, value as string);
+      // 记录请求参数（调试用）
+      this.logger.debug(`支付宝查询请求参数: ${JSON.stringify(params, null, 2)}`);
+
+      // 发送请求
+      const formData = new URLSearchParams();
+      for (const [key, value] of Object.entries(params)) {
+        formData.append(key, value);
       }
-      params.append('sign', sign);
 
-      // 同步请求（使用 fetch）
-      // 注意：这里需要同步执行，但在 Node.js 中 fetch 是异步的
-      // 实际使用时应该在 service 中异步调用
-      return null; // 占位，实际逻辑在 payments.service.ts 中实现
+      const response = await fetch(this.sandboxGateway, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData.toString(),
+      });
+
+      const responseText = await response.text();
+      this.logger.log(`支付宝查询原始响应: ${responseText}`);
+
+      // 解析响应
+      let result: Record<string, unknown>;
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        this.logger.error(`支付宝响应解析失败，非 JSON 格式: ${responseText}`);
+        return { success: false, msg: '响应格式错误', rawResponse: responseText };
+      }
+
+      // 获取查询响应
+      const queryResponse = result.alipay_trade_query_response as Record<string, unknown> | undefined;
+
+      if (!queryResponse) {
+        this.logger.error(`支付宝响应缺少 alipay_trade_query_response: ${JSON.stringify(result)}`);
+        return { success: false, msg: '响应格式错误', rawResponse: result };
+      }
+
+      const code = queryResponse.code as string;
+      const msg = queryResponse.msg as string;
+
+      // 检查网关返回码
+      if (code !== '10000') {
+        this.logger.warn(`支付宝查询失败: code=${code}, msg=${msg}, sub_msg=${queryResponse.sub_msg}`);
+        return {
+          success: false,
+          code,
+          msg: (queryResponse.sub_msg as string) || msg || '查询失败',
+          rawResponse: queryResponse,
+        };
+      }
+
+      // 查询成功
+      const tradeStatus = queryResponse.trade_status as string;
+      const tradeNo = queryResponse.trade_no as string;
+      const totalAmount = parseFloat(queryResponse.total_amount as string || '0');
+
+      this.logger.log(
+        `支付宝查询成功: orderNo=${orderNo}, tradeNo=${tradeNo}, status=${tradeStatus}, amount=${totalAmount}`,
+      );
+
+      return {
+        success: true,
+        code,
+        msg,
+        tradeStatus,
+        tradeNo,
+        totalAmount,
+        rawResponse: queryResponse,
+      };
     } catch (error) {
-      this.logger.error('查询支付宝订单失败', error);
-      return null;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`支付宝查询异常: ${errorMessage}`);
+      return { success: false, msg: errorMessage };
     }
   }
 
@@ -147,14 +207,10 @@ export class AlipayService {
   }
 
   /**
-   * 生成查询请求的签名参数
+   * 构建查询请求参数（保留兼容性）
    */
   buildQueryParams(orderNo: string): Record<string, string> {
-    const bizContent = JSON.stringify({
-      out_trade_no: orderNo,
-    });
-
-    const params: Record<string, unknown> = {
+    const params: Record<string, string> = {
       app_id: this.appId,
       method: 'alipay.trade.query',
       format: 'JSON',
@@ -162,28 +218,23 @@ export class AlipayService {
       sign_type: 'RSA2',
       timestamp: this.formatTime(new Date()),
       version: '1.0',
-      biz_content: bizContent,
+      biz_content: JSON.stringify({
+        out_trade_no: orderNo,
+      }),
     };
 
     const sign = this.generateSign(params);
+    params.sign = sign;
 
-    return {
-      ...Object.fromEntries(
-        Object.entries(params).map(([k, v]) => [k, String(v)])
-      ),
-      sign,
-    };
+    return params;
   }
 
   /**
    * 验证支付宝回调签名
-   * @param params 回调参数
    */
   verifySign(params: Record<string, string>): boolean {
     try {
       const sign = params.sign;
-      const signType = params.sign_type || 'RSA2';
-
       if (!sign) {
         this.logger.error('签名不存在');
         return false;
@@ -205,9 +256,7 @@ export class AlipayService {
       const verify = crypto.createVerify('RSA-SHA256');
       verify.update(signContent);
 
-      // 格式化公钥
       const publicKey = this.formatPublicKey(this.alipayPublicKey);
-
       return verify.verify(publicKey, sign, 'base64');
     } catch (error) {
       this.logger.error('签名验证失败', error);
@@ -217,8 +266,9 @@ export class AlipayService {
 
   /**
    * 生成签名
+   * 文档: https://opendocs.alipay.com/common/02kf5q
    */
-  private generateSign(params: Record<string, unknown>): string {
+  private generateSign(params: Record<string, string>): string {
     // 排除 sign 字段，按字母排序
     const sortedKeys = Object.keys(params)
       .filter((key) => key !== 'sign' && params[key] !== undefined && params[key] !== '')
@@ -227,82 +277,57 @@ export class AlipayService {
     // 拼接待签名字符串
     const signContent = sortedKeys.map((key) => `${key}=${params[key]}`).join('&');
 
-    // 格式化私钥，尝试多种格式
-    const privateKeysToTry = this.getPrivateKeyVariants(this.privateKey);
+    this.logger.debug(`待签名内容: ${signContent.substring(0, 200)}...`);
 
-    let lastError: Error | null = null;
+    // 尝试多种私钥格式
+    const privateKeysToTry = this.getPrivateKeyVariants(this.privateKey);
 
     for (const privateKeyPem of privateKeysToTry) {
       try {
-        // 使用 crypto.createPrivateKey 创建密钥对象
         const privateKeyObj = crypto.createPrivateKey({
           key: privateKeyPem,
           format: 'pem',
         });
 
-        // RSA2 签名
         const signature = crypto.sign('RSA-SHA256', Buffer.from(signContent), privateKeyObj);
-        return signature.toString('base64');
+        const sign = signature.toString('base64');
+
+        this.logger.debug(`签名生成成功，长度: ${sign.length}`);
+        return sign;
       } catch (error) {
-        lastError = error as Error;
-        // 继续尝试下一种格式
+        this.logger.debug(`私钥格式尝试失败: ${error instanceof Error ? error.message : String(error)}`);
         continue;
       }
     }
 
-    // 所有格式都失败
-    this.logger.error('签名失败，尝试了多种私钥格式均失败', lastError);
-    throw new Error(
-      '签名失败，请检查私钥格式。确保使用 PKCS#8 格式的私钥（以 -----BEGIN PRIVATE KEY----- 开头）',
-    );
+    throw new Error('签名失败，请检查私钥格式');
   }
 
   /**
    * 获取私钥的各种可能格式变体
-   * 返回多种格式的私钥，用于逐一尝试
    */
   private getPrivateKeyVariants(key: string): string[] {
     const variants: string[] = [];
     const trimmedKey = key.trim();
-    const cleanKey = trimmedKey.replace(/\s/g, '');
-    const lines = cleanKey.match(/.{1,64}/g) || [];
 
-    // 1. 如果已经是 PEM 格式，直接使用
+    // 如果已经是 PEM 格式，直接使用
     if (trimmedKey.includes('-----BEGIN')) {
       variants.push(trimmedKey);
     }
 
-    // 2. PKCS#8 格式（推荐）
-    variants.push(`-----BEGIN PRIVATE KEY-----\n${lines.join('\n')}\n-----END PRIVATE KEY-----`);
+    // 处理纯 base64 格式
+    const cleanKey = trimmedKey.replace(/\s/g, '');
+    if (!cleanKey.includes('-----BEGIN')) {
+      const lines = cleanKey.match(/.{1,64}/g) || [];
 
-    // 3. PKCS#1 RSA 格式（旧版支付宝可能使用）
-    variants.push(`-----BEGIN RSA PRIVATE KEY-----\n${lines.join('\n')}\n-----END RSA PRIVATE KEY-----`);
+      // PKCS#8 格式
+      variants.push(`-----BEGIN PRIVATE KEY-----\n${lines.join('\n')}\n-----END PRIVATE KEY-----`);
 
-    return variants;
-  }
-
-  /**
-   * 格式化私钥（已弃用，使用 getPrivateKeyVariants 代替）
-   * 支持原始 base64、PKCS#1 和 PKCS#8 格式
-   * @deprecated
-   */
-  private formatPrivateKey(key: string): string {
-    const trimmedKey = key.trim();
-
-    // 如果已经是 PEM 格式（包含 BEGIN），直接返回
-    if (trimmedKey.includes('-----BEGIN')) {
-      return trimmedKey;
+      // PKCS#1 RSA 格式
+      variants.push(`-----BEGIN RSA PRIVATE KEY-----\n${lines.join('\n')}\n-----END RSA PRIVATE KEY-----`);
     }
 
-    // 原始 base64 格式，需要添加 PEM 头尾
-    // 先移除所有空白
-    const cleanKey = trimmedKey.replace(/\s/g, '');
-
-    // 格式化为 64 字符每行
-    const lines = cleanKey.match(/.{1,64}/g) || [];
-
-    // 尝试 PKCS#8 格式（支付宝推荐）
-    return `-----BEGIN PRIVATE KEY-----\n${lines.join('\n')}\n-----END PRIVATE KEY-----`;
+    return variants;
   }
 
   /**
@@ -311,12 +336,10 @@ export class AlipayService {
   private formatPublicKey(key: string): string {
     const trimmedKey = key.trim();
 
-    // 如果已经是 PEM 格式
     if (trimmedKey.includes('-----BEGIN')) {
       return trimmedKey;
     }
 
-    // 原始 base64 格式
     const cleanKey = trimmedKey.replace(/\s/g, '');
     const lines = cleanKey.match(/.{1,64}/g) || [];
     return `-----BEGIN PUBLIC KEY-----\n${lines.join('\n')}\n-----END PUBLIC KEY-----`;

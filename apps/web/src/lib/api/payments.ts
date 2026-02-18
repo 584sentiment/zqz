@@ -19,6 +19,11 @@ export interface PaymentStatus {
   createdAt: string;
 }
 
+export interface SyncPaymentResponse extends PaymentStatus {
+  synced: boolean;
+  message: string;
+}
+
 export interface PaymentHistory {
   orderNo: string;
   plan: string;
@@ -47,6 +52,14 @@ export const paymentsApi = {
    */
   async getPaymentStatus(orderNo: string): Promise<PaymentStatus> {
     const response = await apiClient.get<PaymentStatus>(`/payments/status/${orderNo}`);
+    return response.data;
+  },
+
+  /**
+   * 同步订单状态（从支付宝查询）
+   */
+  async syncPaymentStatus(orderNo: string): Promise<SyncPaymentResponse> {
+    const response = await apiClient.post<SyncPaymentResponse>(`/payments/sync/${orderNo}`);
     return response.data;
   },
 

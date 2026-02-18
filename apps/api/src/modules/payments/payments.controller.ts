@@ -62,6 +62,19 @@ export class PaymentsController {
   }
 
   /**
+   * 同步订单状态（从支付宝查询）
+   * POST /payments/sync/:orderNo
+   */
+  @Post('sync/:orderNo')
+  @UseGuards(JwtAuthGuard)
+  async syncPaymentStatus(
+    @Req() req: { user: { id: string } },
+    @Param('orderNo') orderNo: string,
+  ) {
+    return this.paymentsService.syncPaymentStatus(req.user.id, orderNo);
+  }
+
+  /**
    * 获取用户订单历史
    * GET /payments/history
    */

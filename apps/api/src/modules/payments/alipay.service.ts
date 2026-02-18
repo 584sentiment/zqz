@@ -93,6 +93,89 @@ export class AlipayService {
   }
 
   /**
+   * 查询支付宝订单状态（用于主动同步）
+   * @param orderNo 商户订单号
+   * @returns 支付宝查询结果
+   */
+  queryPayment(orderNo: string): { tradeStatus: string; tradeNo: string; totalAmount: string } | null {
+    if (!this.isConfigured()) {
+      return null;
+    }
+
+    try {
+      // 构建查询请求参数
+      const bizContent = JSON.stringify({
+        out_trade_no: orderNo,
+      });
+
+      const commonParams = {
+        app_id: this.appId,
+        method: 'alipay.trade.query',
+        format: 'JSON',
+        charset: 'utf-8',
+        sign_type: 'RSA2',
+        timestamp: this.formatTime(new Date()),
+        version: '1.0',
+        biz_content: bizContent,
+      };
+
+      // 生成签名
+      const sign = this.generateSign(commonParams);
+
+      // 构建请求 URL
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(commonParams)) {
+        params.append(key, value as string);
+      }
+      params.append('sign', sign);
+
+      // 同步请求（使用 fetch）
+      // 注意：这里需要同步执行，但在 Node.js 中 fetch 是异步的
+      // 实际使用时应该在 service 中异步调用
+      return null; // 占位，实际逻辑在 payments.service.ts 中实现
+    } catch (error) {
+      this.logger.error('查询支付宝订单失败', error);
+      return null;
+    }
+  }
+
+  /**
+   * 获取支付宝网关地址
+   */
+  getGatewayUrl(): string {
+    return this.sandboxGateway;
+  }
+
+  /**
+   * 生成查询请求的签名参数
+   */
+  buildQueryParams(orderNo: string): Record<string, string> {
+    const bizContent = JSON.stringify({
+      out_trade_no: orderNo,
+    });
+
+    const params: Record<string, unknown> = {
+      app_id: this.appId,
+      method: 'alipay.trade.query',
+      format: 'JSON',
+      charset: 'utf-8',
+      sign_type: 'RSA2',
+      timestamp: this.formatTime(new Date()),
+      version: '1.0',
+      biz_content: bizContent,
+    };
+
+    const sign = this.generateSign(params);
+
+    return {
+      ...Object.fromEntries(
+        Object.entries(params).map(([k, v]) => [k, String(v)])
+      ),
+      sign,
+    };
+  }
+
+  /**
    * 验证支付宝回调签名
    * @param params 回调参数
    */

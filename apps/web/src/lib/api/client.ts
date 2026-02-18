@@ -1,6 +1,25 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+// 动态获取 API URL，支持 IP 访问
+const getApiUrl = () => {
+  // 优先使用环境变量
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+
+  // 在浏览器环境中，动态检测当前主机名
+  if (typeof window !== 'undefined') {
+    const { hostname } = window.location;
+    // 如果是 IP 地址访问，使用相同的 IP 地址访问 API
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      return `http://${hostname}:3001/api/v1`;
+    }
+  }
+
+  return 'http://localhost:3001/api/v1';
+};
+
+const API_URL = getApiUrl();
 
 // 辅助函数：检查是否在浏览器环境
 const isBrowser = () => typeof window !== 'undefined';

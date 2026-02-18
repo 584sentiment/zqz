@@ -6,22 +6,26 @@ import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Button } from '@/components/ui/button';
 import { paymentsApi, PaymentStatus } from '@/lib/api/payments';
+import { useToast } from '@/components/ui/use-toast';
 import {
   CheckCircle2,
   XCircle,
   Clock,
   Loader2,
   ArrowLeft,
+  RefreshCw,
 } from 'lucide-react';
 
 export default function PaymentResultPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { toast } = useToast();
   const orderNo = searchParams.get('orderNo');
 
   const [status, setStatus] = useState<'loading' | 'success' | 'failed' | 'pending'>('loading');
   const [paymentInfo, setPaymentInfo] = useState<PaymentStatus | null>(null);
   const [pollCount, setPollCount] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const checkPaymentStatus = useCallback(async () => {
     if (!orderNo) {
@@ -51,6 +55,44 @@ export default function PaymentResultPage() {
     }
   }, [orderNo, pollCount]);
 
+  const handleSyncStatus = async () => {
+    if (!orderNo) return;
+
+    setIsSyncing(true);
+    try {
+      const result = await paymentsApi.syncPaymentStatus(orderNo);
+      setPaymentInfo(result);
+
+      if (result.status === 'paid') {
+        setStatus('success');
+        toast({
+          title: '同步成功',
+          description: '订单已确认支付，订阅已升级',
+        });
+      } else if (result.status === 'closed') {
+        setStatus('failed');
+        toast({
+          title: '交易已关闭',
+          description: result.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: '同步完成',
+          description: result.message,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: '同步失败',
+        description: '无法同步订单状态，请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   useEffect(() => {
     checkPaymentStatus();
   }, [checkPaymentStatus]);
@@ -79,14 +121,27 @@ export default function PaymentResultPage() {
             <Clock className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
             <h1 className="text-xl font-semibold text-gray-900 mb-2">等待支付确认</h1>
             <p className="text-gray-500 mb-6">
-              支付可能需要几秒钟处理，您可以稍后刷新页面查看结果
+              支付可能需要几秒钟处理，您也可以点击下方按钮手动同步状态
             </p>
             <div className="space-y-3">
-              <Button onClick={checkPaymentStatus} className="w-full">
+              <Button onClick={handleSyncStatus} disabled={isSyncing} className="w-full">
+                {isSyncing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    正在同步...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    同步订单状态
+                  </>
+                )}
+              </Button>
+              <Button onClick={checkPaymentStatus} variant="outline" className="w-full">
                 刷新状态
               </Button>
               <Link href="/dashboard/subscription">
-                <Button variant="outline" className="w-full">
+                <Button variant="ghost" className="w-full">
                   返回会员中心
                 </Button>
               </Link>
@@ -142,11 +197,26 @@ export default function PaymentResultPage() {
             </p>
 
             <div className="space-y-3">
+              {orderNo && (
+                <Button onClick={handleSyncStatus} disabled={isSyncing} variant="outline" className="w-full">
+                  {isSyncing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      正在同步...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      已支付？点击同步
+                    </>
+                  )}
+                </Button>
+              )}
               <Link href="/dashboard/subscription/upgrade">
                 <Button className="w-full">重新购买</Button>
               </Link>
               <Link href="/dashboard/subscription">
-                <Button variant="outline" className="w-full">
+                <Button variant="ghost" className="w-full">
                   返回会员中心
                 </Button>
               </Link>

@@ -54,3 +54,5 @@ packages/database/prisma/*.db-journal
 # 日志
 logs/
 *.log
+
+apps/web/test-results/

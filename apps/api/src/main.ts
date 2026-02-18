@@ -28,7 +28,7 @@ async function bootstrap() {
 
   // CORS 配置
   app.enableCors({
-    origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
+    origin: process.env.CORS_ORIGINS?.split(',') || true,
     credentials: true,
   });
 
@@ -38,7 +38,7 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT', 3001);
 
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   console.log(`🚀 API 服务已启动: http://localhost:${port}/api/v1`);
 }
 

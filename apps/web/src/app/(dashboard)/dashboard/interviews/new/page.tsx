@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { interviewsApi, QuestionCategory, InProgressInterview } from '@/lib/api/interviews';
@@ -24,6 +24,7 @@ import {
 
 export default function NewInterviewPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const [step, setStep] = useState(1);
@@ -37,6 +38,16 @@ export default function NewInterviewPage() {
   const [selectedJob, setSelectedJob] = useState<string>('');
   const [selectedMode, setSelectedMode] = useState<'text' | 'voice'>('text');
   const [selectedDifficulty, setSelectedDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+
+  // 处理 URL 参数中的 jobId
+  useEffect(() => {
+    const jobIdFromUrl = searchParams.get('jobId');
+    if (jobIdFromUrl) {
+      setSelectedJob(jobIdFromUrl);
+      // 清除 URL 参数
+      router.replace('/dashboard/interviews/new');
+    }
+  }, [searchParams, router]);
 
   useEffect(() => {
     const loadData = async () => {

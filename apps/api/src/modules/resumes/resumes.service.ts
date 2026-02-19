@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ResumeGenerationService, AIServiceError } from '@ai-job-assistant/ai';
 
 export interface MatchAnalysis {
@@ -24,6 +25,7 @@ export class ResumesService {
   constructor(
     private prisma: PrismaService,
     private subscriptionsService: SubscriptionsService,
+    private notificationsService: NotificationsService,
   ) {
     this.resumeGenerationService = new ResumeGenerationService();
   }
@@ -901,6 +903,11 @@ export class ResumesService {
           matchScore: (matchAnalysis?.score as number) || 0,
           updatedAt: new Date(),
         },
+      });
+
+      // 发送简历生成完成通知
+      await this.notificationsService.notifyResumeCompleted(userId, resumeId, resume.name).catch((err) => {
+        this.logger.warn(`发送简历完成通知失败: ${err.message}`);
       });
 
       // 记录使用量

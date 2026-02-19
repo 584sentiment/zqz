@@ -22,6 +22,7 @@ import {
   ArchiveRestore,
   Loader2,
   ChevronDown,
+  Star,
 } from 'lucide-react';
 
 const PAGE_SIZE = 10;
@@ -33,6 +34,7 @@ export default function JobsPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [pagination, setPagination] = useState<{ total: number; hasMore: boolean }>({ total: 0, hasMore: false });
   const [currentPage, setCurrentPage] = useState(0);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -50,6 +52,7 @@ export default function JobsPage() {
         status: statusFilter === 'all' ? undefined : statusFilter,
         skip: page * PAGE_SIZE,
         take: PAGE_SIZE,
+        favorites: showFavoritesOnly || undefined,
       });
 
       if (append) {
@@ -69,19 +72,19 @@ export default function JobsPage() {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [statusFilter, toast]);
+  }, [statusFilter, showFavoritesOnly, toast]);
 
   // 初始加载
   useEffect(() => {
     loadJobs(0, false);
-  }, [statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [statusFilter, showFavoritesOnly]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 搜索时重置分页
   useEffect(() => {
     setCurrentPage(0);
     setJobs([]);
     loadJobs(0, false);
-  }, [statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [statusFilter, showFavoritesOnly]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLoadMore = () => {
     if (!isLoadingMore && pagination.hasMore) {
@@ -134,7 +137,7 @@ export default function JobsPage() {
 
   const handleArchive = async (jobId: string) => {
     try {
-      await jobsApi.update(jobId, { status: 'archived' } as Job);
+      await jobsApi.updateStatus(jobId, 'archived');
       toast({
         title: '归档成功',
         description: '岗位已归档',
@@ -151,7 +154,7 @@ export default function JobsPage() {
 
   const handleRestore = async (jobId: string) => {
     try {
-      await jobsApi.update(jobId, { status: 'active' } as Job);
+      await jobsApi.updateStatus(jobId, 'active');
       toast({
         title: '恢复成功',
         description: '岗位已恢复到活跃列表',
@@ -160,6 +163,50 @@ export default function JobsPage() {
     } catch (error) {
       toast({
         title: '恢复失败',
+        description: '请稍后重试',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleUpdateStatus = async (jobId: string, newStatus: string) => {
+    try {
+      await jobsApi.updateStatus(jobId, newStatus);
+      // 更新本地状态
+      setJobs((prev) =>
+        prev.map((job) =>
+          job.id === jobId ? { ...job, status: newStatus } : job
+        )
+      );
+      toast({
+        title: '状态更新成功',
+        description: `岗位状态已更新为: ${statusOptions.find(s => s.value === newStatus)?.label || newStatus}`,
+      });
+    } catch (error) {
+      toast({
+        title: '状态更新失败',
+        description: '请稍后重试',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleToggleFavorite = async (jobId: string, currentStatus: boolean) => {
+    try {
+      await jobsApi.toggleFavorite(jobId, !currentStatus);
+      // 更新本地状态
+      setJobs((prev) =>
+        prev.map((job) =>
+          job.id === jobId ? { ...job, isFavorite: !currentStatus } : job
+        )
+      );
+      toast({
+        title: currentStatus ? '已取消收藏' : '已收藏',
+        description: currentStatus ? '岗位已从收藏夹移除' : '岗位已添加到收藏夹',
+      });
+    } catch (error) {
+      toast({
+        title: '操作失败',
         description: '请稍后重试',
         variant: 'destructive',
       });
@@ -230,6 +277,15 @@ export default function JobsPage() {
             />
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant={showFavoritesOnly ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+              className="gap-1"
+            >
+              <Star className={`w-4 h-4 ${showFavoritesOnly ? 'fill-current' : ''}`} />
+              收藏
+            </Button>
             <Filter className="w-4 h-4 text-gray-400" />
             <select
               value={statusFilter}
@@ -285,11 +341,17 @@ export default function JobsPage() {
                               <h3 className="text-lg font-semibold text-gray-900">
                                 {job.title || '未命名职位'}
                               </h3>
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge.bg} ${statusBadge.text}`}
+                              <select
+                                value={job.status}
+                                onChange={(e) => handleUpdateStatus(job.id, e.target.value)}
+                                className={`px-2 py-0.5 rounded-full text-xs font-medium border-0 cursor-pointer ${statusBadge.bg} ${statusBadge.text}`}
                               >
-                                {statusBadge.label}
-                              </span>
+                                {statusOptions.filter(opt => opt.value !== 'all').map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
                             <div className="flex items-center gap-4 text-sm text-gray-500">
                               {job.company && (
@@ -339,6 +401,14 @@ export default function JobsPage() {
 
                       {/* 操作按钮 */}
                       <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleFavorite(job.id, job.isFavorite)}
+                          className={job.isFavorite ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-yellow-500'}
+                        >
+                          <Star className={`w-4 h-4 ${job.isFavorite ? 'fill-current' : ''}`} />
+                        </Button>
                         <Link href={`/dashboard/jobs/${job.id}`}>
                           <Button variant="outline" size="sm">
                             <Eye className="w-4 h-4 mr-1" />

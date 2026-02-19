@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth';
 import { apiClient } from '@/lib/api/client';
 import { authApi } from '@/lib/api/auth';
 import { subscriptionsApi, SubscriptionInfo } from '@/lib/api/subscriptions';
+import { notificationsApi } from '@/lib/api/notifications';
 import { useToast } from '@/components/ui/use-toast';
 import { ThemeToggle } from '@/components/theme-toggle';
 import {
@@ -25,6 +26,7 @@ import {
   Mail,
   Loader2,
   Crown,
+  Sparkles,
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -32,12 +34,13 @@ interface DashboardLayoutProps {
 }
 
 const navItems: Array<{
-  href: '/dashboard' | '/dashboard/jobs' | '/dashboard/profile' | '/dashboard/resumes' | '/dashboard/interviews';
+  href: '/dashboard' | '/dashboard/jobs' | '/dashboard/profile' | '/dashboard/resumes' | '/dashboard/interviews' | '/dashboard/skills/discovery';
   label: string;
   icon: typeof LayoutDashboard;
 }> = [
   { href: '/dashboard', label: '首页', icon: LayoutDashboard },
   { href: '/dashboard/jobs', label: '岗位管理', icon: Briefcase },
+  { href: '/dashboard/skills/discovery', label: '技能发掘', icon: Sparkles },
   { href: '/dashboard/profile', label: '个人档案', icon: User },
   { href: '/dashboard/resumes', label: '简历管理', icon: FileText },
   { href: '/dashboard/interviews', label: '模拟面试', icon: MessageSquare },
@@ -52,6 +55,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isResending, setIsResending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // 检查是否需要显示验证邮件提示
   const showVerificationBanner = user && !user.emailVerified && !emailSent;
@@ -150,6 +154,37 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     };
   }, [user?.id]);
 
+  // 获取未读消息数量
+  useEffect(() => {
+    if (!user) {
+      setUnreadCount(0);
+      return;
+    }
+
+    let isMounted = true;
+
+    const fetchUnreadCount = async () => {
+      try {
+        const result = await notificationsApi.getUnreadCount();
+        if (isMounted) {
+          setUnreadCount(result.count);
+        }
+      } catch {
+        // 静默失败
+      }
+    };
+
+    fetchUnreadCount();
+
+    // 每 60 秒刷新一次未读数量
+    const interval = setInterval(fetchUnreadCount, 60000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [user?.id]);
+
   // 关闭移动菜单当路由变化
   useEffect(() => {
     setShowMobileMenu(false);
@@ -174,7 +209,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <div className="hidden lg:flex items-center space-x-1 xl:space-x-6">
                 {navItems.map((item) => {
                   const Icon = item.icon;
-                  const isActive = pathname === item.href;
+                  // 首页使用精确匹配，其他页面使用前缀匹配
+                  const isActive = item.href === '/dashboard'
+                    ? pathname === '/dashboard'
+                    : pathname.startsWith(item.href);
                   return (
                     <Link
                       key={item.href}
@@ -196,7 +234,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <div className="hidden md:flex lg:hidden items-center space-x-1">
                 {navItems.map((item) => {
                   const Icon = item.icon;
-                  const isActive = pathname === item.href;
+                  // 首页使用精确匹配，其他页面使用前缀匹配
+                  const isActive = item.href === '/dashboard'
+                    ? pathname === '/dashboard'
+                    : pathname.startsWith(item.href);
                   return (
                     <Link
                       key={item.href}
@@ -233,11 +274,18 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </button>
 
               {/* Notifications */}
-              <button className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition relative">
+              <Link
+                href="/dashboard/notifications"
+                className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition relative"
+              >
                 <Bell className="w-5 h-5" />
                 {/* 通知红点 */}
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-red-500 rounded-full text-[10px] font-medium text-white flex items-center justify-center">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </Link>
 
               {/* Theme Toggle - 隐藏在最小屏幕 */}
               <div className="hidden sm:block">
@@ -332,7 +380,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="px-4 py-3 space-y-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = pathname === item.href;
+                // 首页使用精确匹配，其他页面使用前缀匹配
+                const isActive = item.href === '/dashboard'
+                  ? pathname === '/dashboard'
+                  : pathname.startsWith(item.href);
                 return (
                   <Link
                     key={item.href}

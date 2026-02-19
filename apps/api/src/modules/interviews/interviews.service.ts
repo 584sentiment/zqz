@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { InterviewService } from '@ai-job-assistant/ai';
 
 export interface CreateInterviewDto {
@@ -42,6 +43,7 @@ export class InterviewsService {
   constructor(
     private prisma: PrismaService,
     private subscriptionsService: SubscriptionsService,
+    private notificationsService: NotificationsService,
   ) {
     this.aiInterviewService = new InterviewService();
   }
@@ -339,6 +341,13 @@ export class InterviewsService {
     // 如果面试完成，生成报告
     if (isLastQuestion) {
       await this.generateReport(interviewId, answers);
+
+      // 发送面试完成通知
+      const report = updated.report as { overallScore?: number } | null;
+      const score = report?.overallScore;
+      await this.notificationsService.notifyInterviewCompleted(userId, interviewId, score).catch((err) => {
+        this.logger.warn(`发送面试完成通知失败: ${err.message}`);
+      });
     }
 
     return {

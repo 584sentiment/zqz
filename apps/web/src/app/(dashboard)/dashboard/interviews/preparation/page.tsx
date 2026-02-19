@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import {
   interviewsApi,
@@ -33,6 +33,7 @@ import {
 
 export default function InterviewPreparationPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [plans, setPlans] = useState<PreparationPlanListItem[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -75,6 +76,17 @@ export default function InterviewPreparationPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // 处理 URL 参数中的 jobId
+  useEffect(() => {
+    const jobIdFromUrl = searchParams.get('jobId');
+    if (jobIdFromUrl) {
+      setSelectedJobId(jobIdFromUrl);
+      setShowCreateModal(true);
+      // 清除 URL 参数
+      router.replace('/dashboard/interviews/preparation');
+    }
+  }, [searchParams, router]);
 
   const handleCreatePlan = async () => {
     setIsCreating(true);

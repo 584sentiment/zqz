@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/auth';
 import { apiClient } from '@/lib/api/client';
 import { authApi } from '@/lib/api/auth';
+import { notificationsApi, NotificationSettings } from '@/lib/api/notifications';
 import {
   User,
   Mail,
@@ -18,7 +19,14 @@ import {
   Shield,
   Trash2,
   AlertTriangle,
+  ChevronRight,
+  Bell,
+  Briefcase,
+  Gift,
+  Crown,
+  Settings as SettingsIcon,
 } from 'lucide-react';
+import Link from 'next/link';
 
 interface UserProfile {
   id: string;
@@ -57,6 +65,11 @@ export default function SettingsPage() {
   const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
+  // 消息设置状态
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings | null>(null);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
   const loadUser = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -79,6 +92,46 @@ export default function SettingsPage() {
   useEffect(() => {
     loadUser();
   }, [loadUser]);
+
+  // 加载消息设置
+  useEffect(() => {
+    const loadSettings = async () => {
+      setIsLoadingSettings(true);
+      try {
+        const settings = await notificationsApi.getSettings();
+        setNotificationSettings(settings);
+      } catch {
+        // 静默失败
+      } finally {
+        setIsLoadingSettings(false);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  // 保存消息设置
+  const handleSaveNotificationSettings = async (key: keyof NotificationSettings, value: boolean) => {
+    if (!notificationSettings) return;
+
+    setIsSavingSettings(true);
+    try {
+      const newSettings = { ...notificationSettings, [key]: value };
+      const updated = await notificationsApi.updateSettings({ [key]: value });
+      setNotificationSettings(updated);
+      toast({
+        title: '设置已保存',
+        description: key === 'dailyReminder' ? (value ? '已开启每日提醒' : '已关闭每日提醒') : '消息设置已更新',
+      });
+    } catch {
+      toast({
+        title: '保存失败',
+        description: '请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -458,7 +511,153 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
+
+            {/* 账户安全链接 */}
+            <div className="pt-4 border-t border-gray-100">
+              <Link
+                href="/dashboard/settings/security"
+                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Shield className="w-5 h-5 text-gray-600" />
+                  <div>
+                    <p className="font-medium text-gray-900">登录历史与会话管理</p>
+                    <p className="text-sm text-gray-500">查看登录记录，管理活跃设备</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-400" />
+              </Link>
+            </div>
           </div>
+        </div>
+
+        {/* 消息设置卡片 */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+            <Bell className="w-5 h-5" />
+            消息通知
+          </h2>
+
+          {isLoadingSettings ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* 每日提醒 */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+                    <Bell className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">每日面试准备提醒</p>
+                    <p className="text-sm text-gray-500">每天早上 9 点发送邮件提醒</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notificationSettings?.dailyReminder ?? false}
+                    onChange={(e) => handleSaveNotificationSettings('dailyReminder', e.target.checked)}
+                    disabled={isSavingSettings}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+              </div>
+
+              {/* 消息类型设置 */}
+              <div className="pt-4 border-t border-gray-100">
+                <p className="text-sm font-medium text-gray-700 mb-3">站内消息类型</p>
+                <div className="space-y-3">
+                  {/* 系统通知 */}
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <SettingsIcon className="w-5 h-5 text-blue-500" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">系统通知</p>
+                        <p className="text-xs text-gray-500">账户安全、系统升级、维护公告</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={notificationSettings?.systemEnabled ?? true}
+                        onChange={(e) => handleSaveNotificationSettings('systemEnabled', e.target.checked)}
+                        disabled={isSavingSettings}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+
+                  {/* 业务提醒 */}
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Briefcase className="w-5 h-5 text-green-500" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">业务提醒</p>
+                        <p className="text-xs text-gray-500">简历生成完成、面试提醒、匹配度更新</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={notificationSettings?.businessEnabled ?? true}
+                        onChange={(e) => handleSaveNotificationSettings('businessEnabled', e.target.checked)}
+                        disabled={isSavingSettings}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+
+                  {/* 活动公告 */}
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Gift className="w-5 h-5 text-purple-500" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">活动公告</p>
+                        <p className="text-xs text-gray-500">促销活动、新功能上线、会员福利</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={notificationSettings?.activityEnabled ?? true}
+                        onChange={(e) => handleSaveNotificationSettings('activityEnabled', e.target.checked)}
+                        disabled={isSavingSettings}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+
+                  {/* 订阅消息 */}
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Crown className="w-5 h-5 text-yellow-500" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">订阅消息</p>
+                        <p className="text-xs text-gray-500">订阅到期、续费成功、配额提醒</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={notificationSettings?.subscriptionEnabled ?? true}
+                        onChange={(e) => handleSaveNotificationSettings('subscriptionEnabled', e.target.checked)}
+                        disabled={isSavingSettings}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 危险区域卡片 */}

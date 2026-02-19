@@ -50,6 +50,9 @@ model User {
   skillSessions  SkillDiscoverySession[]
   usageLogs      UsageLog[]
   payments       Payment[]
+  loginHistories LoginHistory[]
+  sessions       UserSession[]
+  notifications  Notification[]
 
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
@@ -200,10 +203,12 @@ model Job {
 
   status          String   @default("active") // active, archived, applied
   notes           String?  @db.Text
+  isFavorite      Boolean  @default(false) @map("is_favorite")
 
   // 关系
   resumes         Resume[]
   skillSessions   SkillDiscoverySession[]
+  statusHistory   JobStatusHistory[]
 
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
@@ -212,6 +217,23 @@ model Job {
   @@index([userId, status])
   @@index([createdAt(sort: Desc)])
   @@map("jobs")
+}
+
+model JobStatusHistory {
+  id              String   @id @default(cuid())
+  jobId           String   @map("job_id")
+  job             Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  fromStatus      String?  @map("from_status")
+  toStatus        String   @map("to_status")
+
+  note            String?  @db.Text
+  changedBy       String   @map("changed_by") // userId
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([jobId, createdAt(sort: Desc)])
+  @@map("job_status_history")
 }
 
 // ============== 简历相关 ==============
@@ -429,4 +451,87 @@ model Payment {
   @@index([status])
   @@index([createdAt(sort: Desc)])
   @@map("payments")
+}
+
+// ============== 安全相关 ==============
+
+model LoginHistory {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 登录信息
+  loginAt         DateTime @default(now()) @map("login_at")
+  loginMethod     String   @map("login_method") // password, github, wechat
+  success         Boolean  @default(true)
+
+  // 设备和位置信息
+  ipAddress       String?  @map("ip_address")
+  userAgent       String?  @map("user_agent")
+  device          String?  // Desktop, Mobile, Tablet
+  browser         String?
+  os              String?
+  location        String?  // 城市/国家
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([userId, loginAt(sort: Desc)])
+  @@map("login_histories")
+}
+
+model UserSession {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 会话信息
+  tokenHash       String   @unique @map("token_hash") // refresh token hash
+  expiresAt       DateTime @map("expires_at")
+
+  // 设备信息
+  deviceName      String?  @map("device_name")
+  ipAddress       String?  @map("ip_address")
+  userAgent       String?  @map("user_agent")
+  lastActiveAt    DateTime @default(now()) @map("last_active_at")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+// ============== 通知相关 ==============
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 消息分类
+  type        String   // system | business | activity | subscription
+
+  // 消息内容
+  title       String
+  content     String   @db.Text
+  icon        String?  // 可选图标标识
+
+  // 跳转链接
+  actionType  String?  // link | modal | none
+  actionUrl   String?  @map("action_url")
+  actionData  Json?    @map("action_data")  // 额外参数
+
+  // 状态
+  isRead      Boolean  @default(false) @map("is_read")
+  readAt      DateTime? @map("read_at")
+
+  // 过期时间（可选，用于自动清理）
+  expiresAt   DateTime? @map("expires_at")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([userId, isRead])
+  @@index([userId, type])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("notifications")
 }

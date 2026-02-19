@@ -2,10 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '@/common/database/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { Prisma } from '@prisma/client';
 
 interface UserPreferences {
   dailyReminder?: boolean;
   reminderTime?: string; // e.g., "09:00"
+  systemEnabled?: boolean;
+  businessEnabled?: boolean;
+  activityEnabled?: boolean;
+  subscriptionEnabled?: boolean;
 }
 
 interface DailyTask {
@@ -21,6 +26,18 @@ interface DailyTask {
   focusArea: string;
 }
 
+export interface CreateNotificationDto {
+  userId: string;
+  type: 'system' | 'business' | 'activity' | 'subscription';
+  title: string;
+  content: string;
+  icon?: string;
+  actionType?: 'link' | 'modal' | 'none';
+  actionUrl?: string;
+  actionData?: Record<string, unknown>;
+  expiresAt?: Date;
+}
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
@@ -29,6 +46,372 @@ export class NotificationsService {
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
   ) {}
+
+  // ============== 消息管理 API ==============
+
+  /**
+   * 获取消息列表
+   */
+  async getNotifications(
+    userId: string,
+    options: {
+      page?: number;
+      limit?: number;
+      type?: string;
+      unreadOnly?: boolean;
+    },
+  ) {
+    const { page = 1, limit = 20, type, unreadOnly } = options;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.NotificationWhereInput = {
+      userId,
+      ...(type && type !== 'all' && { type }),
+      ...(unreadOnly && { isRead: false }),
+    };
+
+    const [data, total, unreadCount] = await Promise.all([
+      this.prisma.notification.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.notification.count({ where }),
+      this.prisma.notification.count({
+        where: { userId, isRead: false },
+      }),
+    ]);
+
+    return {
+      data,
+      pagination: {
+        total,
+        page,
+        limit,
+        hasMore: skip + data.length < total,
+      },
+      unreadCount,
+    };
+  }
+
+  /**
+   * 获取未读消息数量
+   */
+  async getUnreadCount(userId: string): Promise<number> {
+    return this.prisma.notification.count({
+      where: { userId, isRead: false },
+    });
+  }
+
+  /**
+   * 标记消息为已读
+   */
+  async markAsRead(userId: string, notificationId: string): Promise<boolean> {
+    const result = await this.prisma.notification.updateMany({
+      where: { id: notificationId, userId },
+      data: {
+        isRead: true,
+        readAt: new Date(),
+      },
+    });
+    return result.count > 0;
+  }
+
+  /**
+   * 批量标记已读
+   */
+  async batchMarkAsRead(
+    userId: string,
+    options: { ids?: string[]; all?: boolean; type?: string },
+  ): Promise<number> {
+    const where: Prisma.NotificationWhereInput = {
+      userId,
+      isRead: false,
+    };
+
+    if (options.ids && options.ids.length > 0) {
+      where.id = { in: options.ids };
+    }
+
+    if (options.type && options.type !== 'all') {
+      where.type = options.type;
+    }
+
+    const result = await this.prisma.notification.updateMany({
+      where,
+      data: {
+        isRead: true,
+        readAt: new Date(),
+      },
+    });
+
+    return result.count;
+  }
+
+  /**
+   * 删除消息
+   */
+  async deleteNotification(userId: string, notificationId: string): Promise<boolean> {
+    const result = await this.prisma.notification.deleteMany({
+      where: { id: notificationId, userId },
+    });
+    return result.count > 0;
+  }
+
+  /**
+   * 清空所有已读消息
+   */
+  async clearReadNotifications(userId: string): Promise<number> {
+    const result = await this.prisma.notification.deleteMany({
+      where: { userId, isRead: true },
+    });
+    return result.count;
+  }
+
+  // ============== 消息创建服务 ==============
+
+  /**
+   * 创建消息
+   */
+  async createNotification(dto: CreateNotificationDto) {
+    // 检查用户是否启用了该类型消息
+    const user = await this.prisma.user.findUnique({
+      where: { id: dto.userId },
+      select: { preferences: true },
+    });
+
+    const preferences = user?.preferences as UserPreferences | null;
+
+    // 根据消息类型检查用户偏好
+    if (preferences) {
+      const typeEnabledMap: Record<string, boolean | undefined> = {
+        system: preferences.systemEnabled,
+        business: preferences.businessEnabled,
+        activity: preferences.activityEnabled,
+        subscription: preferences.subscriptionEnabled,
+      };
+
+      // 如果用户明确关闭了该类型消息，则不创建
+      if (typeEnabledMap[dto.type] === false) {
+        this.logger.debug(`用户已关闭 ${dto.type} 类型消息，跳过创建`);
+        return null;
+      }
+    }
+
+    return this.prisma.notification.create({
+      data: {
+        userId: dto.userId,
+        type: dto.type,
+        title: dto.title,
+        content: dto.content,
+        icon: dto.icon,
+        actionType: dto.actionType,
+        actionUrl: dto.actionUrl,
+        actionData: dto.actionData as Prisma.JsonObject,
+        expiresAt: dto.expiresAt,
+      },
+    });
+  }
+
+  /**
+   * 批量创建消息（用于系统广播）
+   */
+  async createBatchNotifications(
+    userIds: string[],
+    dto: Omit<CreateNotificationDto, 'userId'>,
+  ) {
+    const data = userIds.map((userId) => ({
+      userId,
+      type: dto.type,
+      title: dto.title,
+      content: dto.content,
+      icon: dto.icon,
+      actionType: dto.actionType,
+      actionUrl: dto.actionUrl,
+      actionData: dto.actionData as Prisma.JsonObject,
+      expiresAt: dto.expiresAt,
+    }));
+
+    return this.prisma.notification.createMany({
+      data,
+      skipDuplicates: true,
+    });
+  }
+
+  // ============== 业务消息快捷方法 ==============
+
+  /**
+   * 简历生成完成通知
+   */
+  async notifyResumeCompleted(userId: string, resumeId: string, resumeName: string) {
+    return this.createNotification({
+      userId,
+      type: 'business',
+      title: '简历生成完成',
+      content: `您的简历「${resumeName}」已生成完成，点击查看详情。`,
+      icon: 'FileText',
+      actionType: 'link',
+      actionUrl: `/dashboard/resumes/${resumeId}`,
+    });
+  }
+
+  /**
+   * 模拟面试完成通知
+   */
+  async notifyInterviewCompleted(userId: string, interviewId: string, score?: number) {
+    const scoreText = score ? `，得分：${score}分` : '';
+    return this.createNotification({
+      userId,
+      type: 'business',
+      title: '模拟面试完成',
+      content: `您的模拟面试已完成${scoreText}，点击查看详细报告。`,
+      icon: 'Video',
+      actionType: 'link',
+      actionUrl: `/dashboard/interviews/${interviewId}`,
+    });
+  }
+
+  /**
+   * 新设备登录通知
+   */
+  async notifyNewLogin(userId: string, device: string, location: string) {
+    return this.createNotification({
+      userId,
+      type: 'system',
+      title: '新设备登录提醒',
+      content: `您的账户在 ${location} 使用 ${device} 登录。如非本人操作，请立即修改密码。`,
+      icon: 'Shield',
+      actionType: 'link',
+      actionUrl: '/dashboard/settings/security',
+    });
+  }
+
+  /**
+   * 订阅即将到期通知
+   */
+  async notifySubscriptionExpiring(userId: string, days: number) {
+    return this.createNotification({
+      userId,
+      type: 'subscription',
+      title: '订阅即将到期',
+      content: `您的订阅将于 ${days} 天后到期，续费可继续享受会员权益。`,
+      icon: 'Crown',
+      actionType: 'link',
+      actionUrl: '/dashboard/subscription',
+    });
+  }
+
+  /**
+   * 配额使用提醒
+   */
+  async notifyQuotaWarning(userId: string, quotaType: string, percentage: number) {
+    const quotaNames: Record<string, string> = {
+      ai: 'AI 对话',
+      resume: '简历生成',
+      interview: '模拟面试',
+    };
+    const name = quotaNames[quotaType] || quotaType;
+
+    return this.createNotification({
+      userId,
+      type: 'subscription',
+      title: '配额使用提醒',
+      content: `您的 ${name} 配额已使用 ${percentage}%，升级套餐可获得更多配额。`,
+      icon: 'AlertTriangle',
+      actionType: 'link',
+      actionUrl: '/dashboard/subscription/upgrade',
+    });
+  }
+
+  // ============== 用户设置 ==============
+
+  /**
+   * 更新用户提醒设置
+   */
+  async updateReminderPreference(userId: string, enabled: boolean): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { preferences: true },
+    });
+
+    const currentPreferences = (user?.preferences as unknown as UserPreferences) || {};
+    const updatedPreferences = {
+      ...currentPreferences,
+      dailyReminder: enabled,
+    };
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { preferences: JSON.parse(JSON.stringify(updatedPreferences)) },
+    });
+  }
+
+  /**
+   * 获取用户提醒设置
+   */
+  async getReminderPreference(userId: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { preferences: true },
+    });
+
+    const preferences = user?.preferences as UserPreferences | null;
+    return preferences?.dailyReminder ?? false;
+  }
+
+  /**
+   * 获取用户消息设置
+   */
+  async getNotificationSettings(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { preferences: true },
+    });
+
+    const preferences = user?.preferences as UserPreferences | null;
+    return {
+      systemEnabled: preferences?.systemEnabled ?? true,
+      businessEnabled: preferences?.businessEnabled ?? true,
+      activityEnabled: preferences?.activityEnabled ?? true,
+      subscriptionEnabled: preferences?.subscriptionEnabled ?? true,
+      dailyReminder: preferences?.dailyReminder ?? false,
+    };
+  }
+
+  /**
+   * 更新用户消息设置
+   */
+  async updateNotificationSettings(
+    userId: string,
+    settings: Partial<{
+      systemEnabled: boolean;
+      businessEnabled: boolean;
+      activityEnabled: boolean;
+      subscriptionEnabled: boolean;
+      dailyReminder: boolean;
+    }>,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { preferences: true },
+    });
+
+    const currentPreferences = (user?.preferences as unknown as UserPreferences) || {};
+    const updatedPreferences = {
+      ...currentPreferences,
+      ...settings,
+    };
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { preferences: JSON.parse(JSON.stringify(updatedPreferences)) },
+    });
+
+    return this.getNotificationSettings(userId);
+  }
+
+  // ============== 定时任务 ==============
 
   /**
    * 每日早上 9 点发送准备计划提醒
@@ -118,10 +501,6 @@ export class NotificationsService {
     name: string,
     tasks: Array<{ title: string; type: string; duration: number }>,
   ) {
-    const taskList = tasks
-      .map((t) => `- ${t.title} (${t.duration}分钟)`)
-      .join('\n');
-
     const totalDuration = tasks.reduce((sum, t) => sum + t.duration, 0);
 
     const subject = '【智求职】今日面试准备任务提醒';
@@ -163,40 +542,6 @@ export class NotificationsService {
     `;
 
     await this.mailService.sendCustomEmail(email, subject, html);
-  }
-
-  /**
-   * 更新用户提醒设置
-   */
-  async updateReminderPreference(userId: string, enabled: boolean): Promise<void> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { preferences: true },
-    });
-
-    const currentPreferences = (user?.preferences as unknown as UserPreferences) || {};
-    const updatedPreferences = {
-      ...currentPreferences,
-      dailyReminder: enabled,
-    };
-
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { preferences: JSON.parse(JSON.stringify(updatedPreferences)) },
-    });
-  }
-
-  /**
-   * 获取用户提醒设置
-   */
-  async getReminderPreference(userId: string): Promise<boolean> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { preferences: true },
-    });
-
-    const preferences = user?.preferences as UserPreferences | null;
-    return preferences?.dailyReminder ?? false;
   }
 
   /**

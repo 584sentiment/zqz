@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { resumesApi, Resume, ResumeTemplate } from '@/lib/api/resumes';
+import { jobsApi, Job } from '@/lib/api/jobs';
 import { subscriptionsApi } from '@/lib/api/subscriptions';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -26,18 +28,23 @@ import {
   Globe,
   AlertTriangle,
   Crown,
+  X,
 } from 'lucide-react';
 
 export default function ResumesPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const { toast } = useToast();
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [templates, setTemplates] = useState<ResumeTemplate[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<'zh' | 'en'>('zh');
   const [resumeName, setResumeName] = useState('');
+  const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [quotaInfo, setQuotaInfo] = useState<{
     total: number;
     used: number;
@@ -49,13 +56,15 @@ export default function ResumesPage() {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [resumesData, templatesData, subscriptionData] = await Promise.all([
+      const [resumesData, templatesData, subscriptionData, jobsResponse] = await Promise.all([
         resumesApi.getList(statusFilter === 'all' ? undefined : { status: statusFilter }),
         resumesApi.getTemplates(),
         subscriptionsApi.getMySubscription().catch(() => null),
+        jobsApi.getList({ status: 'active' }),
       ]);
       setResumes(resumesData);
       setTemplates(templatesData);
+      setJobs(jobsResponse.data);
       if (subscriptionData?.quotas?.resume) {
         setQuotaInfo(subscriptionData.quotas.resume);
       }
@@ -76,6 +85,17 @@ export default function ResumesPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // 处理 URL 参数中的 jobId
+  useEffect(() => {
+    const jobIdFromUrl = searchParams.get('jobId');
+    if (jobIdFromUrl) {
+      setSelectedJobId(jobIdFromUrl);
+      setShowCreateModal(true);
+      // 清除 URL 参数
+      router.replace('/dashboard/resumes');
+    }
+  }, [searchParams, router]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -333,8 +353,42 @@ export default function ResumesPage() {
       {/* 创建简历模态框 */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">创建新简历</h2>
+          <div className="bg-white rounded-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">创建新简历</h2>
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setResumeName('');
+                  setSelectedLanguage('zh');
+                  setSelectedJobId('');
+                }}
+                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* 目标岗位选择 */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <Briefcase className="w-4 h-4 inline mr-1" />
+                目标岗位（可选）
+              </label>
+              <select
+                value={selectedJobId}
+                onChange={(e) => setSelectedJobId(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-sm"
+              >
+                <option value="">不关联岗位</option>
+                {jobs.map((job) => (
+                  <option key={job.id} value={job.id}>
+                    {job.title} - {job.company}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">关联岗位后，AI 将针对岗位要求优化简历内容</p>
+            </div>
 
             {/* 简历名称 */}
             <div className="mb-4">
@@ -414,10 +468,12 @@ export default function ResumesPage() {
                         name: resumeName || '未命名简历',
                         templateId: template.id,
                         language: selectedLanguage,
+                        jobId: selectedJobId || undefined,
                       });
                       setShowCreateModal(false);
                       setResumeName('');
                       setSelectedLanguage('zh');
+                      setSelectedJobId('');
                       window.location.href = `/dashboard/resumes/${resume.id}`;
                     } catch (error: unknown) {
                       const axiosError = error as {
@@ -492,6 +548,7 @@ export default function ResumesPage() {
                   setShowCreateModal(false);
                   setResumeName('');
                   setSelectedLanguage('zh');
+                  setSelectedJobId('');
                 }}
               >
                 取消

@@ -413,7 +413,10 @@ export default function JobDetailPage({ params }: PageProps) {
 
         {/* 快捷操作 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <button className="flex items-center gap-4 p-5 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-primary/20 transition-all group">
+          <Link
+            href={`/dashboard/resumes?jobId=${job.id}`}
+            className="flex items-center gap-4 p-5 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-primary/20 transition-all group"
+          >
             <div className="p-3 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors">
               <FileText className="w-6 h-6" />
             </div>
@@ -421,7 +424,7 @@ export default function JobDetailPage({ params }: PageProps) {
               <h3 className="font-semibold text-gray-900">生成定制简历</h3>
               <p className="text-sm text-gray-500">针对此岗位优化</p>
             </div>
-          </button>
+          </Link>
 
           <button
             onClick={handlePredictQuestions}
@@ -437,7 +440,10 @@ export default function JobDetailPage({ params }: PageProps) {
             </div>
           </button>
 
-          <button className="flex items-center gap-4 p-5 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-orange-200 transition-all group">
+          <Link
+            href={`/dashboard/interviews/preparation?jobId=${job.id}`}
+            className="flex items-center gap-4 p-5 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-orange-200 transition-all group"
+          >
             <div className="p-3 rounded-lg bg-orange-100 text-orange-600 group-hover:bg-orange-500 group-hover:text-white transition-colors">
               <MessageSquare className="w-6 h-6" />
             </div>
@@ -445,9 +451,12 @@ export default function JobDetailPage({ params }: PageProps) {
               <h3 className="font-semibold text-gray-900">面试准备</h3>
               <p className="text-sm text-gray-500">AI 问答题库</p>
             </div>
-          </button>
+          </Link>
 
-          <button className="flex items-center gap-4 p-5 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all group">
+          <Link
+            href={`/dashboard/interviews/new?jobId=${job.id}`}
+            className="flex items-center gap-4 p-5 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all group"
+          >
             <div className="p-3 rounded-lg bg-blue-100 text-blue-600 group-hover:bg-blue-500 group-hover:text-white transition-colors">
               <Sparkles className="w-6 h-6" />
             </div>
@@ -455,7 +464,7 @@ export default function JobDetailPage({ params }: PageProps) {
               <h3 className="font-semibold text-gray-900">模拟面试</h3>
               <p className="text-sm text-gray-500">视频仿真练习</p>
             </div>
-          </button>
+          </Link>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -1,14 +1,18 @@
-import { Controller, Post, Body, UseGuards, Request, HttpCode, HttpStatus, Get, Query, Delete, Req, Res } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus, Get, Query, Delete, Req, Res } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
+import { SecurityService } from '../security/security.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RegisterDto, LoginDto, RefreshTokenDto, ChangePasswordDto, DeleteAccountDto } from './dto/auth.dto';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private securityService: SecurityService,
+  ) {}
 
   @Post('register')
   async register(@Body() dto: RegisterDto) {
@@ -19,20 +23,29 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(
-    @Request() req: { user: { id: string; email: string; nickname: string } },
+    @Req() req: Request,
     @Body() body: LoginDto,
   ) {
+    // 类型断言获取用户信息
+    const user = req.user as { id: string; email: string; nickname: string };
+
     // 用户已在 LocalAuthGuard 中验证，直接生成令牌
     const tokens = await this.authService.generateTokens(
-      req.user.id,
-      req.user.email,
+      user.id,
+      user.email,
       body.rememberMe,
     );
+
+    // 记录成功登录
+    await this.securityService.recordLogin(user.id, 'password', true, req);
+    // 创建会话
+    await this.securityService.createSession(user.id, tokens.refreshToken, req);
+
     return {
       user: {
-        id: req.user.id,
-        email: req.user.email,
-        name: req.user.nickname,
+        id: user.id,
+        email: user.email,
+        name: user.nickname,
       },
       tokens,
     };
@@ -53,17 +66,19 @@ export class AuthController {
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
   async changePassword(
-    @Request() req: { user: { id: string } },
+    @Req() req: Request,
     @Body() dto: ChangePasswordDto,
   ) {
-    return this.authService.changePassword(req.user.id, dto.currentPassword, dto.newPassword);
+    const user = req.user as { id: string };
+    return this.authService.changePassword(user.id, dto.currentPassword, dto.newPassword);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
-  async resendVerification(@Request() req: { user: { id: string } }) {
-    return this.authService.resendVerificationEmail(req.user.id);
+  async resendVerification(@Req() req: Request) {
+    const user = req.user as { id: string };
+    return this.authService.resendVerificationEmail(user.id);
   }
 
   @Get('verify-email')
@@ -90,10 +105,11 @@ export class AuthController {
   @Delete('account')
   @HttpCode(HttpStatus.OK)
   async deleteAccount(
-    @Request() req: { user: { id: string } },
+    @Req() req: Request,
     @Body() dto: DeleteAccountDto,
   ) {
-    return this.authService.deleteAccount(req.user.id, dto.password);
+    const user = req.user as { id: string };
+    return this.authService.deleteAccount(user.id, dto.password);
   }
 
   // ============== GitHub OAuth ==============
@@ -107,11 +123,16 @@ export class AuthController {
   @Get('github/callback')
   @UseGuards(AuthGuard('github'))
   async githubAuthCallback(
-    @Req() req: { user: unknown },
+    @Req() req: Request,
     @Res() res: Response,
   ) {
     try {
       const result = await this.authService.githubLogin(req.user as Parameters<AuthService['githubLogin']>[0]);
+
+      // 记录 GitHub 登录
+      await this.securityService.recordLogin(result.user.id, 'github', true, req);
+      // 创建会话
+      await this.securityService.createSession(result.user.id, result.tokens.refreshToken, req);
 
       // 将 token 传递给前端（通过 URL 参数或 cookie）
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';

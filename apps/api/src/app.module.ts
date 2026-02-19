@@ -19,6 +19,7 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { SecurityModule } from './modules/security/security.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -75,6 +76,7 @@ import { HealthController } from './health.controller';
     NotificationsModule,
     AdminModule,
     PaymentsModule,
+    SecurityModule,
   ],
   controllers: [HealthController],
   providers: [

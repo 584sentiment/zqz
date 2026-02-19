@@ -3,13 +3,20 @@ import {
   ExecutionContext,
   UnauthorizedException,
   HttpException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { LoginRateLimitGuard } from './login-rate-limit.guard';
+import { SecurityService } from '../../security/security.service';
 
 @Injectable()
 export class LocalAuthGuard extends AuthGuard('local') {
-  constructor(private readonly rateLimitGuard: LoginRateLimitGuard) {
+  constructor(
+    private readonly rateLimitGuard: LoginRateLimitGuard,
+    @Inject(forwardRef(() => SecurityService))
+    private readonly securityService: SecurityService,
+  ) {
     super();
   }
 
@@ -17,26 +24,27 @@ export class LocalAuthGuard extends AuthGuard('local') {
     // 先检查速率限制
     await this.rateLimitGuard.canActivate(context);
 
+    const request = context.switchToHttp().getRequest();
+    const email = request.body?.email;
+
     try {
       const result = (await super.canActivate(context)) as boolean;
 
       // 登录成功，清除失败记录
-      const request = context.switchToHttp().getRequest();
-      const email = request.body?.email;
       if (email) {
         this.rateLimitGuard.clearFailedAttempts(email);
       }
 
       return result;
     } catch (error) {
-      const request = context.switchToHttp().getRequest();
-      const email = request.body?.email;
-
       if (email && error instanceof UnauthorizedException) {
         // 记录登录失败
-        const result = this.rateLimitGuard.recordFailedAttempt(email);
+        const rateLimitResult = this.rateLimitGuard.recordFailedAttempt(email);
 
-        if (result.locked) {
+        // 记录失败登录到历史（这里我们不知道用户 ID，使用 'unknown'）
+        await this.securityService.recordLogin('unknown', 'password', false, request);
+
+        if (rateLimitResult.locked) {
           throw new HttpException(
             {
               statusCode: 429,
@@ -44,7 +52,7 @@ export class LocalAuthGuard extends AuthGuard('local') {
               error: 'Too Many Requests',
               data: {
                 locked: true,
-                remainingMinutes: result.remainingMinutes,
+                remainingMinutes: rateLimitResult.remainingMinutes,
               },
             },
             429,
@@ -57,7 +65,7 @@ export class LocalAuthGuard extends AuthGuard('local') {
           message: '邮箱或密码错误',
           error: 'Unauthorized',
           data: {
-            remainingAttempts: result.remainingAttempts,
+            remainingAttempts: rateLimitResult.remainingAttempts,
           },
         });
       }

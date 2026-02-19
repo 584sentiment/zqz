@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
@@ -8,6 +8,7 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { GitHubStrategy } from './strategies/github.strategy';
 import { LoginRateLimitGuard } from './guards/login-rate-limit.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
+import { SecurityModule } from '../security/security.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { LocalAuthGuard } from './guards/local-auth.guard';
       secret: process.env.JWT_SECRET || 'your-secret-key',
       signOptions: { expiresIn: process.env.JWT_EXPIRES_IN || '15m' },
     }),
+    forwardRef(() => SecurityModule),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, LocalStrategy, GitHubStrategy, LoginRateLimitGuard, LocalAuthGuard],

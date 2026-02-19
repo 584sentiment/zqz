@@ -27,6 +27,7 @@ export interface Job {
   matchedSkills: string[];
   status: string;
   notes: string | null;
+  isFavorite: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -37,6 +38,20 @@ export interface JobsListResponse {
     total: number;
     hasMore: boolean;
   };
+}
+
+export interface JobStatusHistory {
+  id: string;
+  fromStatus: string | null;
+  toStatus: string;
+  note: string | null;
+  changedBy: string;
+  createdAt: string;
+}
+
+export interface JobStatusStats {
+  status: string;
+  count: number;
 }
 
 export const jobsApi = {
@@ -70,13 +85,24 @@ export const jobsApi = {
     return response.data;
   },
 
-  async getList(params?: { status?: string; skip?: number; take?: number }): Promise<JobsListResponse> {
+  async getList(params?: { status?: string; skip?: number; take?: number; favorites?: boolean }): Promise<JobsListResponse> {
     const searchParams = new URLSearchParams();
     if (params?.status) searchParams.set('status', params.status);
     if (params?.skip) searchParams.set('skip', params.skip.toString());
     if (params?.take) searchParams.set('take', params.take.toString());
+    if (params?.favorites) searchParams.set('favorites', 'true');
 
     const response = await apiClient.get<JobsListResponse>(`/jobs?${searchParams.toString()}`);
+    return response.data;
+  },
+
+  async getFavorites(): Promise<Job[]> {
+    const response = await apiClient.get<Job[]>('/jobs/favorites/list');
+    return response.data;
+  },
+
+  async toggleFavorite(id: string, favorite?: boolean): Promise<Job> {
+    const response = await apiClient.post<Job>(`/jobs/${id}/favorite`, { favorite });
     return response.data;
   },
 
@@ -92,5 +118,26 @@ export const jobsApi = {
 
   async delete(id: string): Promise<void> {
     await apiClient.delete(`/jobs/${id}`);
+  },
+
+  // 状态追踪
+  async getStatusStats(): Promise<JobStatusStats[]> {
+    const response = await apiClient.get<JobStatusStats[]>('/jobs/stats/status');
+    return response.data;
+  },
+
+  async updateStatus(id: string, status: string, note?: string): Promise<Job> {
+    const response = await apiClient.post<Job>(`/jobs/${id}/status`, { status, note });
+    return response.data;
+  },
+
+  async getStatusHistory(id: string): Promise<JobStatusHistory[]> {
+    const response = await apiClient.get<JobStatusHistory[]>(`/jobs/${id}/status/history`);
+    return response.data;
+  },
+
+  async batchUpdateStatus(jobIds: string[], status: string, note?: string): Promise<Array<{ jobId: string; success: boolean; job?: Job; error?: string }>> {
+    const response = await apiClient.post('/jobs/batch/status', { jobIds, status, note });
+    return response.data;
   },
 };

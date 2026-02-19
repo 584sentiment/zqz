@@ -1,9 +1,11 @@
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { Request } from 'express';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '@/common/database/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { SecurityService } from '../security/security.service';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 
 @Injectable()
@@ -12,6 +14,8 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private mailService: MailService,
+    @Inject(forwardRef(() => SecurityService))
+    private securityService: SecurityService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -79,7 +83,7 @@ export class AuthService {
     };
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, req?: Request) {
     // 查找用户
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -87,17 +91,32 @@ export class AuthService {
     });
 
     if (!user) {
+      // 记录失败登录（未知用户）
+      if (req) {
+        await this.securityService.recordLogin('unknown', 'password', false, req);
+      }
       throw new UnauthorizedException('邮箱或密码错误');
     }
 
     // 验证密码
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!isPasswordValid) {
+      // 记录失败登录
+      if (req) {
+        await this.securityService.recordLogin(user.id, 'password', false, req);
+      }
       throw new UnauthorizedException('邮箱或密码错误');
     }
 
     // 生成令牌
-    const tokens = await this.generateTokens(user.id, user.email);
+    const tokens = await this.generateTokens(user.id, user.email, dto.rememberMe);
+
+    // 记录成功登录
+    if (req) {
+      await this.securityService.recordLogin(user.id, 'password', true, req);
+      // 创建会话记录
+      await this.securityService.createSession(user.id, tokens.refreshToken, req);
+    }
 
     return {
       user: {

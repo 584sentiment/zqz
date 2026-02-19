@@ -33,11 +33,12 @@ export class JobsService {
     });
   }
 
-  async findAll(userId: string, options?: { status?: string; skip?: number; take?: number }) {
+  async findAll(userId: string, options?: { status?: string; skip?: number; take?: number; favorites?: boolean }) {
     const where = {
       userId,
       deletedAt: null,
       ...(options?.status && { status: options.status }),
+      ...(options?.favorites && { isFavorite: true }),
     };
 
     const [jobs, total] = await Promise.all([
@@ -57,6 +58,137 @@ export class JobsService {
         hasMore: (options?.skip ?? 0) + jobs.length < total,
       },
     };
+  }
+
+  /**
+   * 获取收藏的岗位列表
+   */
+  async getFavorites(userId: string) {
+    const jobs = await this.prisma.job.findMany({
+      where: {
+        userId,
+        deletedAt: null,
+        isFavorite: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return jobs;
+  }
+
+  /**
+   * 切换岗位收藏状态
+   */
+  async toggleFavorite(userId: string, jobId: string, favorite?: boolean) {
+    // 先检查岗位是否存在
+    const job = await this.findOne(userId, jobId);
+
+    // 如果传入了明确的收藏状态，使用它；否则切换当前状态
+    const newFavoriteStatus = favorite !== undefined ? favorite : !job.isFavorite;
+
+    const updatedJob = await this.prisma.job.update({
+      where: { id: jobId },
+      data: { isFavorite: newFavoriteStatus },
+    });
+
+    return {
+      ...updatedJob,
+      isFavorite: newFavoriteStatus,
+    };
+  }
+
+  /**
+   * 更新岗位状态并记录历史
+   */
+  async updateStatus(userId: string, jobId: string, newStatus: string, note?: string) {
+    // 先检查岗位是否存在
+    const job = await this.findOne(userId, jobId);
+
+    // 如果状态没有变化，直接返回
+    if (job.status === newStatus) {
+      return job;
+    }
+
+    // 使用事务更新状态并记录历史
+    const [updatedJob] = await this.prisma.$transaction([
+      this.prisma.job.update({
+        where: { id: jobId },
+        data: { status: newStatus },
+      }),
+      this.prisma.jobStatusHistory.create({
+        data: {
+          jobId,
+          fromStatus: job.status,
+          toStatus: newStatus,
+          note,
+          changedBy: userId,
+        },
+      }),
+    ]);
+
+    this.logger.log(`岗位状态更新: jobId=${jobId}, ${job.status} -> ${newStatus}`);
+
+    return updatedJob;
+  }
+
+  /**
+   * 获取岗位状态历史
+   */
+  async getStatusHistory(userId: string, jobId: string) {
+    // 先验证岗位归属
+    await this.findOne(userId, jobId);
+
+    const history = await this.prisma.jobStatusHistory.findMany({
+      where: { jobId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    return history.map((h) => ({
+      id: h.id,
+      fromStatus: h.fromStatus,
+      toStatus: h.toStatus,
+      note: h.note,
+      changedBy: h.changedBy,
+      createdAt: h.createdAt,
+    }));
+  }
+
+  /**
+   * 批量更新岗位状态
+   */
+  async batchUpdateStatus(userId: string, jobIds: string[], newStatus: string, note?: string) {
+    const results = [];
+
+    for (const jobId of jobIds) {
+      try {
+        const result = await this.updateStatus(userId, jobId, newStatus, note);
+        results.push({ jobId, success: true, job: result });
+      } catch (error) {
+        results.push({ jobId, success: false, error: String(error) });
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * 获取状态统计
+   */
+  async getStatusStats(userId: string) {
+    const stats = await this.prisma.job.groupBy({
+      by: ['status'],
+      where: {
+        userId,
+        deletedAt: null,
+      },
+      _count: true,
+    });
+
+    return stats.map((s) => ({
+      status: s.status,
+      count: s._count,
+    }));
   }
 
   async findOne(userId: string, jobId: string) {

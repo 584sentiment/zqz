@@ -78,12 +78,61 @@ export class JobsController {
     @Query('status') status?: string,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
+    @Query('favorites') favorites?: string,
   ) {
     return this.jobsService.findAll(req.user.id, {
       status,
       skip: skip ? parseInt(skip, 10) : undefined,
       take: take ? parseInt(take, 10) : undefined,
+      favorites: favorites === 'true',
     });
+  }
+
+  @Get('favorites/list')
+  async getFavorites(@Request() req: { user: { id: string } }) {
+    return this.jobsService.getFavorites(req.user.id);
+  }
+
+  @Post(':id/favorite')
+  async toggleFavorite(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body('favorite') favorite?: boolean,
+  ) {
+    return this.jobsService.toggleFavorite(req.user.id, id, favorite);
+  }
+
+  @Get('stats/status')
+  async getStatusStats(@Request() req: { user: { id: string } }) {
+    return this.jobsService.getStatusStats(req.user.id);
+  }
+
+  @Post(':id/status')
+  async updateStatus(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body('status') status: string,
+    @Body('note') note?: string,
+  ) {
+    return this.jobsService.updateStatus(req.user.id, id, status, note);
+  }
+
+  @Get(':id/status/history')
+  async getStatusHistory(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+  ) {
+    return this.jobsService.getStatusHistory(req.user.id, id);
+  }
+
+  @Post('batch/status')
+  async batchUpdateStatus(
+    @Request() req: { user: { id: string } },
+    @Body('jobIds') jobIds: string[],
+    @Body('status') status: string,
+    @Body('note') note?: string,
+  ) {
+    return this.jobsService.batchUpdateStatus(req.user.id, jobIds, status, note);
   }
 
   @Get(':id')

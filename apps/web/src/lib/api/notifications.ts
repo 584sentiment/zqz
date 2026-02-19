@@ -159,6 +159,55 @@ export const notificationsApi = {
     const response = await apiClient.post<TriggerReminderResponse>('/notifications/trigger-reminder');
     return response.data;
   },
+
+  /**
+   * 获取最新未读消息
+   */
+  async getLatestUnread(): Promise<{ notification: Notification | null }> {
+    const response = await apiClient.get<{ notification: Notification | null }>('/notifications/latest-unread');
+    return response.data;
+  },
+
+  /**
+   * 创建 SSE 连接，实时接收消息通知
+   * 返回 EventSource 实例，调用者负责关闭连接
+   */
+  createNotificationStream(
+    onMessage: (data: { unreadCount: number; latestNotification: Notification | null }) => void,
+    onError?: (error: Event) => void,
+  ): EventSource {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+    // 由于 SSE 不支持自定义 header，我们需要通过 URL 参数传递 token
+    if (!token) {
+      throw new Error('未找到认证 token，无法建立 SSE 连接');
+    }
+
+    const url = `${apiUrl}/notifications/stream?token=${encodeURIComponent(token)}`;
+
+    const eventSource = new EventSource(url, {
+      withCredentials: true, // 携带 cookie
+    });
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onMessage(data);
+      } catch (e) {
+        console.error('解析 SSE 消息失败:', e);
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error('SSE 连接错误:', error);
+      if (onError) {
+        onError(error);
+      }
+    };
+
+    return eventSource;
+  },
 };
 
 // ============== 辅助函数 ==============

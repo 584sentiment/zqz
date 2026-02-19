@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Patch,
   Delete,
   Body,
@@ -9,9 +10,14 @@ import {
   Query,
   UseGuards,
   Req,
+  Res,
+  MessageEvent,
+  Sse,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { NotificationsService } from './notifications.service';
+import { Observable, interval, map, switchMap, startWith } from 'rxjs';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
@@ -149,5 +155,205 @@ export class NotificationsController {
   @Post('trigger-reminder')
   async triggerReminder(@Req() req: { user: { id: string } }) {
     return this.notificationsService.triggerReminder(req.user.id);
+  }
+
+  // ============== 批量推送功能 ==============
+
+  /**
+   * 批量推送消息给指定用户
+   */
+  @Post('broadcast/users')
+  async broadcastToUsers(
+    @Body()
+    body: {
+      userIds: string[];
+      type: 'system' | 'business' | 'activity' | 'subscription';
+      title: string;
+      content: string;
+      icon?: string;
+      actionUrl?: string;
+    },
+  ) {
+    const result = await this.notificationsService.createBatchNotifications(
+      body.userIds,
+      {
+        type: body.type,
+        title: body.title,
+        content: body.content,
+        icon: body.icon,
+        actionType: body.actionUrl ? 'link' : 'none',
+        actionUrl: body.actionUrl,
+      },
+    );
+    return {
+      success: true,
+      sentCount: result.count,
+    };
+  }
+
+  /**
+   * 广播消息给所有用户
+   */
+  @Post('broadcast/all')
+  async broadcastToAll(
+    @Body()
+    body: {
+      type: 'system' | 'business' | 'activity' | 'subscription';
+      title: string;
+      content: string;
+      icon?: string;
+      actionUrl?: string;
+    },
+  ) {
+    const result = await this.notificationsService.broadcastToAllUsers({
+      type: body.type,
+      title: body.title,
+      content: body.content,
+      icon: body.icon,
+      actionType: body.actionUrl ? 'link' : 'none',
+      actionUrl: body.actionUrl,
+    });
+    return {
+      success: true,
+      sentCount: result.count,
+    };
+  }
+
+  /**
+   * 获取广播统计信息
+   */
+  @Get('broadcast/stats')
+  async getBroadcastStats() {
+    return this.notificationsService.getBroadcastStats();
+  }
+
+  // ============== 消息模板管理 ==============
+
+  /**
+   * 获取所有模板
+   */
+  @Get('templates')
+  async getTemplates(@Query('type') type?: string) {
+    return this.notificationsService.getTemplates(type);
+  }
+
+  /**
+   * 获取单个模板
+   */
+  @Get('templates/:id')
+  async getTemplate(@Param('id') id: string) {
+    return this.notificationsService.getTemplate(id);
+  }
+
+  /**
+   * 创建模板
+   */
+  @Post('templates')
+  async createTemplate(
+    @Body()
+    body: {
+      code: string;
+      name: string;
+      type: 'system' | 'business' | 'activity' | 'subscription';
+      title: string;
+      content: string;
+      icon?: string;
+      actionType?: string;
+      actionUrl?: string;
+    },
+  ) {
+    return this.notificationsService.createTemplate(body);
+  }
+
+  /**
+   * 更新模板
+   */
+  @Put('templates/:id')
+  async updateTemplate(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      name?: string;
+      title?: string;
+      content?: string;
+      icon?: string;
+      actionType?: string;
+      actionUrl?: string;
+      isActive?: boolean;
+    },
+  ) {
+    return this.notificationsService.updateTemplate(id, body);
+  }
+
+  /**
+   * 删除模板
+   */
+  @Delete('templates/:id')
+  async deleteTemplate(@Param('id') id: string) {
+    await this.notificationsService.deleteTemplate(id);
+    return { success: true };
+  }
+
+  /**
+   * 使用模板发送消息
+   */
+  @Post('templates/:code/send')
+  async sendFromTemplate(
+    @Param('code') code: string,
+    @Body()
+    body: {
+      userIds?: string[];
+      all?: boolean;
+      variables?: Record<string, string>;
+    },
+  ) {
+    const result = await this.notificationsService.sendFromTemplate(
+      code,
+      body.userIds,
+      body.all,
+      body.variables,
+    );
+    return {
+      success: true,
+      sentCount: result.count,
+    };
+  }
+
+  // ============== 实时推送 (SSE) ==============
+
+  /**
+   * SSE 实时消息推送
+   * 前端通过 EventSource 连接此端点，实时接收未读消息数量变化
+   */
+  @Sse('stream')
+  async notificationStream(
+    @Req() req: { user: { id: string } },
+  ): Promise<Observable<MessageEvent>> {
+    const userId = req.user.id;
+
+    // 每 30 秒推送一次未读数量
+    return interval(30000).pipe(
+      startWith(0),
+      switchMap(async () => {
+        const count = await this.notificationsService.getUnreadCount(userId);
+        const latestNotification = await this.notificationsService.getLatestUnread(userId);
+        return {
+          unreadCount: count,
+          latestNotification,
+        };
+      }),
+      map((data) => ({
+        data: JSON.stringify(data),
+      } as MessageEvent)),
+    );
+  }
+
+  /**
+   * 获取最新未读消息（用于 SSE 推送）
+   */
+  @Get('latest-unread')
+  async getLatestUnread(@Req() req: { user: { id: string } }) {
+    const notification = await this.notificationsService.getLatestUnread(req.user.id);
+    return { notification };
   }
 }

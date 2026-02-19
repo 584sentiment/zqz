@@ -535,3 +535,31 @@ model Notification {
   @@index([userId, createdAt(sort: Desc)])
   @@map("notifications")
 }
+
+model NotificationTemplate {
+  id          String   @id @default(cuid())
+
+  // 模板标识
+  code        String   @unique  // 模板代码，如 resume_completed
+  name        String             // 模板名称
+
+  // 消息配置
+  type        String             // system | business | activity | subscription
+  title       String             // 标题模板，支持变量 {{variable}}
+  content     String   @db.Text  // 内容模板，支持变量 {{variable}}
+  icon        String?
+
+  // 跳转配置
+  actionType  String?  @map("action_type")
+  actionUrl   String?  @map("action_url")
+
+  // 状态
+  isActive    Boolean  @default(true) @map("is_active")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([code])
+  @@index([type])
+  @@map("notification_templates")
+}

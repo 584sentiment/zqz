@@ -154,7 +154,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     };
   }, [user?.id]);
 
-  // 获取未读消息数量
+  // 通过 SSE 获取实时未读消息数量
   useEffect(() => {
     if (!user) {
       setUnreadCount(0);
@@ -162,7 +162,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     }
 
     let isMounted = true;
+    let eventSource: EventSource | null = null;
+    let pollingInterval: NodeJS.Timeout | null = null;
 
+    // 获取未读数量的函数
     const fetchUnreadCount = async () => {
       try {
         const result = await notificationsApi.getUnreadCount();
@@ -174,14 +177,37 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       }
     };
 
+    // 先获取初始值
     fetchUnreadCount();
 
-    // 每 60 秒刷新一次未读数量
-    const interval = setInterval(fetchUnreadCount, 60000);
+    // 尝试建立 SSE 连接
+    try {
+      eventSource = notificationsApi.createNotificationStream(
+        (data) => {
+          if (isMounted) {
+            setUnreadCount(data.unreadCount);
+          }
+        },
+        () => {
+          // SSE 连接失败时，回退到轮询
+          if (isMounted && !pollingInterval) {
+            pollingInterval = setInterval(fetchUnreadCount, 60000);
+          }
+        },
+      );
+    } catch {
+      // SSE 创建失败（如没有 token），使用轮询作为回退
+      pollingInterval = setInterval(fetchUnreadCount, 60000);
+    }
 
     return () => {
       isMounted = false;
-      clearInterval(interval);
+      if (eventSource) {
+        eventSource.close();
+      }
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
     };
   }, [user?.id]);
 

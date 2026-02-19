@@ -105,6 +105,26 @@ export class NotificationsService {
   }
 
   /**
+   * 获取最新未读消息
+   */
+  async getLatestUnread(userId: string) {
+    const notification = await this.prisma.notification.findFirst({
+      where: { userId, isRead: false },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        type: true,
+        title: true,
+        content: true,
+        icon: true,
+        createdAt: true,
+      },
+    });
+
+    return notification;
+  }
+
+  /**
    * 标记消息为已读
    */
   async markAsRead(userId: string, notificationId: string): Promise<boolean> {
@@ -236,6 +256,249 @@ export class NotificationsService {
     return this.prisma.notification.createMany({
       data,
       skipDuplicates: true,
+    });
+  }
+
+  /**
+   * 广播消息给所有活跃用户
+   */
+  async broadcastToAllUsers(dto: Omit<CreateNotificationDto, 'userId'>) {
+    // 获取所有活跃用户
+    const users = await this.prisma.user.findMany({
+      where: {
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+
+    const userIds = users.map((u) => u.id);
+
+    // 检查用户消息偏好
+    const enabledUserIds: string[] = [];
+    const typeKey = `${dto.type}Enabled` as keyof UserPreferences;
+
+    for (const userId of userIds) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { preferences: true },
+      });
+
+      const preferences = user?.preferences as UserPreferences | null;
+
+      // 如果用户没有明确关闭该类型消息，则发送
+      if (!preferences || preferences[typeKey] !== false) {
+        enabledUserIds.push(userId);
+      }
+    }
+
+    if (enabledUserIds.length === 0) {
+      return { count: 0 };
+    }
+
+    return this.createBatchNotifications(enabledUserIds, dto);
+  }
+
+  /**
+   * 获取广播统计信息
+   */
+  async getBroadcastStats() {
+    const [totalUsers, activeUsers, totalNotifications, unreadNotifications] =
+      await Promise.all([
+        this.prisma.user.count({ where: { deletedAt: null } }),
+        this.prisma.user.count({
+          where: { deletedAt: null, emailVerified: true },
+        }),
+        this.prisma.notification.count(),
+        this.prisma.notification.count({ where: { isRead: false } }),
+      ]);
+
+    // 按类型统计
+    const byType = await this.prisma.notification.groupBy({
+      by: ['type'],
+      _count: { id: true },
+    });
+
+    return {
+      totalUsers,
+      activeUsers,
+      totalNotifications,
+      unreadNotifications,
+      byType: byType.map((item) => ({
+        type: item.type,
+        count: item._count.id,
+      })),
+    };
+  }
+
+  // ============== 消息模板管理 ==============
+
+  /**
+   * 获取所有模板
+   */
+  async getTemplates(type?: string) {
+    return this.prisma.notificationTemplate.findMany({
+      where: {
+        ...(type && { type }),
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * 获取单个模板
+   */
+  async getTemplate(id: string) {
+    const template = await this.prisma.notificationTemplate.findUnique({
+      where: { id },
+    });
+
+    if (!template) {
+      throw new Error('模板不存在');
+    }
+
+    return template;
+  }
+
+  /**
+   * 根据 code 获取模板
+   */
+  async getTemplateByCode(code: string) {
+    return this.prisma.notificationTemplate.findUnique({
+      where: { code },
+    });
+  }
+
+  /**
+   * 创建模板
+   */
+  async createTemplate(dto: {
+    code: string;
+    name: string;
+    type: 'system' | 'business' | 'activity' | 'subscription';
+    title: string;
+    content: string;
+    icon?: string;
+    actionType?: string;
+    actionUrl?: string;
+  }) {
+    // 检查 code 是否已存在
+    const existing = await this.prisma.notificationTemplate.findUnique({
+      where: { code: dto.code },
+    });
+
+    if (existing) {
+      throw new Error(`模板代码 ${dto.code} 已存在`);
+    }
+
+    return this.prisma.notificationTemplate.create({
+      data: {
+        code: dto.code,
+        name: dto.name,
+        type: dto.type,
+        title: dto.title,
+        content: dto.content,
+        icon: dto.icon,
+        actionType: dto.actionType,
+        actionUrl: dto.actionUrl,
+      },
+    });
+  }
+
+  /**
+   * 更新模板
+   */
+  async updateTemplate(
+    id: string,
+    dto: {
+      name?: string;
+      title?: string;
+      content?: string;
+      icon?: string;
+      actionType?: string;
+      actionUrl?: string;
+      isActive?: boolean;
+    },
+  ) {
+    const template = await this.prisma.notificationTemplate.findUnique({
+      where: { id },
+    });
+
+    if (!template) {
+      throw new Error('模板不存在');
+    }
+
+    return this.prisma.notificationTemplate.update({
+      where: { id },
+      data: dto,
+    });
+  }
+
+  /**
+   * 删除模板
+   */
+  async deleteTemplate(id: string) {
+    const template = await this.prisma.notificationTemplate.findUnique({
+      where: { id },
+    });
+
+    if (!template) {
+      throw new Error('模板不存在');
+    }
+
+    await this.prisma.notificationTemplate.delete({
+      where: { id },
+    });
+  }
+
+  /**
+   * 使用模板发送消息
+   */
+  async sendFromTemplate(
+    code: string,
+    userIds?: string[],
+    all = false,
+    variables: Record<string, string> = {},
+  ) {
+    const template = await this.getTemplateByCode(code);
+
+    if (!template || !template.isActive) {
+      throw new Error(`模板 ${code} 不存在或已禁用`);
+    }
+
+    // 替换变量
+    const replaceVariables = (text: string) => {
+      let result = text;
+      for (const [key, value] of Object.entries(variables)) {
+        result = result.replace(new RegExp(`{{${key}}}`, 'g'), value);
+      }
+      return result;
+    };
+
+    const title = replaceVariables(template.title);
+    const content = replaceVariables(template.content);
+
+    if (all) {
+      return this.broadcastToAllUsers({
+        type: template.type as 'system' | 'business' | 'activity' | 'subscription',
+        title,
+        content,
+        icon: template.icon || undefined,
+        actionType: template.actionType as 'link' | 'modal' | 'none' | undefined,
+        actionUrl: template.actionUrl || undefined,
+      });
+    }
+
+    if (!userIds || userIds.length === 0) {
+      throw new Error('请指定目标用户或选择全部用户');
+    }
+
+    return this.createBatchNotifications(userIds, {
+      type: template.type as 'system' | 'business' | 'activity' | 'subscription',
+      title,
+      content,
+      icon: template.icon || undefined,
+      actionType: template.actionType as 'link' | 'modal' | 'none' | undefined,
+      actionUrl: template.actionUrl || undefined,
     });
   }
 
@@ -490,6 +753,43 @@ export class NotificationsService {
       this.logger.log(`每日提醒发送完成，共发送 ${sentCount} 封邮件`);
     } catch (error) {
       this.logger.error('发送每日提醒失败:', error);
+    }
+  }
+
+  /**
+   * 每天凌晨 2 点清理过期的已读消息
+   * 删除 90 天前的已读消息和过期消息
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_2AM, {
+    timeZone: 'Asia/Shanghai',
+  })
+  async cleanupOldNotifications() {
+    this.logger.log('开始清理过期消息...');
+
+    try {
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+      // 删除 90 天前的已读消息
+      const deletedRead = await this.prisma.notification.deleteMany({
+        where: {
+          isRead: true,
+          createdAt: { lt: ninetyDaysAgo },
+        },
+      });
+
+      // 删除已过期的消息（无论是否已读）
+      const deletedExpired = await this.prisma.notification.deleteMany({
+        where: {
+          expiresAt: { lt: new Date() },
+        },
+      });
+
+      this.logger.log(
+        `清理完成：已删除 ${deletedRead.count} 条已读消息，${deletedExpired.count} 条过期消息`,
+      );
+    } catch (error) {
+      this.logger.error('清理过期消息失败:', error);
     }
   }
 

@@ -1,8 +1,10 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { HttpModule } from '@nestjs/axios';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { WechatService } from './wechat.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { GitHubStrategy } from './strategies/github.strategy';
@@ -17,10 +19,11 @@ import { SecurityModule } from '../security/security.module';
       secret: process.env.JWT_SECRET || 'your-secret-key',
       signOptions: { expiresIn: process.env.JWT_EXPIRES_IN || '15m' },
     }),
+    HttpModule,
     forwardRef(() => SecurityModule),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, LocalStrategy, GitHubStrategy, LoginRateLimitGuard, LocalAuthGuard],
+  providers: [AuthService, WechatService, JwtStrategy, LocalStrategy, GitHubStrategy, LoginRateLimitGuard, LocalAuthGuard],
   exports: [AuthService],
 })
 export class AuthModule {}

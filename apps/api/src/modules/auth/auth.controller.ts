@@ -2,6 +2,7 @@ import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus, Get, Query, De
 import { AuthGuard } from '@nestjs/passport';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
+import { WechatService } from './wechat.service';
 import { SecurityService } from '../security/security.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -11,6 +12,7 @@ import { RegisterDto, LoginDto, RefreshTokenDto, ChangePasswordDto, DeleteAccoun
 export class AuthController {
   constructor(
     private authService: AuthService,
+    private wechatService: WechatService,
     private securityService: SecurityService,
   ) {}
 
@@ -147,5 +149,54 @@ export class AuthController {
       const errorMessage = error instanceof Error ? error.message : '登录失败';
       return res.redirect(`${frontendUrl}/login?error=${encodeURIComponent(errorMessage)}`);
     }
+  }
+
+  // ============== 微信 OAuth ==============
+
+  /**
+   * 获取微信登录二维码
+   */
+  @Get('wechat/qr')
+  async getWechatQrCode() {
+    return this.wechatService.getQrCode();
+  }
+
+  /**
+   * 微信回调处理
+   */
+  @Get('wechat/callback')
+  async wechatCallback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    try {
+      await this.wechatService.handleCallback(code, state);
+
+      // 自动确认登录
+      const result = await this.wechatService.confirmLogin(state, req);
+
+      // 重定向到前端并携带 token
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const redirectUrl = `${frontendUrl}/auth/callback?` +
+        `accessToken=${result.tokens?.accessToken}&` +
+        `refreshToken=${result.tokens?.refreshToken}&` +
+        `user=${encodeURIComponent(JSON.stringify(result.user))}`;
+
+      return res.redirect(redirectUrl);
+    } catch (error) {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const errorMessage = error instanceof Error ? error.message : '微信登录失败';
+      return res.redirect(`${frontendUrl}/login?error=${encodeURIComponent(errorMessage)}`);
+    }
+  }
+
+  /**
+   * 轮询微信登录状态
+   */
+  @Get('wechat/status')
+  async getWechatStatus(@Query('state') state: string) {
+    return this.wechatService.getStatus(state);
   }
 }

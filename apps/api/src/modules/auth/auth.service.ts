@@ -535,4 +535,98 @@ export class AuthService {
       tokens,
     };
   }
+
+  /**
+   * 微信 OAuth 登录
+   */
+  async wechatLogin(userInfo: {
+    openid: string;
+    nickname: string;
+    headimgurl: string;
+    unionid?: string;
+  }) {
+    // 生成虚拟邮箱（微信用户可能没有邮箱）
+    const virtualEmail = `wx_${userInfo.openid}@wechat.local`;
+
+    // 查找是否已有微信关联的用户或使用相同虚拟邮箱的用户
+    let user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { oauthProvider: 'wechat', oauthId: userInfo.openid },
+          { oauthProvider: 'wechat', oauthId: userInfo.unionid },
+          { email: virtualEmail },
+        ],
+      },
+      include: { subscription: true },
+    });
+
+    if (user) {
+      // 用户已存在，更新 OAuth 信息（如果尚未关联）
+      if (!user.oauthProvider) {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            oauthProvider: 'wechat',
+            oauthId: userInfo.unionid || userInfo.openid,
+            avatarUrl: user.avatarUrl || userInfo.headimgurl,
+          },
+          include: { subscription: true },
+        });
+      }
+    } else {
+      // 创建新用户
+      user = await this.prisma.user.create({
+        data: {
+          email: virtualEmail,
+          oauthProvider: 'wechat',
+          oauthId: userInfo.unionid || userInfo.openid,
+          passwordHash: '', // OAuth 用户不需要密码
+          nickname: userInfo.nickname,
+          avatarUrl: userInfo.headimgurl,
+          emailVerified: true, // 微信用户已验证
+          emailVerifiedAt: new Date(),
+        },
+        include: { subscription: true },
+      });
+
+      // 创建用户档案
+      await this.prisma.profile.create({
+        data: {
+          userId: user.id,
+          name: user.nickname || '',
+        },
+      });
+
+      // 创建免费订阅
+      await this.prisma.subscription.create({
+        data: {
+          userId: user.id,
+          plan: 'free',
+          aiQuota: 10,
+          resumeQuota: 3,
+          interviewQuota: 1,
+        },
+      });
+
+      // 重新获取用户（包含订阅信息）
+      user = await this.prisma.user.findUnique({
+        where: { id: user.id },
+        include: { subscription: true },
+      });
+    }
+
+    // 生成令牌
+    const tokens = await this.generateTokens(user!.id, user!.email);
+
+    return {
+      user: {
+        id: user!.id,
+        email: user!.email,
+        name: user!.nickname,
+        avatarUrl: user!.avatarUrl,
+        emailVerified: user!.emailVerified,
+      },
+      tokens,
+    };
+  }
 }

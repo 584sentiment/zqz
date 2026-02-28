@@ -137,7 +137,7 @@ export class AuthController {
       await this.securityService.createSession(result.user.id, result.tokens.refreshToken, req);
 
       // 将 token 传递给前端（通过 URL 参数或 cookie）
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const frontendUrl = process.env.WEB_URL || 'http://localhost:3000';
       const redirectUrl = `${frontendUrl}/auth/callback?` +
         `accessToken=${result.tokens.accessToken}&` +
         `refreshToken=${result.tokens.refreshToken}&` +
@@ -145,7 +145,7 @@ export class AuthController {
 
       return res.redirect(redirectUrl);
     } catch (error) {
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const frontendUrl = process.env.WEB_URL || 'http://localhost:3000';
       const errorMessage = error instanceof Error ? error.message : '登录失败';
       return res.redirect(`${frontendUrl}/login?error=${encodeURIComponent(errorMessage)}`);
     }
@@ -178,7 +178,7 @@ export class AuthController {
       const result = await this.wechatService.confirmLogin(state, req);
 
       // 重定向到前端并携带 token
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const frontendUrl = process.env.WEB_URL || 'http://localhost:3000';
       const redirectUrl = `${frontendUrl}/auth/callback?` +
         `accessToken=${result.tokens?.accessToken}&` +
         `refreshToken=${result.tokens?.refreshToken}&` +
@@ -186,7 +186,7 @@ export class AuthController {
 
       return res.redirect(redirectUrl);
     } catch (error) {
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const frontendUrl = process.env.WEB_URL || 'http://localhost:3000';
       const errorMessage = error instanceof Error ? error.message : '微信登录失败';
       return res.redirect(`${frontendUrl}/login?error=${encodeURIComponent(errorMessage)}`);
     }

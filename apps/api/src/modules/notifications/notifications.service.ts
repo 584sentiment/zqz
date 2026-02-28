@@ -827,7 +827,7 @@ export class NotificationsService {
         </div>
 
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard/interviews/preparation"
+          <a href="${process.env.WEB_URL || 'http://localhost:3000'}/dashboard/interviews/preparation"
              style="display: inline-block; background: #4F46E5; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 500;">
             前往完成今日任务
           </a>

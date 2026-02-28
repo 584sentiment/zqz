@@ -31,9 +31,8 @@ export class MailService {
     // 优先使用 process.env
     this.fromEmail = process.env.SMTP_FROM || this.configService.get<string>('SMTP_FROM') || 'noreply@example.com';
 
-    // 正确获取前端 URL（去掉 /api/v1 后缀）
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || this.configService.get<string>('NEXT_PUBLIC_API_URL') || 'http://localhost:3001/api/v1';
-    this.frontendUrl = apiUrl.replace(/:\d+/, ':3000').replace(/\/api\/v\d+$/, '');
+    // 使用 WEB_URL 作为前端 URL
+    this.frontendUrl = process.env.WEB_URL || this.configService.get<string>('WEB_URL') || 'http://localhost:3000';
 
     this.logger.debug(`Frontend URL: ${this.frontendUrl}`);
     this.initTransporter();

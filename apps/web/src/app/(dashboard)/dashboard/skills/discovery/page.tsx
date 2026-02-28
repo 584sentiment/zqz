@@ -50,13 +50,15 @@ export default function SkillDiscoveryPage() {
 
   // 流式输出状态
   const streamingContentRef = useRef('');
+  const fullResponseRef = useRef(''); // 存储完整的 AI 响应
   const { displayText, isStreaming, startStreaming } = useStreamingText({
     charDelay: 25,
     onComplete: () => {
-      // 流式输出完成，将内容添加到消息列表
-      if (streamingContentRef.current) {
-        setMessages((prev) => [...prev, { role: 'assistant', content: streamingContentRef.current }]);
-        streamingContentRef.current = '';
+      // 流式输出完成，使用 ref 中的完整内容添加到消息列表
+      const fullResponse = fullResponseRef.current;
+      if (fullResponse) {
+        setMessages((prev) => [...prev, { role: 'assistant', content: fullResponse }]);
+        fullResponseRef.current = '';
       }
       setIsSending(false);
     },
@@ -140,25 +142,26 @@ export default function SkillDiscoveryPage() {
     setIsSending(true);
 
     try {
-      // 增加消息计数
-      await skillsApi.incrementMessage(currentSession.id);
+      // 调用真正的 AI 聊天 API
+      const response = await skillsApi.chat(currentSession.id, userMessage, messages);
 
-      // 模拟技能发现
-      const skills = extractSkills(userMessage);
-      if (skills.length > 0) {
-        for (const skill of skills) {
-          await skillsApi.addSkill(currentSession.id, skill);
-        }
-        setCurrentSession((prev) =>
-          prev ? { ...prev, discoveredSkills: [...prev.discoveredSkills, ...skills] } : null
+      // 更新发现的技能
+      if (response.discoveredSkills && response.discoveredSkills.length > 0) {
+        const newSkills = response.discoveredSkills.filter(
+          (skill) => !currentSession.discoveredSkills.includes(skill)
         );
+        if (newSkills.length > 0) {
+          setCurrentSession((prev) =>
+            prev
+              ? { ...prev, discoveredSkills: [...prev.discoveredSkills, ...newSkills] }
+              : null
+          );
+        }
       }
 
-      // 生成 AI 响应内容
-      const aiResponse = generateResponse(userMessage, skills);
-
-      // 使用流式输出显示响应
-      startStreaming(aiResponse);
+      // 存储完整响应到 ref，然后使用流式输出显示
+      fullResponseRef.current = response.response;
+      startStreaming(response.response);
     } catch (error) {
       toast({
         title: '发送失败',
@@ -271,41 +274,6 @@ export default function SkillDiscoveryPage() {
       title: '保存完成',
       description: `已将 ${savedCount} 个技能保存到个人档案`,
     });
-  };
-
-  // 简单的技能提取（模拟）
-  const extractSkills = (text: string): string[] => {
-    const skillKeywords = [
-      'React', 'Vue', 'Angular', 'TypeScript', 'JavaScript', 'Python', 'Java', 'Go',
-      'Node.js', 'Next.js', 'PostgreSQL', 'MySQL', 'MongoDB', 'Redis', 'Docker',
-      'Kubernetes', 'AWS', 'Git', 'Linux', '项目管理', '团队协作', '沟通能力',
-      '问题解决', '领导力', '数据分析', '产品设计', '用户体验', '敏捷开发',
-    ];
-
-    const found: string[] = [];
-    const lowerText = text.toLowerCase();
-    for (const skill of skillKeywords) {
-      if (lowerText.includes(skill.toLowerCase()) && !found.includes(skill)) {
-        found.push(skill);
-      }
-    }
-    return found;
-  };
-
-  // 生成响应（模拟）
-  const generateResponse = (userMessage: string, skills: string[]): string => {
-    if (skills.length > 0) {
-      return `太棒了！从你的描述中，我发现了这些技能：${skills.join('、')}。\n\n能再详细说说你在项目中是如何运用这些技能的吗？或者你还有其他想分享的经历？`;
-    }
-
-    const responses = [
-      '这很有意思！能具体说说你在这个项目中负责什么吗？',
-      '听起来是个很棒的经历。在这个过程中你遇到了哪些挑战？',
-      '你是如何解决这些问题的？能举个例子吗？',
-      '团队合作中你扮演了什么角色？和其他成员是如何配合的？',
-    ];
-
-    return responses[Math.floor(Math.random() * responses.length)];
   };
 
   return (

@@ -1,9 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
+import { SkillDiscoveryService } from '@ai-job-assistant/ai';
 
 @Injectable()
 export class SkillsService {
-  constructor(private prisma: PrismaService) {}
+  private skillDiscoveryAI: SkillDiscoveryService;
+
+  constructor(private prisma: PrismaService) {
+    this.skillDiscoveryAI = new SkillDiscoveryService();
+  }
 
   /**
    * 创建新的技能发掘会话
@@ -125,5 +130,49 @@ export class SkillsService {
     return this.updateSession(userId, sessionId, {
       messagesCount: session.messagesCount + 1,
     });
+  }
+
+  /**
+   * 发送聊天消息并获取 AI 响应
+   */
+  async chat(
+    userId: string,
+    sessionId: string,
+    message: string,
+    conversationHistory: Array<{ role: string; content: string }>,
+  ) {
+    // 验证会话存在
+    const session = await this.getSession(userId, sessionId);
+
+    // 调用 AI 服务获取响应
+    const aiResponse = await this.skillDiscoveryAI.chat(message, conversationHistory);
+
+    // 更新消息计数
+    await this.updateSession(userId, sessionId, {
+      messagesCount: session.messagesCount + 1,
+    });
+
+    // 如果发现了新技能，添加到会话中
+    if (aiResponse.discoveredSkills && aiResponse.discoveredSkills.length > 0) {
+      const currentSkills = session.discoveredSkills as string[];
+      const newSkills = aiResponse.discoveredSkills.filter(
+        (skill: string) => !currentSkills.includes(skill)
+      );
+
+      if (newSkills.length > 0) {
+        await this.prisma.skillDiscoverySession.update({
+          where: { id: sessionId },
+          data: {
+            discoveredSkills: [...currentSkills, ...newSkills],
+          },
+        });
+      }
+    }
+
+    return {
+      response: aiResponse.response,
+      discoveredSkills: aiResponse.discoveredSkills,
+      isComplete: aiResponse.isComplete,
+    };
   }
 }

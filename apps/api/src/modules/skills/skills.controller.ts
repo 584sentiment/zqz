@@ -74,6 +74,18 @@ export class SkillsController {
   }
 
   /**
+   * 发送聊天消息并获取 AI 响应
+   */
+  @Post('discovery/sessions/:id/chat')
+  async chat(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() body: { message: string; conversationHistory?: Array<{ role: string; content: string }> },
+  ) {
+    return this.skillsService.chat(req.user.id, id, body.message, body.conversationHistory || []);
+  }
+
+  /**
    * 完成会话
    */
   @Post('discovery/sessions/:id/complete')

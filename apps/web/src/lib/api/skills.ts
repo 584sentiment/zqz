@@ -16,6 +16,17 @@ export interface SkillSession {
   };
 }
 
+export interface ChatResponse {
+  response: string;
+  discoveredSkills: string[];
+  isComplete: boolean;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export const skillsApi = {
   async createSession(jobId?: string): Promise<SkillSession> {
     const response = await apiClient.post<SkillSession>('/skills/discovery/sessions', { jobId });
@@ -44,6 +55,18 @@ export const skillsApi = {
   async incrementMessage(sessionId: string): Promise<SkillSession> {
     const response = await apiClient.post<SkillSession>(
       `/skills/discovery/sessions/${sessionId}/message`
+    );
+    return response.data;
+  },
+
+  async chat(
+    sessionId: string,
+    message: string,
+    conversationHistory: ChatMessage[]
+  ): Promise<ChatResponse> {
+    const response = await apiClient.post<ChatResponse>(
+      `/skills/discovery/sessions/${sessionId}/chat`,
+      { message, conversationHistory }
     );
     return response.data;
   },

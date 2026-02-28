@@ -81,12 +81,22 @@ export function useStreamingText(options: UseStreamingTextOptions = {}) {
     setIsStreaming(false);
   }, []);
 
+  const resetDisplayText = useCallback(() => {
+    abortRef.current = true;
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    setDisplayText('');
+    setIsStreaming(false);
+  }, []);
+
   return {
     displayText,
     isStreaming,
     startStreaming,
     stopStreaming,
     completeStreaming,
+    resetDisplayText,
   };
 }
 

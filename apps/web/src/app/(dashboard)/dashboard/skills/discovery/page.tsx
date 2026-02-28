@@ -51,7 +51,7 @@ export default function SkillDiscoveryPage() {
   // 流式输出状态
   const streamingContentRef = useRef('');
   const fullResponseRef = useRef(''); // 存储完整的 AI 响应
-  const { displayText, isStreaming, startStreaming } = useStreamingText({
+  const { displayText, isStreaming, startStreaming, resetDisplayText } = useStreamingText({
     charDelay: 25,
     onComplete: () => {
       // 流式输出完成，使用 ref 中的完整内容添加到消息列表
@@ -140,6 +140,9 @@ export default function SkillDiscoveryPage() {
     setInput('');
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
     setIsSending(true);
+
+    // 重置流式输出状态，避免显示上一次的内容
+    resetDisplayText();
 
     try {
       // 调用真正的 AI 聊天 API

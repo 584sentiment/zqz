@@ -507,16 +507,36 @@ export class SkillDiscoveryService {
         3000   // 3 秒首字节阈值
       );
 
+      const content = result.content as string;
+
+      // 尝试从响应中提取 JSON
       try {
-        const parsed = JSON.parse(result.content as string);
+        // 首先尝试直接解析
+        const parsed = JSON.parse(content);
         return {
-          response: parsed.response || result.content,
+          response: parsed.response || content,
           discoveredSkills: parsed.discoveredSkills || [],
           isComplete: parsed.isComplete || false,
         };
       } catch {
+        // 尝试提取 JSON 块
+        const jsonMatch = content.match(/\{[\s\S]*"response"[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            const parsed = JSON.parse(jsonMatch[0]);
+            return {
+              response: parsed.response || content,
+              discoveredSkills: parsed.discoveredSkills || [],
+              isComplete: parsed.isComplete || false,
+            };
+          } catch {
+            // JSON 提取失败，返回原始内容
+          }
+        }
+
+        // 如果无法解析 JSON，返回原始内容作为响应
         return {
-          response: result.content as string,
+          response: content,
           discoveredSkills: [],
           isComplete: false,
         };

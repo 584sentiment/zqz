@@ -117,13 +117,9 @@ export const promptTemplates = {
 2. 判断技能的熟练程度（1-5级）
 3. 记录技能的证明/依据
 
-返回格式：
-{
-  "response": "你的回复内容",
-  "discoveredSkills": ["发现的技能"],
-  "followUpQuestion": "追问内容",
-  "isComplete": false
-}`,
+【重要】你必须且只能返回一个纯 JSON 对象，不要包含任何其他文字、解释或 markdown 标记。
+返回格式示例：
+{"response":"你的回复内容","discoveredSkills":["技能1","技能2"],"isComplete":false}`,
 
   // 面试问题生成提示词
   interviewQuestionGeneration: `你是一位专业的面试官。根据以下岗位信息和候选人背景，生成针对性的面试问题。

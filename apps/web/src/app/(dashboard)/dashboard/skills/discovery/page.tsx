@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { skillsApi, SkillSession } from '@/lib/api/skills';
+import { skillsApi, SkillSession, SessionMessage } from '@/lib/api/skills';
 import { jobsApi, Job } from '@/lib/api/jobs';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -125,12 +125,37 @@ export default function SkillDiscoveryPage() {
 
   const continueSession = async (session: SkillSession) => {
     setCurrentSession(session);
-    setMessages([
-      {
-        role: 'assistant',
-        content: '欢迎回来！我们之前已经发现了一些技能。你想继续聊聊其他经历吗？',
-      },
-    ]);
+    setIsLoading(true);
+
+    try {
+      // 加载历史消息
+      const historyMessages = await skillsApi.getSessionMessages(session.id);
+
+      if (historyMessages.length > 0) {
+        // 如果有历史消息，直接使用
+        setMessages(historyMessages.map(msg => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+        })));
+      } else {
+        // 如果没有历史消息，显示欢迎消息
+        const job = session.job;
+        const welcomeMessage = job
+          ? `你好！我是你的技能发掘助手。我看到你对「${job.title}」岗位感兴趣。\n\n让我来帮助你发掘与这个岗位相关的技能。请告诉我你在哪些工作或项目经历中，展示过与这个岗位相关的能力？`
+          : '你好！我是你的技能发掘助手。让我来帮助你发现自己的核心技能和优势。\n\n请告诉我你最近的一份工作或项目经历，我会通过对话帮你挖掘出你可能忽视的技能。';
+        setMessages([{ role: 'assistant', content: welcomeMessage }]);
+      }
+    } catch (error) {
+      // 加载失败时显示默认消息
+      setMessages([
+        {
+          role: 'assistant',
+          content: '欢迎回来！我们之前已经发现了一些技能。你想继续聊聊其他经历吗？',
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const sendMessage = async () => {

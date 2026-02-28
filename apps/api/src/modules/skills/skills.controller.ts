@@ -51,6 +51,17 @@ export class SkillsController {
   }
 
   /**
+   * 获取会话的消息历史
+   */
+  @Get('discovery/sessions/:id/messages')
+  async getSessionMessages(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+  ) {
+    return this.skillsService.getSessionMessages(req.user.id, id);
+  }
+
+  /**
    * 添加发现的技能
    */
   @Post('discovery/sessions/:id/skills')

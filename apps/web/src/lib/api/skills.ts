@@ -27,6 +27,13 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface SessionMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string;
+}
+
 export const skillsApi = {
   async createSession(jobId?: string): Promise<SkillSession> {
     const response = await apiClient.post<SkillSession>('/skills/discovery/sessions', { jobId });
@@ -41,6 +48,13 @@ export const skillsApi = {
 
   async getSession(id: string): Promise<SkillSession> {
     const response = await apiClient.get<SkillSession>(`/skills/discovery/sessions/${id}`);
+    return response.data;
+  },
+
+  async getSessionMessages(sessionId: string): Promise<SessionMessage[]> {
+    const response = await apiClient.get<SessionMessage[]>(
+      `/skills/discovery/sessions/${sessionId}/messages`
+    );
     return response.data;
   },
 

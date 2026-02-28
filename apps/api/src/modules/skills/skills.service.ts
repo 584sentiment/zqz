@@ -64,6 +64,38 @@ export class SkillsService {
   }
 
   /**
+   * 获取会话的消息历史
+   */
+  async getSessionMessages(userId: string, sessionId: string) {
+    // 先验证会话存在
+    await this.getSession(userId, sessionId);
+
+    return this.prisma.skillDiscoveryMessage.findMany({
+      where: { sessionId },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        role: true,
+        content: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  /**
+   * 保存消息到数据库
+   */
+  private async saveMessage(sessionId: string, role: string, content: string) {
+    return this.prisma.skillDiscoveryMessage.create({
+      data: {
+        sessionId,
+        role,
+        content,
+      },
+    });
+  }
+
+  /**
    * 更新会话
    */
   async updateSession(
@@ -144,12 +176,21 @@ export class SkillsService {
     // 验证会话存在
     const session = await this.getSession(userId, sessionId);
 
+    // 保存用户消息
+    await this.saveMessage(sessionId, 'user', message);
+
     // 调用 AI 服务获取响应
     const aiResponse = await this.skillDiscoveryAI.chat(message, conversationHistory);
 
-    // 更新消息计数
-    await this.updateSession(userId, sessionId, {
-      messagesCount: session.messagesCount + 1,
+    // 保存 AI 响应
+    await this.saveMessage(sessionId, 'assistant', aiResponse.response);
+
+    // 更新消息计数（用户消息 + AI 响应）
+    await this.prisma.skillDiscoverySession.update({
+      where: { id: sessionId },
+      data: {
+        messagesCount: session.messagesCount + 2,
+      },
     });
 
     // 如果发现了新技能，添加到会话中

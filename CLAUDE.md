@@ -100,6 +100,24 @@ apps/web   ────> packages/shared
 - **Resume** → ResumeTemplate (引用)
 - **Interview** → 独立实体
 
+## 认证与安全
+
+### 认证方式
+- **邮箱密码**: 注册/登录 + 邮箱验证 + 密码重置
+- **OAuth**: GitHub、微信扫码登录
+- **JWT**: 访问令牌 15 分钟过期，支持 Refresh Token
+
+### 配额系统
+使用 `@RequireQuota` 装饰器控制 AI 功能调用：
+```typescript
+@RequireQuota('ai')        // AI 对话配额
+@RequireQuota('resume')    // 简历生成配额
+@RequireQuota('interview') // 模拟面试配额
+```
+
+### 速率限制
+全局配置：每分钟最多 100 次请求（ThrottlerGuard）
+
 ## 环境变量
 
 必需的环境变量 (见 `.env.example`):
@@ -129,6 +147,27 @@ import { ResumeStatus } from '@ai-job-assistant/shared/types';
 
 ### TypeScript 配置
 根目录 `tsconfig.json` 定义了严格的基础配置，各子项目可扩展。启用 `noUncheckedIndexedAccess`，访问数组/对象索引时需处理 undefined。
+
+### 前端路由结构
+使用 Next.js 路由组组织页面：
+- `(auth)/` - 认证相关页面：login, register, forgot-password, verify-email
+- `(dashboard)/dashboard/` - 主要功能：jobs, resumes, interviews, skills, profile, settings, subscription
+
+### 后端模块结构
+每个业务模块遵循 NestJS 约定：
+```
+modules/<name>/
+├── <name>.controller.ts   # 路由定义
+├── <name>.service.ts      # 业务逻辑
+├── <name>.module.ts       # 模块注册
+├── dto/                   # 请求/响应 DTO
+└── guards/                # 模块专属守卫
+```
+
+### 测试约定
+- **前端单元测试**: Vitest (`npm run test -w apps/web`)
+- **前端 E2E 测试**: Playwright (`npm run test:e2e -w apps/web`)，测试文件位于 `apps/web/e2e/`
+- **后端单元测试**: Jest (`npm run test -w apps/api`)
 
 ## 设计文档
 

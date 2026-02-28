@@ -2,36 +2,20 @@
   "name": "@ai-job-assistant/database",
   "version": "0.1.0",
   "private": true,
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts",
-    "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
+    "build": "echo \"Database package uses Prisma generate, run: npm run db:generate\"",
     "generate": "prisma generate",
     "db:push": "prisma db push",
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "studio": "prisma studio",
-    "lint": "eslint src/",
+    "lint": "eslint prisma/",
     "test": "jest"
   },
   "dependencies": {
-    "@prisma/client": "^5.8.1"
+    "@prisma/client": "^5.22.0"
   },
   "devDependencies": {
-    "prisma": "^5.8.1",
-    "tsup": "^8.0.1"
-  },
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "types": "./dist/index.d.ts"
-    },
-    "./client": {
-      "import": "./dist/client.js",
-      "require": "./dist/client.cjs",
-      "types": "./dist/client.d.ts"
-    }
+    "prisma": "^5.8.1"
   }
 }

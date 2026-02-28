@@ -1,3 +1,6 @@
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['@ai-job-assistant/shared', '@ai-job-assistant/database'],

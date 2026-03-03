@@ -1,32 +1,32 @@
 /**
- * 现代简约模板
+ * 经典专业模板
  */
 
 import type { ResumeTemplate, TemplateStyles, TemplateLayout } from '../types/template.types';
 import { COLOR_THEMES, DEFAULT_FONTS } from '../types/template.types';
 
-const modernStyles: TemplateStyles = {
-  colors: COLOR_THEMES.modern,
+const classicStyles: TemplateStyles = {
+  colors: COLOR_THEMES.classic,
   fonts: DEFAULT_FONTS,
 
   header: {
     name: {
       fontFamily: DEFAULT_FONTS.primary,
-      fontSize: 28,
+      fontSize: 32,
       fontWeight: 'bold',
-      color: '#1f2937',
-      lineHeight: 1.3,
-      letterSpacing: 0,
-      textAlign: 'center',
+      color: '#111827',
+      lineHeight: 1.2,
+      letterSpacing: 0.5,
+      textAlign: 'left',
     },
     title: {
       fontFamily: DEFAULT_FONTS.primary,
-      fontSize: 14,
+      fontSize: 16,
       fontWeight: 'normal',
-      color: '#4b5563',
-      lineHeight: 1.4,
+      color: '#374151',
+      lineHeight: 1.3,
       letterSpacing: 0.5,
-      textAlign: 'center',
+      textAlign: 'left',
     },
     contact: {
       fontFamily: DEFAULT_FONTS.primary,
@@ -35,21 +35,21 @@ const modernStyles: TemplateStyles = {
       color: '#6b7280',
       lineHeight: 1.4,
       letterSpacing: 0,
-      textAlign: 'center',
+      textAlign: 'left',
     },
   },
 
   section: {
     title: {
       fontFamily: DEFAULT_FONTS.primary,
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: 'bold',
-      color: '#1f2937',
-      lineHeight: 1.4,
-      letterSpacing: 0.5,
+      color: '#111827',
+      lineHeight: 1.3,
+      letterSpacing: 1,
       textAlign: 'left',
     },
-    accentColor: '#2563eb',
+    accentColor: '#1f2937',
   },
 
   body: {
@@ -58,13 +58,13 @@ const modernStyles: TemplateStyles = {
       fontSize: 11,
       fontWeight: 'normal',
       color: '#374151',
-      lineHeight: 1.6,
+      lineHeight: 1.5,
       letterSpacing: 0,
       textAlign: 'left',
     },
     bold: {
       fontFamily: DEFAULT_FONTS.primary,
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: 'bold',
       color: '#1f2937',
       lineHeight: 1.4,
@@ -76,34 +76,34 @@ const modernStyles: TemplateStyles = {
       fontSize: 10,
       fontWeight: 'normal',
       color: '#6b7280',
-      lineHeight: 1.4,
+      lineHeight: 1.3,
       letterSpacing: 0,
       textAlign: 'left',
     },
   },
 
   spacing: {
-    sectionGap: 20,
-    paragraphGap: 8,
-    listItemGap: 12,
-    tagGap: 8,
+    sectionGap: 18,
+    paragraphGap: 6,
+    listItemGap: 10,
+    tagGap: 6,
   },
 };
 
-const modernLayout: TemplateLayout = {
-  header: { align: 'center', showDivider: true },
-  sectionOrder: ['experience', 'skills', 'projects', 'education'],
+const classicLayout: TemplateLayout = {
+  header: { align: 'left', showDivider: false },
+  sectionOrder: ['experience', 'education', 'skills', 'projects'],
   showSourceBadge: false,
-  highlightMatchedSkills: true,
+  highlightMatchedSkills: false,
 };
 
-export const modernTemplate: ResumeTemplate = {
-  id: 'modern',
-  name: '现代简约',
-  description: '简洁现代的设计风格，适合科技行业求职',
-  thumbnail: '/templates/modern.png',
+export const classicTemplate: ResumeTemplate = {
+  id: 'classic',
+  name: '经典专业',
+  description: '传统商务风格，适合金融、咨询等行业',
+  thumbnail: '/templates/classic.png',
   category: 'professional',
   isPremium: false,
-  styles: modernStyles,
-  layout: modernLayout,
+  styles: classicStyles,
+  layout: classicLayout,
 };

@@ -22,6 +22,16 @@ export class CreateSkillDto {
   @IsInt()
   @Min(0)
   years?: number;
+
+  // 来源追踪
+  @IsOptional()
+  @IsString()
+  @IsIn(['manual', 'discovery'])
+  source?: string;
+
+  @IsOptional()
+  @IsString()
+  discoverySessionId?: string;
 }
 
 export class UpdateSkillDto {

@@ -65,6 +65,8 @@ interface Skill {
   level: number;
   evidence: string | null;
   years: number | null;
+  source: string;
+  discoverySessionId: string | null;
 }
 
 type ActiveSection = 'education' | 'experience' | 'project' | 'skill' | null;
@@ -759,6 +761,7 @@ export default function ProfilePage() {
                 subtitle: `${skillCategoryOptions.find((c) => c.value === skill.category)?.label || skill.category} · ${skillLevelLabels[skill.level - 1]}`,
                 date: skill.years ? `${skill.years} 年经验` : '',
                 description: skill.evidence,
+                tag: skill.source === 'discovery' ? { label: '技能发掘', type: 'discovery' as const } : null,
                 onEdit: () => handleEditSkill(skill),
                 onDelete: () => handleDeleteSkill(skill.id),
               }))}
@@ -904,6 +907,7 @@ interface SectionItem {
   techStack?: string[];
   achievements?: string[];
   link?: string | null;
+  tag?: { label: string; type: 'discovery' | 'manual' } | null;
   onEdit: () => void;
   onDelete: () => void;
 }
@@ -956,7 +960,18 @@ function SectionCard({
             <div key={item.id} className="p-4 border border-gray-100 rounded-lg hover:border-gray-200 transition-colors">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900">{item.title}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-gray-900">{item.title}</h3>
+                    {item.tag && (
+                      <span className={`px-2 py-0.5 text-xs rounded-full ${
+                        item.tag.type === 'discovery'
+                          ? 'bg-purple-50 text-purple-600'
+                          : 'bg-gray-50 text-gray-500'
+                      }`}>
+                        {item.tag.label}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-600">{item.subtitle}</p>
                   <p className="text-xs text-gray-400 mt-1 flex items-center gap-2">
                     <Calendar className="w-3 h-3" />

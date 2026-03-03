@@ -32,6 +32,16 @@ interface Message {
   content: string;
 }
 
+// 用户已有技能的类型
+interface UserSkill {
+  id: string;
+  name: string;
+  category: string;
+  level: number;
+  source: string;
+  discoverySessionId: string | null;
+}
+
 export default function SkillDiscoveryPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -43,7 +53,8 @@ export default function SkillDiscoveryPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [savedSkills, setSavedSkills] = useState<string[]>([]);
+  const [savedSkills, setSavedSkills] = useState<string[]>([]); // 已保存到档案的技能名称列表
+  const [userSkills, setUserSkills] = useState<UserSkill[]>([]); // 用户所有技能（用于同步状态）
   const [showJobSelector, setShowJobSelector] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -74,12 +85,18 @@ export default function SkillDiscoveryPage() {
   const loadSessions = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [sessionsData, jobsResponse] = await Promise.all([
+      const [sessionsData, jobsResponse, skillsResponse] = await Promise.all([
         skillsApi.getSessions(),
         jobsApi.getList({ status: 'active' }),
+        apiClient.get<UserSkill[]>('/users/me/skills'),
       ]);
       setSessions(sessionsData);
       setJobs(jobsResponse.data);
+      setUserSkills(skillsResponse.data);
+
+      // 根据用户已有技能更新 savedSkills 状态
+      const existingSkillNames = skillsResponse.data.map((s) => s.name);
+      setSavedSkills(existingSkillNames);
     } catch (error) {
       toast({
         title: '加载失败',
@@ -90,6 +107,18 @@ export default function SkillDiscoveryPage() {
       setIsLoading(false);
     }
   }, [toast]);
+
+  // 同步技能状态：当 userSkills 或 currentSession 变化时，更新 savedSkills
+  useEffect(() => {
+    if (userSkills.length > 0 && currentSession) {
+      const existingSkillNames = userSkills.map((s) => s.name);
+      // 只标记在当前会话发现的技能中，已存在于用户档案的技能
+      const savedInCurrentSession = currentSession.discoveredSkills.filter((s) =>
+        existingSkillNames.includes(s)
+      );
+      setSavedSkills(savedInCurrentSession);
+    }
+  }, [userSkills, currentSession]);
 
   useEffect(() => {
     loadSessions();
@@ -128,6 +157,17 @@ export default function SkillDiscoveryPage() {
     setIsLoading(true);
 
     try {
+      // 重新加载用户技能列表以同步状态
+      const skillsResponse = await apiClient.get<UserSkill[]>('/users/me/skills');
+      setUserSkills(skillsResponse.data);
+
+      // 根据用户已有技能确定哪些已保存
+      const existingSkillNames = skillsResponse.data.map((s) => s.name);
+      const savedInCurrentSession = session.discoveredSkills.filter((s) =>
+        existingSkillNames.includes(s)
+      );
+      setSavedSkills(savedInCurrentSession);
+
       // 加载历史消息
       const historyMessages = await skillsApi.getSessionMessages(session.id);
 
@@ -249,8 +289,22 @@ export default function SkillDiscoveryPage() {
         name: skill,
         category: 'technical',
         level: 3,
+        source: 'discovery',
+        discoverySessionId: currentSession?.id,
       });
       setSavedSkills((prev) => [...prev, skill]);
+      // 更新 userSkills 列表
+      setUserSkills((prev) => [
+        ...prev,
+        {
+          id: `temp-${Date.now()}`,
+          name: skill,
+          category: 'technical',
+          level: 3,
+          source: 'discovery',
+          discoverySessionId: currentSession?.id || null,
+        },
+      ]);
       toast({
         title: '保存成功',
         description: `技能「${skill}」已添加到个人档案`,
@@ -289,6 +343,8 @@ export default function SkillDiscoveryPage() {
           name: skill,
           category: 'technical',
           level: 3,
+          source: 'discovery',
+          discoverySessionId: currentSession?.id,
         });
         savedCount++;
       } catch (error) {
@@ -296,6 +352,18 @@ export default function SkillDiscoveryPage() {
       }
     }
     setSavedSkills((prev) => [...prev, ...unsavedSkills]);
+    // 更新 userSkills 列表
+    setUserSkills((prev) => [
+      ...prev,
+      ...unsavedSkills.map((skill) => ({
+        id: `temp-${Date.now()}-${skill}`,
+        name: skill,
+        category: 'technical',
+        level: 3,
+        source: 'discovery',
+        discoverySessionId: currentSession?.id || null,
+      })),
+    ]);
     setIsSaving(false);
 
     toast({

@@ -261,6 +261,17 @@ export class UsersService {
   // 技能标签 CRUD
   async createSkill(userId: string, dto: CreateSkillDto) {
     const profileId = await this.getProfileId(userId);
+
+    // 检查是否已存在同名技能（避免重复添加）
+    const existingSkill = await this.prisma.skill.findFirst({
+      where: { profileId, name: dto.name },
+    });
+
+    if (existingSkill) {
+      // 如果已存在，返回已有技能（不重复创建）
+      return existingSkill;
+    }
+
     return this.prisma.skill.create({
       data: {
         profileId,
@@ -269,6 +280,8 @@ export class UsersService {
         level: dto.level,
         evidence: dto.evidence,
         years: dto.years,
+        source: dto.source || 'manual',
+        discoverySessionId: dto.discoverySessionId,
       },
     });
   }

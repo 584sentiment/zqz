@@ -110,9 +110,14 @@ model Skill {
   evidence        String?  @db.Text
   years           Int?
 
+  // 来源追踪
+  source          String   @default("manual") // manual, discovery
+  discoverySessionId String? @map("discovery_session_id")
+
   createdAt       DateTime @default(now()) @map("created_at")
 
   @@index([profileId, category])
+  @@index([source])
   @@map("skills")
 }
 

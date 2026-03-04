@@ -432,19 +432,6 @@ function SummaryEditor({
     />
   );
 }
-    return data;
-  }, [data]);
-
-  return (
-    <RichTextEditor
-      content={parsedContent}
-      onChange={(content) => onChange(JSON.stringify(content))}
-      placeholder="简要介绍您的专业背景和核心优势..."
-      minHeight={100}
-      readOnly={readOnly}
-    />
-  );
-}
 
 // 工作经历编辑器
 function ExperienceEditor({

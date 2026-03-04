@@ -189,6 +189,7 @@ export function RichTextEditor({
     ],
     content: content || '',
     editable: !readOnly,
+    immediatelyRender: false, // 避免 SSR 水合问题
     onUpdate: ({ editor }) => {
       onChange(editor.getJSON());
     },

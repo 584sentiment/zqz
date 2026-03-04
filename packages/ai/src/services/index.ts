@@ -640,3 +640,7 @@ export class InterviewService {
     }
   }
 }
+
+// 导出简历建议服务
+export { ResumeSuggestionService, getResumeSuggestionService } from './resume-suggestion';
+export type { ResumeSuggestion } from './resume-suggestion';

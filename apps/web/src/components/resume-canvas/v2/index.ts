@@ -107,4 +107,7 @@ export type { InteractiveRenderPlan, EditableRegion } from './services/interacti
 // 组件
 export { ResumeRendererV2 } from './components/ResumeRendererV2';
 export { InteractiveCanvas } from './components/InteractiveCanvas';
+export { SectionDragList } from './components/SectionDragList';
+export { InlineRichTextEditor } from './components/InlineRichTextEditor';
+export type { DraggableSection } from './components/SectionDragList';
 export { default } from './components/ResumeRendererV2';

@@ -8,6 +8,7 @@ import { resumesApi, Resume, MatchAnalysis, ResumeVersion, ResumeSuggestion, Job
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { useAutoSave } from '@/hooks/use-auto-save';
+import { useResumeHistory } from '@/hooks/use-resume-history';
 import { AIErrorState } from '@/components/ai-error-state';
 import { InteractiveCanvas, getStylePreset, createRenderEngine, exportToPDF, downloadPDF } from '@/components/resume-canvas/v2';
 import type { ResumeContent as ResumeContentV2, RenderPlan } from '@/components/resume-canvas/v2/types';
@@ -44,6 +45,8 @@ import {
   RefreshCw,
   Key,
   Lightbulb,
+  Undo2,
+  Redo2,
 } from 'lucide-react';
 
 export default function ResumeDetailPage() {
@@ -77,6 +80,42 @@ export default function ResumeDetailPage() {
 
   // 编辑状态
   const [editedContent, setEditedContent] = useState<Record<string, unknown>>({});
+
+  // 撤销/重做功能
+  const {
+    value: historyContent,
+    setValue: setHistoryContent,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    clearHistory,
+  } = useResumeHistory<Record<string, unknown>>({
+    initialValue: {},
+    onChange: (value) => {
+      setEditedContent(value);
+    },
+  });
+
+  // 键盘快捷键
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+        if (e.shiftKey) {
+          e.preventDefault();
+          redo();
+        } else {
+          e.preventDefault();
+          undo();
+        }
+      }
+    };
+
+    if (isEditing) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isEditing, undo, redo]);
 
   // 样式预设（默认使用高管双栏布局）
   const [selectedPresetId, setSelectedPresetId] = useState(resume?.templateId || 'executive');
@@ -262,17 +301,19 @@ export default function ResumeDetailPage() {
     }
   };
 
-  // 处理画布内容变化
+  // 处理画布内容变化（支持撤销/重做）
   const handleCanvasContentChange = useCallback((newContent: ResumeContentV2) => {
-    setEditedContent(newContent as unknown as Record<string, unknown>);
-  }, []);
+    setHistoryContent(newContent as unknown as Record<string, unknown>);
+  }, [setHistoryContent]);
 
   // 进入编辑模式
   const handleEnterEditMode = useCallback(() => {
     if (!resume?.content) return;
-    setEditedContent((resume.content as Record<string, unknown>) || {});
+    const content = (resume.content as Record<string, unknown>) || {};
+    setEditedContent(content);
+    clearHistory();
     setIsEditing(true);
-  }, [resume]);
+  }, [resume, clearHistory]);
 
   // 退出编辑模式
   const handleExitEditMode = useCallback(() => {
@@ -280,8 +321,9 @@ export default function ResumeDetailPage() {
     // 重置编辑内容
     if (resume?.content) {
       setEditedContent((resume.content as Record<string, unknown>) || {});
+      clearHistory();
     }
-  }, [resume]);
+  }, [resume, clearHistory]);
 
   const handleGenerate = async () => {
     if (!resume) return;
@@ -1193,6 +1235,7 @@ export default function ResumeDetailPage() {
                   })()}
                 </div>
               </div>
+
             </div>
           )}
 
@@ -1245,9 +1288,38 @@ export default function ResumeDetailPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {isEditing && (
-                      <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                        编辑模式 - 点击文字进行编辑
-                      </span>
+                      <>
+                        <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                          编辑模式 - 点击文字进行编辑
+                        </span>
+                        {/* 撤销/重做按钮 */}
+                        <div className="flex items-center gap-1 ml-2">
+                          <button
+                            onClick={undo}
+                            disabled={!canUndo}
+                            className={`p-1.5 rounded ${
+                              canUndo
+                                ? 'hover:bg-gray-100 text-gray-600'
+                                : 'text-gray-300 cursor-not-allowed'
+                            }`}
+                            title="撤销 (Ctrl+Z)"
+                          >
+                            <Undo2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={redo}
+                            disabled={!canRedo}
+                            className={`p-1.5 rounded ${
+                              canRedo
+                                ? 'hover:bg-gray-100 text-gray-600'
+                                : 'text-gray-300 cursor-not-allowed'
+                            }`}
+                            title="重做 (Ctrl+Shift+Z)"
+                          >
+                            <Redo2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </>
                     )}
                     <button
                       onClick={() => setIsFullscreen(true)}
@@ -1261,13 +1333,17 @@ export default function ResumeDetailPage() {
 
                 {/* 画布区域 */}
                 <div className="flex-1 overflow-auto flex items-center justify-center p-8 bg-gray-50">
-                  <div className="shadow-xl">
+                  <div className="shadow-xl" style={{ marginLeft: isEditing ? '30px' : '0' }}>
                     <InteractiveCanvas
                       content={resumeContent}
                       presetId={selectedPresetId}
                       scale={canvasScale}
                       isEditing={isEditing}
+                      enableSectionDrag={isEditing}
                       onContentChange={handleCanvasContentChange}
+                      onSectionOrderChange={(newSections) => {
+                        // 区块顺序已变化，可用于持久化
+                      }}
                       onRenderPlanGenerated={(plan) => {
                         setV2RenderPlan(plan);
                       }}

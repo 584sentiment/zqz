@@ -45,10 +45,25 @@ export interface EditableRegion {
   };
 }
 
+/** 区块区域信息（用于拖拽排序） */
+export interface SectionRegion {
+  id: string;
+  /** 区块类型 */
+  type: 'header' | 'summary' | 'experience' | 'skills' | 'projects' | 'education' | 'contact';
+  /** 区块名称 */
+  name: string;
+  /** 渲染位置 */
+  rect: Rect;
+  /** 数据路径 */
+  path: string;
+}
+
 /** 交互式渲染方案 */
 export interface InteractiveRenderPlan extends RenderPlan {
   /** 可编辑区域列表 */
   editableRegions: EditableRegion[];
+  /** 区块区域列表（用于拖拽排序） */
+  sectionRegions: SectionRegion[];
 }
 
 /**
@@ -100,15 +115,20 @@ function estimateTextHeight(text: string, maxWidth: number, fontSize: number, li
   return lineCount * fontSize * lineHeight * 1.1;
 }
 
+/** 默认区块顺序 */
+const DEFAULT_SECTION_ORDER = ['summary', 'skills', 'education', 'experience', 'projects'];
+
 /**
  * 交互式渲染方案生成器
  */
 export class InteractiveRenderPlanGenerator {
   private preset: StylePreset;
   private content!: ResumeContent;
+  private sectionOrder: string[] = DEFAULT_SECTION_ORDER;
   private currentY: number = MARGIN.top;
   private commands: DrawCommand[] = [];
   private editableRegions: EditableRegion[] = [];
+  private sectionRegions: SectionRegion[] = [];
   private commandId: number = 0;
 
   constructor(preset: StylePreset) {
@@ -117,12 +137,16 @@ export class InteractiveRenderPlanGenerator {
 
   /**
    * 生成交互式渲染方案
+   * @param content 简历内容
+   * @param sectionOrder 可选的区块顺序，如 ['experience', 'skills', 'education']
    */
-  generate(content: ResumeContent): InteractiveRenderPlan {
+  generate(content: ResumeContent, sectionOrder?: string[]): InteractiveRenderPlan {
     this.content = content;
+    this.sectionOrder = sectionOrder || DEFAULT_SECTION_ORDER;
     this.currentY = MARGIN.top;
     this.commands = [];
     this.editableRegions = [];
+    this.sectionRegions = [];
     this.commandId = 0;
 
     // 根据预设类型选择布局
@@ -153,6 +177,7 @@ export class InteractiveRenderPlanGenerator {
       presetId: this.preset.id,
       pages: [page],
       editableRegions: this.editableRegions,
+      sectionRegions: this.sectionRegions,
       meta: {
         generatedAt: new Date().toISOString(),
         model: 'interactive-generator',
@@ -180,7 +205,7 @@ export class InteractiveRenderPlanGenerator {
     // 左侧边栏内容
     let sidebarY = MARGIN.top;
 
-    // 联系方式
+    // 联系方式（带标签）
     if (this.content.contact) {
       sidebarY = this.addSectionHeader('联系方式', MARGIN.left, sidebarY, sidebarWidth);
       sidebarY += 10;
@@ -188,7 +213,7 @@ export class InteractiveRenderPlanGenerator {
       if (this.content.contact.email) {
         this.addEditableText({
           path: 'contact.email',
-          value: this.content.contact.email,
+          value: `Email: ${this.content.contact.email}`,
           x: MARGIN.left,
           y: sidebarY,
           maxWidth: sidebarWidth,
@@ -200,7 +225,7 @@ export class InteractiveRenderPlanGenerator {
       if (this.content.contact.phone) {
         this.addEditableText({
           path: 'contact.phone',
-          value: this.content.contact.phone,
+          value: `Tel: ${this.content.contact.phone}`,
           x: MARGIN.left,
           y: sidebarY,
           maxWidth: sidebarWidth,
@@ -212,7 +237,7 @@ export class InteractiveRenderPlanGenerator {
       if (this.content.contact.location) {
         this.addEditableText({
           path: 'contact.location',
-          value: this.content.contact.location,
+          value: `地址: ${this.content.contact.location}`,
           x: MARGIN.left,
           y: sidebarY,
           maxWidth: sidebarWidth,
@@ -259,53 +284,55 @@ export class InteractiveRenderPlanGenerator {
     this.addLine(mainX, mainY, mainX + mainWidth, mainY, colors.border.medium);
     mainY += SECTION_GAP;
 
-    // 个人简介
-    if (this.content.summary) {
-      mainY = this.addSectionHeader('个人简介', mainX, mainY, mainWidth);
-      mainY += 10;
-      mainY = this.addEditableText({
-        path: 'summary',
-        value: this.content.summary,
-        x: mainX,
-        y: mainY,
-        maxWidth: mainWidth,
-        style: typography.body,
-      });
-      mainY += SECTION_GAP;
-    }
+    // 根据 sectionOrder 渲染主内容区块
+    const mainContentSections = ['summary', 'experience', 'projects', 'education'];
+    const orderedSections = this.sectionOrder.filter(s => mainContentSections.includes(s));
 
-    // 工作经历
-    if (this.content.experience.length > 0) {
-      mainY = this.addSectionHeader('工作经历', mainX, mainY, mainWidth);
-      mainY += 10;
-
-      for (let i = 0; i < this.content.experience.length; i++) {
-        const exp = this.content.experience[i];
-        mainY = this.addExperienceItem(exp, mainX, mainY, mainWidth, i);
-        mainY += i < this.content.experience.length - 1 ? ITEM_GAP : SECTION_GAP;
+    for (const sectionType of orderedSections) {
+      if (sectionType === 'summary' && this.content.summary) {
+        mainY = this.addSectionHeader('个人简介', mainX, mainY, mainWidth);
+        mainY += 10;
+        mainY = this.addEditableText({
+          path: 'summary',
+          value: this.content.summary,
+          x: mainX,
+          y: mainY,
+          maxWidth: mainWidth,
+          style: typography.body,
+        });
+        mainY += SECTION_GAP;
       }
-    }
 
-    // 项目经历
-    if (this.content.projects && this.content.projects.length > 0) {
-      mainY = this.addSectionHeader('项目经历', mainX, mainY, mainWidth);
-      mainY += 10;
+      if (sectionType === 'experience' && this.content.experience.length > 0) {
+        mainY = this.addSectionHeader('工作经历', mainX, mainY, mainWidth);
+        mainY += 10;
 
-      for (let i = 0; i < this.content.projects.length; i++) {
-        const proj = this.content.projects[i];
-        mainY = this.addProjectItem(proj, mainX, mainY, mainWidth, i);
-        mainY += i < this.content.projects.length - 1 ? ITEM_GAP : SECTION_GAP;
+        for (let i = 0; i < this.content.experience.length; i++) {
+          const exp = this.content.experience[i];
+          mainY = this.addExperienceItem(exp, mainX, mainY, mainWidth, i);
+          mainY += i < this.content.experience.length - 1 ? ITEM_GAP : SECTION_GAP;
+        }
       }
-    }
 
-    // 教育背景
-    if (this.content.education.length > 0) {
-      mainY = this.addSectionHeader('教育背景', mainX, mainY, mainWidth);
-      mainY += 10;
+      if (sectionType === 'projects' && this.content.projects && this.content.projects.length > 0) {
+        mainY = this.addSectionHeader('项目经历', mainX, mainY, mainWidth);
+        mainY += 10;
 
-      for (const edu of this.content.education) {
-        mainY = this.addEducationItem(edu, mainX, mainY, mainWidth);
-        mainY += ITEM_GAP;
+        for (let i = 0; i < this.content.projects.length; i++) {
+          const proj = this.content.projects[i];
+          mainY = this.addProjectItem(proj, mainX, mainY, mainWidth, i);
+          mainY += i < this.content.projects.length - 1 ? ITEM_GAP : SECTION_GAP;
+        }
+      }
+
+      if (sectionType === 'education' && this.content.education.length > 0) {
+        mainY = this.addSectionHeader('教育背景', mainX, mainY, mainWidth);
+        mainY += 10;
+
+        for (const edu of this.content.education) {
+          mainY = this.addEducationItem(edu, mainX, mainY, mainWidth);
+          mainY += ITEM_GAP;
+        }
       }
     }
   }
@@ -345,11 +372,11 @@ export class InteractiveRenderPlanGenerator {
       headerY += 25;
     }
 
-    // 联系方式（一行显示）
+    // 联系方式（一行显示，带标签）
     const contactParts: string[] = [];
-    if (this.content.contact?.email) contactParts.push(this.content.contact.email);
-    if (this.content.contact?.phone) contactParts.push(this.content.contact.phone);
-    if (this.content.contact?.location) contactParts.push(this.content.contact.location);
+    if (this.content.contact?.email) contactParts.push(`Email: ${this.content.contact.email}`);
+    if (this.content.contact?.phone) contactParts.push(`Tel: ${this.content.contact.phone}`);
+    if (this.content.contact?.location) contactParts.push(`地址: ${this.content.contact.location}`);
 
     if (contactParts.length > 0) {
       this.addEditableText({
@@ -367,62 +394,149 @@ export class InteractiveRenderPlanGenerator {
     this.addLine(MARGIN.left, headerY, A4.width - MARGIN.right, headerY, colors.primary, 2);
     headerY += SECTION_GAP;
 
-    // 双栏内容
+    // 双栏内容 - 根据区块顺序动态分配到左右栏
     let leftY = headerY;
     let rightY = headerY;
 
-    // 左栏：个人简介 + 技能
-    if (this.content.summary) {
-      leftY = this.addSectionHeader('个人简介', MARGIN.left, leftY, leftWidth);
-      leftY += 10;
-      leftY = this.addEditableText({
-        path: 'summary',
-        value: this.content.summary,
-        x: MARGIN.left,
-        y: leftY,
-        maxWidth: leftWidth,
-        style: typography.body,
-      });
-      leftY += SECTION_GAP;
-    }
+    // 过滤出实际存在的区块
+    const existingSections = this.sectionOrder.filter(s => {
+      if (s === 'summary') return !!this.content.summary;
+      if (s === 'skills') return this.content.skills.length > 0;
+      if (s === 'education') return this.content.education.length > 0;
+      if (s === 'experience') return this.content.experience.length > 0;
+      if (s === 'projects') return (this.content.projects?.length ?? 0) > 0;
+      return false;
+    });
 
-    if (this.content.skills.length > 0) {
-      leftY = this.addSectionHeader('专业技能', MARGIN.left, leftY, leftWidth);
-      leftY += 10;
-      leftY = this.addSkillTags(this.content.skills, MARGIN.left, leftY, leftWidth);
-      leftY += SECTION_GAP;
-    }
+    // 按顺序交替分配到左右栏（奇数位置左栏，偶数位置右栏）
+    const leftSectionSet = new Set<string>();
+    const rightSectionSet = new Set<string>();
 
-    if (this.content.education.length > 0) {
-      leftY = this.addSectionHeader('教育背景', MARGIN.left, leftY, leftWidth);
-      leftY += 10;
-      for (const edu of this.content.education) {
-        leftY = this.addEducationItem(edu, MARGIN.left, leftY, leftWidth);
-        leftY += ITEM_GAP;
+    existingSections.forEach((section, index) => {
+      if (index % 2 === 0) {
+        leftSectionSet.add(section);
+      } else {
+        rightSectionSet.add(section);
+      }
+    });
+
+    // 按原始顺序渲染左栏区块
+    for (const sectionType of existingSections) {
+      if (!leftSectionSet.has(sectionType)) continue;
+
+      if (sectionType === 'summary' && this.content.summary) {
+        leftY = this.addSectionHeader('个人简介', MARGIN.left, leftY, leftWidth);
+        leftY += 10;
+        leftY = this.addEditableText({
+          path: 'summary',
+          value: this.content.summary,
+          x: MARGIN.left,
+          y: leftY,
+          maxWidth: leftWidth,
+          style: typography.body,
+        });
+        leftY += SECTION_GAP;
+      }
+
+      if (sectionType === 'skills' && this.content.skills.length > 0) {
+        leftY = this.addSectionHeader('专业技能', MARGIN.left, leftY, leftWidth);
+        leftY += 10;
+        leftY = this.addSkillTags(this.content.skills, MARGIN.left, leftY, leftWidth);
+        leftY += SECTION_GAP;
+      }
+
+      if (sectionType === 'education' && this.content.education.length > 0) {
+        leftY = this.addSectionHeader('教育背景', MARGIN.left, leftY, leftWidth);
+        leftY += 10;
+        for (const edu of this.content.education) {
+          leftY = this.addEducationItem(edu, MARGIN.left, leftY, leftWidth);
+          leftY += ITEM_GAP;
+        }
+        leftY += SECTION_GAP - ITEM_GAP;
+      }
+
+      if (sectionType === 'experience' && this.content.experience.length > 0) {
+        leftY = this.addSectionHeader('工作经历', MARGIN.left, leftY, leftWidth);
+        leftY += 10;
+
+        for (let i = 0; i < this.content.experience.length; i++) {
+          const exp = this.content.experience[i];
+          leftY = this.addExperienceItem(exp, MARGIN.left, leftY, leftWidth, i);
+          leftY += ITEM_GAP;
+        }
+        leftY += SECTION_GAP - ITEM_GAP;
+      }
+
+      if (sectionType === 'projects' && this.content.projects && this.content.projects.length > 0) {
+        leftY = this.addSectionHeader('项目经历', MARGIN.left, leftY, leftWidth);
+        leftY += 10;
+
+        for (let i = 0; i < this.content.projects.length; i++) {
+          const proj = this.content.projects[i];
+          leftY = this.addProjectItem(proj, MARGIN.left, leftY, leftWidth, i);
+          leftY += ITEM_GAP;
+        }
+        leftY += SECTION_GAP - ITEM_GAP;
       }
     }
 
-    // 右栏：工作经历 + 项目经历
-    if (this.content.experience.length > 0) {
-      rightY = this.addSectionHeader('工作经历', rightX, rightY, leftWidth);
-      rightY += 10;
+    // 按原始顺序渲染右栏区块
+    for (const sectionType of existingSections) {
+      if (!rightSectionSet.has(sectionType)) continue;
 
-      for (let i = 0; i < this.content.experience.length; i++) {
-        const exp = this.content.experience[i];
-        rightY = this.addExperienceItem(exp, rightX, rightY, leftWidth, i);
-        rightY += ITEM_GAP;
+      if (sectionType === 'summary' && this.content.summary) {
+        rightY = this.addSectionHeader('个人简介', rightX, rightY, leftWidth);
+        rightY += 10;
+        rightY = this.addEditableText({
+          path: 'summary',
+          value: this.content.summary,
+          x: rightX,
+          y: rightY,
+          maxWidth: leftWidth,
+          style: typography.body,
+        });
+        rightY += SECTION_GAP;
       }
-      rightY += SECTION_GAP - ITEM_GAP;
-    }
 
-    if (this.content.projects && this.content.projects.length > 0) {
-      rightY = this.addSectionHeader('项目经历', rightX, rightY, leftWidth);
-      rightY += 10;
+      if (sectionType === 'skills' && this.content.skills.length > 0) {
+        rightY = this.addSectionHeader('专业技能', rightX, rightY, leftWidth);
+        rightY += 10;
+        rightY = this.addSkillTags(this.content.skills, rightX, rightY, leftWidth);
+        rightY += SECTION_GAP;
+      }
 
-      for (let i = 0; i < this.content.projects.length; i++) {
-        const proj = this.content.projects[i];
-        rightY = this.addProjectItem(proj, rightX, rightY, leftWidth, i);
-        rightY += ITEM_GAP;
+      if (sectionType === 'education' && this.content.education.length > 0) {
+        rightY = this.addSectionHeader('教育背景', rightX, rightY, leftWidth);
+        rightY += 10;
+        for (const edu of this.content.education) {
+          rightY = this.addEducationItem(edu, rightX, rightY, leftWidth);
+          rightY += ITEM_GAP;
+        }
+        rightY += SECTION_GAP - ITEM_GAP;
+      }
+
+      if (sectionType === 'experience' && this.content.experience.length > 0) {
+        rightY = this.addSectionHeader('工作经历', rightX, rightY, leftWidth);
+        rightY += 10;
+
+        for (let i = 0; i < this.content.experience.length; i++) {
+          const exp = this.content.experience[i];
+          rightY = this.addExperienceItem(exp, rightX, rightY, leftWidth, i);
+          rightY += ITEM_GAP;
+        }
+        rightY += SECTION_GAP - ITEM_GAP;
+      }
+
+      if (sectionType === 'projects' && this.content.projects && this.content.projects.length > 0) {
+        rightY = this.addSectionHeader('项目经历', rightX, rightY, leftWidth);
+        rightY += 10;
+
+        for (let i = 0; i < this.content.projects.length; i++) {
+          const proj = this.content.projects[i];
+          rightY = this.addProjectItem(proj, rightX, rightY, leftWidth, i);
+          rightY += ITEM_GAP;
+        }
+        rightY += SECTION_GAP - ITEM_GAP;
       }
     }
   }
@@ -465,11 +579,11 @@ export class InteractiveRenderPlanGenerator {
       y += 25;
     }
 
-    // 联系方式
+    // 联系方式（带标签）
     const contactParts: string[] = [];
-    if (this.content.contact?.email) contactParts.push(this.content.contact.email);
-    if (this.content.contact?.phone) contactParts.push(this.content.contact.phone);
-    if (this.content.contact?.location) contactParts.push(this.content.contact.location);
+    if (this.content.contact?.email) contactParts.push(`Email: ${this.content.contact.email}`);
+    if (this.content.contact?.phone) contactParts.push(`Tel: ${this.content.contact.phone}`);
+    if (this.content.contact?.location) contactParts.push(`地址: ${this.content.contact.location}`);
     if (contactParts.length > 0) {
       y = this.addEditableText({
         path: 'contact.line',
@@ -580,6 +694,31 @@ export class InteractiveRenderPlanGenerator {
     });
 
     return y + typography.sectionTitle.fontSize * typography.sectionTitle.lineHeight;
+  }
+
+  /**
+   * 开始记录一个区块（记录起始位置）
+   */
+  private startSection(type: SectionRegion['type'], name: string, path: string, x: number, y: number): void {
+    // 暂存区块信息，结束时更新高度
+    this.sectionRegions.push({
+      id: `section-${type}`,
+      type,
+      name,
+      path,
+      rect: { x, y, width: 0, height: 0 },
+    });
+  }
+
+  /**
+   * 结束记录区块（更新高度和宽度）
+   */
+  private endSection(width: number, endY: number): void {
+    const lastSection = this.sectionRegions[this.sectionRegions.length - 1];
+    if (lastSection) {
+      lastSection.rect.width = width;
+      lastSection.rect.height = endY - lastSection.rect.y;
+    }
   }
 
   private addEditableText(params: {
@@ -717,8 +856,28 @@ export class InteractiveRenderPlanGenerator {
     });
     y += 5;
 
-    // 成就列表
-    for (const highlight of exp.highlights) {
+    // 成就列表 - 每条都是可编辑的
+    for (let h = 0; h < exp.highlights.length; h++) {
+      const highlight = exp.highlights[h];
+      const height = estimateTextHeight(highlight, maxWidth - 10, typography.body.fontSize, typography.body.lineHeight);
+
+      // 添加可编辑区域
+      this.editableRegions.push({
+        id: `edit-experience-${index}-highlights-${h}`,
+        type: 'text',
+        path: `experience.${index}.highlights.${h}`,
+        rect: { x: x + 10, y, width: maxWidth - 10, height },
+        value: highlight,
+        style: {
+          fontSize: typography.body.fontSize,
+          fontFamily: typography.body.fontFamily,
+          fontWeight: typography.body.fontWeight,
+          color: colors.text.primary,
+          lineHeight: typography.body.lineHeight,
+        },
+      });
+
+      // 添加绘制命令
       this.commands.push({
         id: this.nextId(),
         type: 'text',
@@ -730,7 +889,7 @@ export class InteractiveRenderPlanGenerator {
         },
         maxWidth: maxWidth - 10,
       });
-      y += estimateTextHeight(highlight, maxWidth - 10, typography.body.fontSize, typography.body.lineHeight);
+      y += height;
     }
 
     return y;
@@ -772,22 +931,61 @@ export class InteractiveRenderPlanGenerator {
 
     // 技术栈
     if (proj.techStack && proj.techStack.length > 0) {
+      const techStackText = `技术栈：${proj.techStack.join(', ')}`;
+      const height = typography.caption.fontSize * typography.caption.lineHeight;
+
+      // 添加可编辑区域
+      this.editableRegions.push({
+        id: `edit-projects-${index}-techStack`,
+        type: 'tags',
+        path: `projects.${index}.techStack`,
+        rect: { x, y, width: maxWidth, height },
+        value: proj.techStack,
+        style: {
+          fontSize: typography.caption.fontSize,
+          fontFamily: typography.caption.fontFamily,
+          fontWeight: typography.caption.fontWeight,
+          color: colors.text.muted,
+          lineHeight: typography.caption.lineHeight,
+        },
+      });
+
       this.commands.push({
         id: this.nextId(),
         type: 'text',
         position: { x, y },
-        content: `技术栈：${proj.techStack.join(', ')}`,
+        content: techStackText,
         style: {
           ...typography.caption,
           color: colors.text.muted,
         },
         maxWidth,
       });
-      y += typography.caption.fontSize * typography.caption.lineHeight + 5;
+      y += height + 5;
     }
 
-    // 成就列表
-    for (const highlight of proj.highlights) {
+    // 成就列表 - 每条都是可编辑的
+    for (let h = 0; h < proj.highlights.length; h++) {
+      const highlight = proj.highlights[h];
+      const height = estimateTextHeight(highlight, maxWidth - 10, typography.body.fontSize, typography.body.lineHeight);
+
+      // 添加可编辑区域
+      this.editableRegions.push({
+        id: `edit-projects-${index}-highlights-${h}`,
+        type: 'text',
+        path: `projects.${index}.highlights.${h}`,
+        rect: { x: x + 10, y, width: maxWidth - 10, height },
+        value: highlight,
+        style: {
+          fontSize: typography.body.fontSize,
+          fontFamily: typography.body.fontFamily,
+          fontWeight: typography.body.fontWeight,
+          color: colors.text.primary,
+          lineHeight: typography.body.lineHeight,
+        },
+      });
+
+      // 添加绘制命令
       this.commands.push({
         id: this.nextId(),
         type: 'text',
@@ -799,7 +997,7 @@ export class InteractiveRenderPlanGenerator {
         },
         maxWidth: maxWidth - 10,
       });
-      y += estimateTextHeight(highlight, maxWidth - 10, typography.body.fontSize, typography.body.lineHeight);
+      y += height;
     }
 
     return y;

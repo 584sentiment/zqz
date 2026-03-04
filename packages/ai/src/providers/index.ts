@@ -17,8 +17,8 @@ export interface AIProviderConfig {
 }
 
 // 默认超时配置
-const DEFAULT_TIMEOUT = 30000; // 30 秒
-const DEFAULT_FIRST_BYTE_TIMEOUT = 3000; // 3 秒
+const DEFAULT_TIMEOUT = 120000; // 120 秒（2分钟）
+const DEFAULT_FIRST_BYTE_TIMEOUT = 10000; // 10 秒
 const DEFAULT_MAX_RETRIES = 2;
 
 export class AIProviderManager {

@@ -1,5 +1,6 @@
 /**
  * 现代简约模板
+ * 左侧边栏布局，蓝色主题
  */
 
 import type { ResumeTemplate, TemplateStyles, TemplateLayout } from '../types/template.types';
@@ -17,7 +18,7 @@ const modernStyles: TemplateStyles = {
       color: '#1f2937',
       lineHeight: 1.3,
       letterSpacing: 0,
-      textAlign: 'center',
+      textAlign: 'left',
     },
     title: {
       fontFamily: DEFAULT_FONTS.primary,
@@ -26,7 +27,7 @@ const modernStyles: TemplateStyles = {
       color: '#4b5563',
       lineHeight: 1.4,
       letterSpacing: 0.5,
-      textAlign: 'center',
+      textAlign: 'left',
     },
     contact: {
       fontFamily: DEFAULT_FONTS.primary,
@@ -35,14 +36,14 @@ const modernStyles: TemplateStyles = {
       color: '#6b7280',
       lineHeight: 1.4,
       letterSpacing: 0,
-      textAlign: 'center',
+      textAlign: 'left',
     },
   },
 
   section: {
     title: {
       fontFamily: DEFAULT_FONTS.primary,
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: 'bold',
       color: '#1f2937',
       lineHeight: 1.4,
@@ -83,7 +84,7 @@ const modernStyles: TemplateStyles = {
   },
 
   spacing: {
-    sectionGap: 20,
+    sectionGap: 18,
     paragraphGap: 8,
     listItemGap: 12,
     tagGap: 8,
@@ -91,16 +92,58 @@ const modernStyles: TemplateStyles = {
 };
 
 const modernLayout: TemplateLayout = {
-  header: { align: 'center', showDivider: true },
-  sectionOrder: ['experience', 'skills', 'projects', 'education'],
+  layoutType: 'left-sidebar',
+
+  header: {
+    align: 'left',
+    showDivider: false,
+    decoration: {
+      type: 'none',
+    },
+  },
+
+  sectionOrder: ['experience', 'projects'],
+
+  sectionTitleStyle: {
+    type: 'left-bar',
+    accentColor: '#2563eb',
+    thickness: 4,
+    borderRadius: 0,
+    padding: { horizontal: 12, vertical: 4 },
+  },
+
+  dividerStyle: {
+    type: 'solid',
+    color: '#e5e7eb',
+    thickness: 1,
+  },
+
+  skillDisplayStyle: {
+    type: 'pills',
+    borderRadius: 16,
+    trackColor: '#eff6ff',
+    fillColor: '#2563eb',
+    matchedBorderColor: '#22c55e',
+    matchedBackgroundColor: '#dcfce7',
+  },
+
+  sidebar: {
+    widthRatio: 0.32,
+    backgroundColor: '#1e40af',
+    padding: 20,
+    sections: ['skills', 'education'],
+    textColor: '#ffffff',
+  },
+
   showSourceBadge: false,
   highlightMatchedSkills: true,
+  sectionGap: 18,
 };
 
 export const modernTemplate: ResumeTemplate = {
   id: 'modern',
   name: '现代简约',
-  description: '简洁现代的设计风格，适合科技行业求职',
+  description: '简洁现代的设计风格，左侧边栏突出联系方式和技能，适合科技行业求职',
   thumbnail: '/templates/modern.png',
   category: 'professional',
   isPremium: false,

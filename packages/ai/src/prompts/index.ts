@@ -8,24 +8,24 @@ export const promptTemplates = {
 {jobDescription}
 
 请以 JSON 格式返回以下结构：
-{
+{{
   "title": "岗位名称",
   "company": "公司名称",
   "location": "工作地点",
   "description": "岗位描述概述",
-  "requirements": {
+  "requirements": {{
     "mustHave": ["必须具备的要求"],
     "niceToHave": ["加分项"],
     "skills": ["技能关键词"],
     "experienceYears": "经验要求",
     "education": "学历要求"
-  },
+  }},
   "responsibilities": ["岗位职责"],
   "benefits": ["福利待遇"],
   "salaryRange": "薪资范围描述",
   "experienceLevel": "entry|mid|senior|lead",
   "employmentType": "full-time|part-time|contract|internship"
-}
+}}
 
 注意：
 1. 如果某些信息在描述中不存在，可以合理推断或留空
@@ -61,42 +61,42 @@ export const promptTemplates = {
 5. **教育经历**：简洁明了，如有相关课程或荣誉可补充
 
 请以 JSON 格式返回简历内容：
-{
+{{
   "summary": "针对该岗位的个人简介，突出匹配点",
   "matchedSkills": ["与岗位要求直接匹配的技能"],
   "experience": [
-    {
+    {{
       "company": "公司名称（来自用户档案）",
       "position": "职位（来自用户档案）",
       "location": "地点",
       "period": "时间范围",
       "highlights": ["使用STAR法则优化的工作成果1", "工作成果2"]
-    }
+    }}
   ],
   "skills": ["技能1（按匹配度排序）", "技能2", "技能3"],
   "projects": [
-    {
+    {{
       "name": "项目名称",
       "role": "角色",
       "techStack": ["技术1", "技术2"],
       "highlights": ["成果1", "成果2"]
-    }
+    }}
   ],
   "education": [
-    {
+    {{
       "school": "学校",
       "degree": "学位",
       "major": "专业",
       "period": "时间"
-    }
+    }}
   ],
-  "matchAnalysis": {
+  "matchAnalysis": {{
     "score": 0-100的匹配度分数,
     "strengths": ["用户的优势1", "优势2"],
     "gaps": ["与岗位要求的差距1", "差距2"],
     "suggestions": ["简历优化建议1", "建议2"]
-  }
-}`,
+  }}
+}}`,
 
   // 技能发掘提示词
   skillDiscovery: `你是一位专业的职业发展顾问。通过与用户对话，帮助用户发现和系统化整理个人技能。
@@ -119,7 +119,7 @@ export const promptTemplates = {
 
 【重要】你必须且只能返回一个纯 JSON 对象，不要包含任何其他文字、解释或 markdown 标记。
 返回格式示例：
-{"response":"你的回复内容","discoveredSkills":["技能1","技能2"],"isComplete":false}`,
+{{"response":"你的回复内容","discoveredSkills":["技能1","技能2"],"isComplete":false}}`,
 
   // 面试问题生成提示词
   interviewQuestionGeneration: `你是一位专业的面试官。根据以下岗位信息和候选人背景，生成针对性的面试问题。
@@ -149,7 +149,7 @@ export const promptTemplates = {
 
 请生成 5-8 个面试问题，返回 JSON 数组格式：
 [
-  {
+  {{
     "id": "q1",
     "question": "问题内容（针对岗位定制）",
     "category": "问题类别（如：技术能力、项目经验、团队协作、领导力等）",
@@ -158,7 +158,7 @@ export const promptTemplates = {
     "keypoints": ["评分要点1", "评分要点2"],
     "followUpQuestions": ["可能的追问1"],
     "relatedJobRequirement": "对应岗位的哪个要求"
-  }
+  }}
 ]`,
 
   // 面试评估提示词
@@ -207,44 +207,44 @@ export const promptTemplates = {
 - 0-5分：无法有效表达
 
 请返回评估结果（JSON格式）：
-{
+{{
   "overallScore": 0-100的总分,
   "criteria": [
-    {
+    {{
       "name": "内容完整性",
       "score": 0-25,
       "scoreAnchors": "选择的分数锚点（如：21-25分-完整回答...）",
       "feedback": "具体反馈，说明得分原因",
       "evidence": "回答中支持该评分的具体内容"
-    },
-    {
+    }},
+    {{
       "name": "逻辑清晰度",
       "score": 0-25,
       "scoreAnchors": "分数锚点",
       "feedback": "具体反馈",
       "evidence": "支持评分的具体内容"
-    },
-    {
+    }},
+    {{
       "name": "专业深度",
       "score": 0-25,
       "scoreAnchors": "分数锚点",
       "feedback": "具体反馈",
       "evidence": "支持评分的具体内容"
-    },
-    {
+    }},
+    {{
       "name": "表达能力",
       "score": 0-25,
       "scoreAnchors": "分数锚点",
       "feedback": "具体反馈",
       "evidence": "支持评分的具体内容"
-    }
+    }}
   ],
   "strengths": ["回答的优点1", "优点2"],
   "improvements": ["具体改进建议1", "建议2"],
   "suggestedAnswer": "参考答案要点（3-5个关键点）",
   "scoreConfidence": "high|medium|low（评分置信度）",
   "consistencyNote": "说明此评分如何保持与其他相似回答的一致性"
-}`,
+}}`,
 
   // 经历优化提示词
   experienceOptimization: `你是一位专业的简历优化专家。请优化以下工作经历描述：
@@ -263,18 +263,18 @@ export const promptTemplates = {
 5. 控制字数在合理范围内
 
 请返回优化结果：
-{
+{{
   "optimizedDescription": "优化后的描述",
   "highlights": ["亮点1", "亮点2"],
   "changes": [
-    {
+    {{
       "original": "原文",
       "optimized": "优化后",
       "reason": "优化原因"
-    }
+    }}
   ],
   "suggestions": ["其他建议"]
-}`,
+}}`,
 };
 
 export type PromptTemplateName = keyof typeof promptTemplates;

@@ -1,5 +1,6 @@
 /**
  * 创意模板
+ * 顶部横幅布局，紫色渐变主题
  */
 
 import type { ResumeTemplate, TemplateStyles, TemplateLayout } from '../types/template.types';
@@ -21,18 +22,18 @@ const creativeStyles: TemplateStyles = {
   header: {
     name: {
       fontFamily: DEFAULT_FONTS.primary,
-      fontSize: 30,
+      fontSize: 28,
       fontWeight: 'bold',
-      color: '#1f2937',
+      color: '#ffffff',
       lineHeight: 1.2,
       letterSpacing: 0,
       textAlign: 'center',
     },
     title: {
       fontFamily: DEFAULT_FONTS.primary,
-      fontSize: 15,
+      fontSize: 16,
       fontWeight: 'normal',
-      color: '#7c3aed',
+      color: '#e9d5ff',
       lineHeight: 1.4,
       letterSpacing: 0.5,
       textAlign: 'center',
@@ -41,8 +42,8 @@ const creativeStyles: TemplateStyles = {
       fontFamily: DEFAULT_FONTS.primary,
       fontSize: 11,
       fontWeight: 'normal',
-      color: '#6b7280',
-      lineHeight: 1.4,
+      color: '#f3e8ff',
+      lineHeight: 1.5,
       letterSpacing: 0,
       textAlign: 'center',
     },
@@ -51,10 +52,10 @@ const creativeStyles: TemplateStyles = {
   section: {
     title: {
       fontFamily: DEFAULT_FONTS.primary,
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: 'bold',
       color: '#7c3aed',
-      lineHeight: 1.3,
+      lineHeight: 1.4,
       letterSpacing: 0.5,
       textAlign: 'left',
     },
@@ -100,16 +101,69 @@ const creativeStyles: TemplateStyles = {
 };
 
 const creativeLayout: TemplateLayout = {
-  header: { align: 'center', showDivider: true },
-  sectionOrder: ['experience', 'projects', 'skills', 'education'],
+  layoutType: 'top-banner',
+
+  header: {
+    align: 'center',
+    showDivider: false,
+    decoration: {
+      type: 'gradient',
+      height: 120,
+      primaryColor: '#7c3aed',
+      secondaryColor: '#a855f7',
+      opacity: 1,
+      borderRadius: 0,
+    },
+    fullBleed: true,
+  },
+
+  sectionOrder: ['experience', 'skills', 'projects', 'education'],
+
+  sectionTitleStyle: {
+    type: 'icon-prefix',
+    accentColor: '#7c3aed',
+    iconName: 'star',
+    borderRadius: 8,
+    padding: { horizontal: 10, vertical: 4 },
+  },
+
+  dividerStyle: {
+    type: 'gradient',
+    color: '#7c3aed',
+    secondaryColor: '#f3e8ff',
+    thickness: 2,
+  },
+
+  skillDisplayStyle: {
+    type: 'tags',
+    borderRadius: 20,
+    trackColor: '#f3e8ff',
+    fillColor: '#7c3aed',
+    matchedBorderColor: '#22c55e',
+    matchedBackgroundColor: '#dcfce7',
+  },
+
+  topBanner: {
+    height: 120,
+    decoration: {
+      type: 'gradient',
+      primaryColor: '#7c3aed',
+      secondaryColor: '#a855f7',
+      opacity: 1,
+    },
+    padding: 25,
+    layout: 'vertical',
+  },
+
   showSourceBadge: true,
   highlightMatchedSkills: true,
+  sectionGap: 22,
 };
 
 export const creativeTemplate: ResumeTemplate = {
   id: 'creative',
   name: '创意风格',
-  description: '活泼设计，适合设计、创意行业',
+  description: '紫色渐变顶部横幅，活泼的设计元素，适合设计、创意行业',
   thumbnail: '/templates/creative.png',
   category: 'creative',
   isPremium: true,

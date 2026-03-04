@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
@@ -9,6 +9,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { useAutoSave } from '@/hooks/use-auto-save';
 import { AIErrorState } from '@/components/ai-error-state';
+import { ResumeRendererV2, getStylePreset, createLocalRenderPlanGenerator, createRenderEngine } from '@/components/resume-canvas/v2';
+import type { ResumeContent as ResumeContentV2, RenderPlan } from '@/components/resume-canvas/v2/types';
 import {
   ArrowLeft,
   Save,
@@ -30,13 +32,14 @@ import {
   FileDown,
   ChevronDown,
   Languages,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
   Cloud,
   CloudOff,
   History,
   RotateCcw,
+  Maximize2,
+  Minimize2,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 
 export default function ResumeDetailPage() {
@@ -56,7 +59,6 @@ export default function ResumeDetailPage() {
   const [matchAnalysis, setMatchAnalysis] = useState<MatchAnalysis | null>(null);
   const [showMatchDetails, setShowMatchDetails] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(100); // 缩放级别 50% - 200%
 
   // AI 错误状态
   const [aiError, setAiError] = useState<string | null>(null);
@@ -69,6 +71,79 @@ export default function ResumeDetailPage() {
 
   // 编辑状态
   const [editedContent, setEditedContent] = useState<Record<string, unknown>>({});
+
+  // 样式预设（默认使用高管双栏布局）
+  const [selectedPresetId, setSelectedPresetId] = useState(resume?.templateId || 'executive');
+  const [v2RenderPlan, setV2RenderPlan] = useState<RenderPlan | null>(null);
+
+  // 全屏预览
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenScale, setFullscreenScale] = useState(1);
+
+  // 将 API 返回的内容转换为 ResumeContentV2 格式
+  const resumeContent = useMemo((): ResumeContentV2 | null => {
+    if (!resume?.content) return null;
+    const content = resume.content as Record<string, unknown>;
+
+    // 处理 summary - 可能是对象或字符串
+    let summaryText: string | undefined;
+    if (typeof content.summary === 'string') {
+      summaryText = content.summary;
+    } else if (content.summary && typeof content.summary === 'object') {
+      summaryText = (content.summary as Record<string, unknown>).text as string | undefined;
+    }
+
+    // 处理 skills - 可能是对象 { list: [...], _source, _basedOn } 或数组
+    let skillsList: string[] = [];
+    if (Array.isArray(content.skills)) {
+      skillsList = content.skills as string[];
+    } else if (content.skills && typeof content.skills === 'object') {
+      const skillsObj = content.skills as Record<string, unknown>;
+      skillsList = (skillsObj.list as string[]) || [];
+    }
+
+    // 处理 experience - 可能是对象 { list: [...], _source, _basedOn } 或数组
+    let experienceList: ResumeContentV2['experience'] = [];
+    if (Array.isArray(content.experience)) {
+      experienceList = content.experience as ResumeContentV2['experience'];
+    } else if (content.experience && typeof content.experience === 'object') {
+      const expObj = content.experience as Record<string, unknown>;
+      experienceList = (expObj.list as ResumeContentV2['experience']) || [];
+    }
+
+    // 处理 projects - 可能是对象 { list: [...], _source, _basedOn } 或数组
+    let projectsList: ResumeContentV2['projects'] = undefined;
+    if (Array.isArray(content.projects)) {
+      projectsList = content.projects as ResumeContentV2['projects'];
+    } else if (content.projects && typeof content.projects === 'object') {
+      const projObj = content.projects as Record<string, unknown>;
+      if (Array.isArray(projObj.list)) {
+        projectsList = projObj.list as ResumeContentV2['projects'];
+      }
+    }
+
+    // 处理 education - 可能是对象 { list: [...], _source, _basedOn } 或数组
+    let educationList: ResumeContentV2['education'] = [];
+    if (Array.isArray(content.education)) {
+      educationList = content.education as ResumeContentV2['education'];
+    } else if (content.education && typeof content.education === 'object') {
+      const eduObj = content.education as Record<string, unknown>;
+      educationList = (eduObj.list as ResumeContentV2['education']) || [];
+    }
+
+    return {
+      name: (content.name as string) || resume.name || '未命名',
+      title: content.title as string | undefined,
+      contact: content.contact as ResumeContentV2['contact'],
+      summary: summaryText,
+      experience: experienceList,
+      skills: skillsList,
+      matchedSkills: content.matchedSkills as string[] | undefined,
+      projects: projectsList,
+      education: educationList,
+      _meta: content._meta as ResumeContentV2['_meta'],
+    };
+  }, [resume]);
 
   // 自动保存
   const {
@@ -93,6 +168,10 @@ export default function ResumeDetailPage() {
       const data = await resumesApi.getById(resumeId);
       setResume(data);
       setEditedContent((data.content as Record<string, unknown>) || {});
+      // 同步样式预设 ID
+      if (data.templateId) {
+        setSelectedPresetId(data.templateId);
+      }
     } catch (error) {
       toast({
         title: '加载失败',
@@ -122,6 +201,18 @@ export default function ResumeDetailPage() {
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showExportMenu]);
+
+  // ESC 键退出全屏
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+        setFullscreenScale(1);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
 
   const handleSave = async () => {
     if (!resume) return;
@@ -353,9 +444,9 @@ export default function ResumeDetailPage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-4xl mx-auto">
+      <div className="flex flex-col h-full">
         {/* 顶部导航 */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
             <Link href="/dashboard/resumes">
               <Button variant="ghost" size="sm">
@@ -718,170 +809,102 @@ export default function ResumeDetailPage() {
           </div>
         )}
 
-        {/* 简历内容 */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          {/* 缩放控制栏 */}
+        {/* 主内容区域 - 左右分屏 */}
+        <div className="flex-1 flex gap-4 min-h-0">
+          {/* 左侧：样式预设选择器 */}
           {resume.status === 'completed' && (
-            <div className="flex items-center justify-between px-6 py-3 bg-gray-50 border-b border-gray-100">
-              <span className="text-sm font-medium text-gray-700">简历预览</span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setZoomLevel(Math.max(50, zoomLevel - 10))}
-                  disabled={zoomLevel <= 50}
-                  className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="缩小"
-                >
-                  <ZoomOut className="w-4 h-4 text-gray-600" />
-                </button>
-                <div className="flex items-center gap-1 px-2">
-                  <input
-                    type="range"
-                    min="50"
-                    max="200"
-                    step="10"
-                    value={zoomLevel}
-                    onChange={(e) => setZoomLevel(parseInt(e.target.value))}
-                    className="w-24 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
-                  />
-                  <span className="text-xs text-gray-500 w-10 text-right">{zoomLevel}%</span>
-                </div>
-                <button
-                  onClick={() => setZoomLevel(Math.min(200, zoomLevel + 10))}
-                  disabled={zoomLevel >= 200}
-                  className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="放大"
-                >
-                  <ZoomIn className="w-4 h-4 text-gray-600" />
-                </button>
-                <button
-                  onClick={() => setZoomLevel(100)}
-                  className="p-1.5 rounded hover:bg-gray-200"
-                  title="重置缩放"
-                >
-                  <Maximize2 className="w-4 h-4 text-gray-600" />
-                </button>
+            <div className="w-64 flex-shrink-0 overflow-y-auto bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+              <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2 sticky top-0 bg-white pb-2">
+                样式预设
+              </h2>
+              <div className="space-y-2">
+                {[
+                  { id: 'modern', name: '现代蓝色', desc: '左侧边栏布局' },
+                  { id: 'classic', name: '经典黑白', desc: '左侧边栏布局' },
+                  { id: 'creative', name: '创意紫色', desc: '顶部横幅布局' },
+                  { id: 'minimal', name: '极简纯净', desc: '单栏无装饰' },
+                  { id: 'executive', name: '高管专业', desc: '双栏布局' },
+                ].map((preset) => (
+                  <button
+                    key={preset.id}
+                    onClick={async () => {
+                      setSelectedPresetId(preset.id);
+                      if (resume) {
+                        try {
+                          await resumesApi.update(resume.id, { templateId: preset.id });
+                          setResume({ ...resume, templateId: preset.id });
+                        } catch {
+                          toast({ title: '保存失败', variant: 'destructive' });
+                        }
+                      }
+                    }}
+                    className={`w-full text-left p-3 rounded-lg border-2 transition ${
+                      selectedPresetId === preset.id
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="font-medium text-gray-900 text-sm">{preset.name}</div>
+                    <p className="text-xs text-gray-500">{preset.desc}</p>
+                  </button>
+                ))}
               </div>
             </div>
           )}
 
-          <div
-            className="p-8 transition-transform origin-top"
-            style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
-          >
+          {/* 右侧：简历预览 */}
+          <div className="flex-1 min-w-0 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             {resume.status === 'draft' ? (
-            <div className="text-center py-12">
-              <FileText className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">简历尚未生成</h3>
-              <p className="text-gray-500 mb-6">点击"AI 生成简历"按钮，让 AI 根据岗位信息为您定制简历</p>
-              <Button onClick={handleGenerate} disabled={isGenerating}>
-                <Sparkles className="w-4 h-4 mr-2" />
-                AI 生成简历
-              </Button>
-            </div>
-          ) : resume.status === 'failed' ? (
-            <AIErrorState
-              error={aiError || '简历生成失败，请稍后重试'}
-              onRetry={handleGenerate}
-              isRetrying={isGenerating}
-            />
-          ) : resume.status === 'generating' ? (
-            <div className="text-center py-12">
-              <Loader2 className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">正在生成简历...</h3>
-              <p className="text-gray-500">AI 正在分析岗位要求并为您定制简历内容</p>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {/* 个人简介 */}
-              <section>
-                <h2 className="text-lg font-bold text-gray-900 mb-3 pb-2 border-b border-gray-200">
-                  个人简介
-                </h2>
-                {isEditing ? (
-                  <textarea
-                    value={(editedContent.summary as string) || ''}
-                    onChange={(e) =>
-                      setEditedContent({ ...editedContent, summary: e.target.value })
-                    }
-                    className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    rows={4}
-                  />
-                ) : (
-                  <p className="text-gray-700 leading-relaxed">
-                    {(content.summary as string) || '暂无个人简介'}
-                  </p>
-                )}
-              </section>
-
-              {/* 工作经历 */}
-              <section>
-                <h2 className="text-lg font-bold text-gray-900 mb-3 pb-2 border-b border-gray-200">
-                  工作经历
-                </h2>
-                <div className="space-y-4">
-                  {((content.experience as Array<Record<string, unknown>>) || []).map(
-                    (exp, index) => (
-                      <div key={index} className="border-l-2 border-primary/30 pl-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <h3 className="font-semibold text-gray-900">
-                              {exp.position as string}
-                            </h3>
-                            <p className="text-sm text-gray-600">{exp.company as string}</p>
-                          </div>
-                          <span className="text-sm text-gray-500">{exp.period as string}</span>
-                        </div>
-                        <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-                          {((exp.highlights as string[]) || []).map((h, i) => (
-                            <li key={i}>{h}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )
-                  )}
-                </div>
-              </section>
-
-              {/* 技能标签 */}
-              <section>
-                <h2 className="text-lg font-bold text-gray-900 mb-3 pb-2 border-b border-gray-200">
-                  专业技能
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                  {((content.skills as string[]) || []).map((skill, index) => (
-                    <span
-                      key={index}
-                      className="px-3 py-1 bg-primary/10 text-primary text-sm font-medium rounded-full"
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              </section>
-
-              {/* 教育经历 */}
-              <section>
-                <h2 className="text-lg font-bold text-gray-900 mb-3 pb-2 border-b border-gray-200">
-                  教育经历
-                </h2>
-                <div className="space-y-3">
-                  {((content.education as Array<Record<string, unknown>>) || []).map(
-                    (edu, index) => (
-                      <div key={index} className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-medium text-gray-900">{edu.school as string}</h3>
-                          <p className="text-sm text-gray-600">
-                            {edu.major as string} · {edu.degree as string}
-                          </p>
-                        </div>
-                        <span className="text-sm text-gray-500">{edu.period as string}</span>
-                      </div>
-                    )
-                  )}
-                </div>
-              </section>
-            </div>
-          )}
+              <div className="text-center py-12">
+                <FileText className="w-16 h-16 text-gray-200 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">简历尚未生成</h3>
+                <p className="text-gray-500 mb-6">点击"AI 生成简历"按钮，让 AI 根据岗位信息为您定制简历</p>
+                <Button onClick={handleGenerate} disabled={isGenerating}>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  AI 生成简历
+                </Button>
+              </div>
+            ) : resume.status === 'failed' ? (
+              <div className="p-8">
+                <AIErrorState
+                  error={aiError || '简历生成失败，请稀后重试'}
+                  onRetry={handleGenerate}
+                  isRetrying={isGenerating}
+                />
+              </div>
+            ) : resume.status === 'generating' ? (
+              <div className="text-center py-12">
+                <Loader2 className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">正在生成简历...</h3>
+                <p className="text-gray-500">AI 正在分析岗位要求并为您定制简历内容</p>
+              </div>
+            ) : resumeContent ? (
+              <div className="h-full">
+                <ResumeRendererV2
+                  content={resumeContent}
+                  presetId={selectedPresetId}
+                  scale={0.8}
+                  showToolbar={true}
+                  showPresetSelector={false}
+                  onRenderPlanGenerated={(plan) => {
+                    setV2RenderPlan(plan);
+                    console.log('渲染方案生成完成:', plan);
+                  }}
+                  onError={(error) => {
+                    toast({
+                      title: '渲染失败',
+                      description: error.message,
+                      variant: 'destructive',
+                    });
+                  }}
+                  onFullscreen={() => setIsFullscreen(true)}
+                />
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                暂无简历内容
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -963,6 +986,140 @@ export default function ResumeDetailPage() {
           </div>
         </div>
       )}
+
+      {/* 全屏预览模态框 */}
+      {isFullscreen && resumeContent && v2RenderPlan && (
+        <FullscreenPreview
+          resumeName={resume.name}
+          presetId={selectedPresetId}
+          renderPlan={v2RenderPlan}
+          scale={fullscreenScale}
+          onScaleChange={setFullscreenScale}
+          onClose={() => {
+            setIsFullscreen(false);
+            setFullscreenScale(1);
+          }}
+        />
+      )}
     </DashboardLayout>
+  );
+}
+
+/** 全屏预览组件 */
+function FullscreenPreview({
+  resumeName,
+  presetId,
+  renderPlan,
+  scale,
+  onScaleChange,
+  onClose,
+}: {
+  resumeName: string;
+  presetId: string;
+  renderPlan: RenderPlan;
+  scale: number;
+  onScaleChange: (scale: number) => void;
+  onClose: () => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const preset = getStylePreset(presetId);
+  const [currentPage, setCurrentPage] = useState(0);
+
+  // 渲染 Canvas
+  useEffect(() => {
+    if (!canvasRef.current || !preset || !renderPlan.pages[currentPage]) return;
+
+    const engine = createRenderEngine(preset);
+    engine.renderPage(renderPlan.pages[currentPage], canvasRef.current, scale);
+  }, [preset, renderPlan, currentPage, scale]);
+
+  // ESC 键退出
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const presetName = presetId === 'modern' ? '现代蓝色' :
+    presetId === 'classic' ? '经典黑白' :
+    presetId === 'creative' ? '创意紫色' :
+    presetId === 'minimal' ? '极简纯净' : '高管专业';
+
+  return (
+    <div className="fixed inset-0 z-50 bg-gray-900/95 flex flex-col">
+      {/* 顶部工具栏 */}
+      <div className="flex items-center justify-between px-6 py-3 bg-gray-800 border-b border-gray-700">
+        <div className="flex items-center gap-4">
+          <h2 className="text-white font-medium">{resumeName}</h2>
+          <span className="text-gray-400 text-sm">{presetName}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* 页面导航 */}
+          {renderPlan.pages.length > 1 && (
+            <div className="flex items-center gap-2 text-gray-300">
+              <button
+                onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
+                disabled={currentPage === 0}
+                className="p-1 hover:text-white disabled:opacity-40"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <span className="text-sm">{currentPage + 1} / {renderPlan.pages.length}</span>
+              <button
+                onClick={() => setCurrentPage(Math.min(renderPlan.pages.length - 1, currentPage + 1))}
+                disabled={currentPage === renderPlan.pages.length - 1}
+                className="p-1 hover:text-white disabled:opacity-40"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          )}
+          {/* 缩放控制 */}
+          <div className="flex items-center gap-2 bg-gray-700 rounded-lg px-3 py-1.5">
+            <button
+              onClick={() => onScaleChange(Math.max(0.5, scale - 0.1))}
+              className="text-gray-300 hover:text-white p-1"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <span className="text-white text-sm w-14 text-center">{Math.round(scale * 100)}%</span>
+            <button
+              onClick={() => onScaleChange(Math.min(2, scale + 0.1))}
+              className="text-gray-300 hover:text-white p-1"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+          </div>
+          {/* 关闭按钮 */}
+          <button
+            onClick={onClose}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition"
+          >
+            <Minimize2 className="w-4 h-4" />
+            退出全屏
+          </button>
+        </div>
+      </div>
+
+      {/* Canvas 预览区域 */}
+      <div className="flex-1 overflow-auto">
+        <div className="flex justify-center py-8 px-4 min-h-full">
+          <div className="shadow-2xl bg-white flex-shrink-0">
+            <canvas ref={canvasRef} />
+          </div>
+        </div>
+      </div>
+
+      {/* 底部提示 */}
+      <div className="text-center py-2 bg-gray-800 text-gray-500 text-sm">
+        按 <kbd className="px-2 py-0.5 bg-gray-700 rounded text-gray-300">ESC</kbd> 退出全屏
+      </div>
+    </div>
   );
 }

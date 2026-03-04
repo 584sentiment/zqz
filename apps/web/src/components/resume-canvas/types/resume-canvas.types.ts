@@ -8,9 +8,14 @@ export type ResumeElementType =
   | 'section-header'
   | 'experience-card'
   | 'skill-tags'
+  | 'skill-progress'        // 技能进度条
+  | 'skill-grouped'         // 技能分类组
   | 'education-item'
   | 'divider'
-  | 'container';
+  | 'container'
+  | 'sidebar'               // 侧边栏容器
+  | 'header-banner'         // 头部横幅
+  | 'background-pattern';   // 背景图案
 
 /** 内容来源类型 */
 export type ContentSourceType =
@@ -127,15 +132,93 @@ export interface ContainerElement extends ResumeElementBase {
   padding?: { top: number; right: number; bottom: number; left: number };
 }
 
+/** 头部横幅元素 */
+export interface HeaderBannerElement extends ResumeElementBase {
+  type: 'header-banner';
+  decoration: {
+    type: 'none' | 'color-block' | 'gradient' | 'pattern-dots' | 'pattern-lines' | 'pattern-geometric';
+    primaryColor?: string;
+    secondaryColor?: string;
+    opacity?: number;
+    borderRadius?: number;
+    patternSize?: number;
+    height?: number;
+  };
+  children: ResumeElement[];
+}
+
+/** 侧边栏容器元素 */
+export interface SidebarContainerElement extends ResumeElementBase {
+  type: 'sidebar';
+  backgroundColor: string;
+  padding: number;
+  children: ResumeElement[];
+}
+
+/** 技能进度条元素 */
+export interface SkillProgressElement extends ResumeElementBase {
+  type: 'skill-progress';
+  skills: Array<{
+    name: string;
+    level: number; // 0-100
+    matched?: boolean;
+  }>;
+  style: {
+    label: TextStyle;
+    trackColor: string;
+    fillColor: string;
+    height: number;
+    borderRadius: number;
+    matchedBorderColor?: string;
+  };
+}
+
+/** 技能分类组元素 */
+export interface SkillGroupedElement extends ResumeElementBase {
+  type: 'skill-grouped';
+  groups: Array<{
+    category: string;
+    skills: string[];
+  }>;
+  matchedSkills?: string[];
+  style: {
+    categoryTitle: TextStyle;
+    tag: TextStyle & {
+      backgroundColor: string;
+      borderRadius: number;
+      paddingX: number;
+      paddingY: number;
+    };
+    gap: number;
+    matchedBorderColor?: string;
+    matchedBackgroundColor?: string;
+  };
+}
+
+/** 背景图案元素 */
+export interface BackgroundPatternElement extends ResumeElementBase {
+  type: 'background-pattern';
+  patternType: 'dots' | 'lines' | 'geometric' | 'gradient';
+  primaryColor: string;
+  secondaryColor?: string;
+  patternSize: number;
+  opacity: number;
+}
+
 /** 联合类型 */
 export type ResumeElement =
   | TextElement
   | SectionHeaderElement
   | ExperienceCardElement
   | SkillTagsElement
+  | SkillProgressElement
+  | SkillGroupedElement
   | EducationElement
   | DividerElement
-  | ContainerElement;
+  | ContainerElement
+  | HeaderBannerElement
+  | SidebarContainerElement
+  | BackgroundPatternElement;
 
 /** 页面数据 */
 export interface PageData {

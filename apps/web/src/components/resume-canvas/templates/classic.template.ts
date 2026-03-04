@@ -1,5 +1,6 @@
 /**
  * 经典专业模板
+ * 单栏布局，精致下划线装饰
  */
 
 import type { ResumeTemplate, TemplateStyles, TemplateLayout } from '../types/template.types';
@@ -16,7 +17,7 @@ const classicStyles: TemplateStyles = {
       fontWeight: 'bold',
       color: '#111827',
       lineHeight: 1.2,
-      letterSpacing: 0.5,
+      letterSpacing: 1,
       textAlign: 'left',
     },
     title: {
@@ -33,7 +34,7 @@ const classicStyles: TemplateStyles = {
       fontSize: 11,
       fontWeight: 'normal',
       color: '#6b7280',
-      lineHeight: 1.4,
+      lineHeight: 1.5,
       letterSpacing: 0,
       textAlign: 'left',
     },
@@ -45,11 +46,11 @@ const classicStyles: TemplateStyles = {
       fontSize: 14,
       fontWeight: 'bold',
       color: '#111827',
-      lineHeight: 1.3,
-      letterSpacing: 1,
+      lineHeight: 1.4,
+      letterSpacing: 1.5,
       textAlign: 'left',
     },
-    accentColor: '#1f2937',
+    accentColor: '#111827',
   },
 
   body: {
@@ -58,7 +59,7 @@ const classicStyles: TemplateStyles = {
       fontSize: 11,
       fontWeight: 'normal',
       color: '#374151',
-      lineHeight: 1.5,
+      lineHeight: 1.6,
       letterSpacing: 0,
       textAlign: 'left',
     },
@@ -66,7 +67,7 @@ const classicStyles: TemplateStyles = {
       fontFamily: DEFAULT_FONTS.primary,
       fontSize: 12,
       fontWeight: 'bold',
-      color: '#1f2937',
+      color: '#111827',
       lineHeight: 1.4,
       letterSpacing: 0,
       textAlign: 'left',
@@ -76,31 +77,63 @@ const classicStyles: TemplateStyles = {
       fontSize: 10,
       fontWeight: 'normal',
       color: '#6b7280',
-      lineHeight: 1.3,
+      lineHeight: 1.4,
       letterSpacing: 0,
       textAlign: 'left',
     },
   },
 
   spacing: {
-    sectionGap: 18,
-    paragraphGap: 6,
-    listItemGap: 10,
+    sectionGap: 20,
+    paragraphGap: 8,
+    listItemGap: 12,
     tagGap: 6,
   },
 };
 
 const classicLayout: TemplateLayout = {
-  header: { align: 'left', showDivider: false },
+  layoutType: 'single-column',
+
+  header: {
+    align: 'left',
+    showDivider: false,
+    decoration: {
+      type: 'none',
+    },
+  },
+
   sectionOrder: ['experience', 'education', 'skills', 'projects'],
+
+  sectionTitleStyle: {
+    type: 'underline',
+    accentColor: '#111827',
+    thickness: 2,
+    borderRadius: 0,
+    padding: { horizontal: 0, vertical: 4 },
+  },
+
+  dividerStyle: {
+    type: 'double',
+    color: '#d1d5db',
+    thickness: 1,
+  },
+
+  skillDisplayStyle: {
+    type: 'list',
+    borderRadius: 0,
+    trackColor: '#f3f4f6',
+    fillColor: '#111827',
+  },
+
   showSourceBadge: false,
   highlightMatchedSkills: false,
+  sectionGap: 20,
 };
 
 export const classicTemplate: ResumeTemplate = {
   id: 'classic',
   name: '经典专业',
-  description: '传统商务风格，适合金融、咨询等行业',
+  description: '传统商务风格，精致的下划线装饰，适合金融、咨询等行业',
   thumbnail: '/templates/classic.png',
   category: 'professional',
   isPremium: false,

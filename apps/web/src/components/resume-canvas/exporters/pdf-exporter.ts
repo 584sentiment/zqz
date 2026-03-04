@@ -173,14 +173,14 @@ export class PDFExporter {
     pageHeight: number
   ): void {
     const { title, style, x, y, height } = element;
-    const color = this.parseColor(style.title.color);
-    const accentColor = this.parseColor(style.accentColor || style.title.color);
+    const color = this.parseColor(style.color);
+    const accentColor = this.parseColor(style.accentColor || style.color);
 
     // 标题文本
     pdfPage.drawText(title, {
       x,
-      y: pageHeight - y - style.title.fontSize,
-      size: style.title.fontSize,
+      y: pageHeight - y - style.fontSize,
+      size: style.fontSize,
       font: fonts.bold,
       color: rgb(color.r, color.g, color.b),
     });
@@ -379,7 +379,7 @@ export class PDFExporter {
    * 下载 PDF
    */
   static download(pdfBytes: Uint8Array, filename: string): void {
-    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const blob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

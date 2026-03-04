@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Stage, Layer, Rect, Text, Group, Line } from 'react-konva';
+import { Stage, Layer, Rect, Text, Group, Line, Circle } from 'react-konva';
 import type {
   ResumeContent,
   ResumeElement,
@@ -12,8 +12,10 @@ import type {
   SkillTagsElement,
   EducationElement,
   DividerElement,
+  HeaderBannerElement,
+  SidebarContainerElement,
 } from '../types/resume-canvas.types';
-import type { ResumeTemplate } from '../types/template.types';
+import type { ResumeTemplate, SectionTitleStyleType } from '../types/template.types';
 import { A4_PAGE } from '../types/template.types';
 import { LayoutEngine } from '../core/layout-engine';
 
@@ -164,6 +166,10 @@ const ElementRenderer: React.FC<{
       return <EducationItemRenderer element={element as EducationElement} onClick={onClick} />;
     case 'divider':
       return <DividerRenderer element={element as DividerElement} />;
+    case 'header-banner':
+      return <HeaderBannerRenderer element={element as HeaderBannerElement} onClick={onClick} />;
+    case 'sidebar':
+      return <SidebarContainerRenderer element={element as SidebarContainerElement} onClick={onClick} />;
     default:
       return null;
   }
@@ -393,6 +399,125 @@ const DividerRenderer: React.FC<{
       strokeWidth={element.thickness}
       dash={element.style === 'dashed' ? [5, 5] : undefined}
     />
+  );
+};
+
+/**
+ * 头部横幅渲染器
+ */
+const HeaderBannerRenderer: React.FC<{
+  element: HeaderBannerElement;
+  onClick?: () => void;
+}> = ({ element, onClick }) => {
+  const { decoration, children } = element;
+
+  const renderBackground = () => {
+    switch (decoration.type) {
+      case 'gradient':
+        return (
+          <Rect
+            x={0}
+            y={0}
+            width={element.width}
+            height={element.height}
+            fillLinearGradientStartPoint={{ x: 0, y: 0 }}
+            fillLinearGradientEndPoint={{ x: element.width, y: element.height }}
+            fillLinearGradientColorStops={[
+              0, decoration.primaryColor || '#7c3aed',
+              1, decoration.secondaryColor || '#a855f7',
+            ]}
+            cornerRadius={decoration.borderRadius || 0}
+          />
+        );
+      case 'color-block':
+        return (
+          <Rect
+            x={0}
+            y={0}
+            width={element.width}
+            height={element.height}
+            fill={decoration.primaryColor}
+            opacity={decoration.opacity || 1}
+            cornerRadius={decoration.borderRadius || 0}
+          />
+        );
+      case 'pattern-dots':
+        // 简化的圆点图案
+        const dotSize = decoration.patternSize || 20;
+        const dots = [];
+        for (let i = 0; i < Math.ceil(element.width / dotSize); i++) {
+          for (let j = 0; j < Math.ceil(element.height / dotSize); j++) {
+            dots.push(
+              <Circle
+                key={`${i}-${j}`}
+                x={i * dotSize + dotSize / 2}
+                y={j * dotSize + dotSize / 2}
+                radius={dotSize / 8}
+                fill={decoration.secondaryColor || decoration.primaryColor}
+                opacity={(decoration.opacity || 1) * 0.3}
+              />
+            );
+          }
+        }
+        return (
+          <>
+            <Rect
+              x={0}
+              y={0}
+              width={element.width}
+              height={element.height}
+              fill={decoration.primaryColor}
+              cornerRadius={decoration.borderRadius || 0}
+            />
+            {dots}
+          </>
+        );
+      default:
+        return (
+          <Rect
+            x={0}
+            y={0}
+            width={element.width}
+            height={element.height}
+            fill={decoration.primaryColor || '#7c3aed'}
+            cornerRadius={decoration.borderRadius || 0}
+          />
+        );
+    }
+  };
+
+  return (
+    <Group x={element.x} y={element.y} onClick={onClick}>
+      {renderBackground()}
+      {children.map((child) => (
+        <ElementRenderer key={child.id} element={child} />
+      ))}
+    </Group>
+  );
+};
+
+/**
+ * 侧边栏容器渲染器
+ */
+const SidebarContainerRenderer: React.FC<{
+  element: SidebarContainerElement;
+  onClick?: () => void;
+}> = ({ element, onClick }) => {
+  return (
+    <Group x={element.x} y={element.y} onClick={onClick}>
+      {/* 背景 */}
+      <Rect
+        x={0}
+        y={0}
+        width={element.width}
+        height={element.height}
+        fill={element.backgroundColor}
+      />
+      {/* 子元素 */}
+      {element.children.map((child) => (
+        <ElementRenderer key={child.id} element={child} />
+      ))}
+    </Group>
   );
 };
 

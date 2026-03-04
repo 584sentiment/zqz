@@ -1,5 +1,6 @@
 /**
  * 极简模板
+ * 纯黑白极简设计，注重内容本身
  */
 
 import type { ResumeTemplate, TemplateStyles, TemplateLayout } from '../types/template.types';
@@ -33,7 +34,7 @@ const minimalStyles: TemplateStyles = {
       fontSize: 10,
       fontWeight: 'normal',
       color: '#a1a1aa',
-      lineHeight: 1.4,
+      lineHeight: 1.5,
       letterSpacing: 0,
       textAlign: 'left',
     },
@@ -42,14 +43,14 @@ const minimalStyles: TemplateStyles = {
   section: {
     title: {
       fontFamily: DEFAULT_FONTS.primary,
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: 'normal',
       color: '#18181b',
       lineHeight: 1.4,
-      letterSpacing: 1,
+      letterSpacing: 2,
       textAlign: 'left',
     },
-    accentColor: '#e4e4e7',
+    accentColor: '#d4d4d8',
   },
 
   body: {
@@ -58,7 +59,7 @@ const minimalStyles: TemplateStyles = {
       fontSize: 10,
       fontWeight: 'normal',
       color: '#3f3f46',
-      lineHeight: 1.6,
+      lineHeight: 1.7,
       letterSpacing: 0,
       textAlign: 'left',
     },
@@ -91,16 +92,48 @@ const minimalStyles: TemplateStyles = {
 };
 
 const minimalLayout: TemplateLayout = {
-  header: { align: 'left', showDivider: false },
+  layoutType: 'single-column',
+
+  header: {
+    align: 'left',
+    showDivider: false,
+    decoration: {
+      type: 'none',
+    },
+  },
+
   sectionOrder: ['experience', 'skills', 'education', 'projects'],
+
+  sectionTitleStyle: {
+    type: 'minimal',
+    accentColor: '#d4d4d8',
+    thickness: 0,
+    borderRadius: 0,
+    padding: { horizontal: 0, vertical: 2 },
+  },
+
+  dividerStyle: {
+    type: 'solid',
+    color: '#e4e4e7',
+    thickness: 0.5,
+  },
+
+  skillDisplayStyle: {
+    type: 'tags',
+    borderRadius: 0,
+    trackColor: '#f4f4f5',
+    fillColor: '#18181b',
+  },
+
   showSourceBadge: false,
   highlightMatchedSkills: false,
+  sectionGap: 16,
 };
 
 export const minimalTemplate: ResumeTemplate = {
   id: 'minimal',
   name: '极简风格',
-  description: '超简洁设计，注重内容本身',
+  description: '纯黑白极简设计，注重内容本身，无多余装饰',
   thumbnail: '/templates/minimal.png',
   category: 'simple',
   isPremium: false,

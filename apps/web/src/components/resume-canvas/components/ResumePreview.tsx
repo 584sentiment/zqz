@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { ResumeCanvas } from './ResumeCanvas';
 import { PDFExporter } from '../exporters/pdf-exporter';
 import { getTemplate, type ResumeTemplate } from '../templates/template-registry';
@@ -39,8 +39,12 @@ export const ResumePreview: React.FC<ResumePreviewProps> = ({
   const [layoutResult, setLayoutResult] = useState<LayoutResult | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
-  // 获取模板
-  const template = getTemplate(templateId) || getTemplate('modern')!;
+  // 使用 useMemo 确保模板在 templateId 变化时更新
+  const template = useMemo(() => {
+    const t = getTemplate(templateId);
+    console.log('[ResumePreview] 模板切换:', templateId, '->', t?.name);
+    return t || getTemplate('modern')!;
+  }, [templateId]);
 
   // 处理布局完成
   const handleLayoutComplete = useCallback((result: LayoutResult) => {

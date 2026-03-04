@@ -441,18 +441,34 @@ export class JobParsingService {
 export class ResumeGenerationService {
   async generate(userProfile: string, jobDescription: string): Promise<Record<string, unknown>> {
     try {
-      const llm = getAIManager().getProvider('deepseek');
+      const manager = getAIManager();
+
+      // 检查 provider 是否可用
+      if (!manager.hasProvider('deepseek')) {
+        console.error('[ResumeGeneration] DeepSeek provider 未配置，检查环境变量 DEEPSEEK_API_KEY');
+        throw new AIServiceError(
+          'AI 服务未正确配置，请检查 DEEPSEEK_API_KEY 环境变量',
+          AIServiceErrorCode.PROVIDER_NOT_CONFIGURED,
+          false
+        );
+      }
+
+      const llm = manager.getProvider('deepseek');
       const prompt = PromptTemplate.fromTemplate(getPromptTemplate('resumeGeneration'));
 
       const chain = prompt.pipe(llm).pipe(new StringOutputParser());
+
+      console.log('[ResumeGeneration] 开始调用 AI 服务...');
 
       // 使用性能监控包装
       const { result } = await withTimeoutAndMetrics(
         '简历生成',
         chain.invoke({ userProfile, jobDescription }),
-        30000, // 30 秒超时
-        3000   // 3 秒首字节阈值
+        90000, // 90 秒超时（简历生成是复杂任务）
+        5000   // 5 秒首字节阈值
       );
+
+      console.log('[ResumeGeneration] AI 响应长度:', result?.length || 0);
 
       try {
         return JSON.parse(result);
@@ -461,13 +477,20 @@ export class ResumeGenerationService {
         if (jsonMatch) {
           return JSON.parse(jsonMatch[0]);
         }
+        console.error('[ResumeGeneration] JSON 解析失败，响应内容:', result.substring(0, 500));
         throw new AIServiceError(
-          '简历生成失败，请稍后重试',
+          '简历生成失败，AI 返回格式异常',
           AIServiceErrorCode.INVALID_RESPONSE,
           true
         );
       }
     } catch (error) {
+      // 如果已经是 AIServiceError，直接抛出
+      if (error instanceof AIServiceError) {
+        throw error;
+      }
+      // 记录原始错误
+      console.error('[ResumeGeneration] 原始错误:', error);
       handleAIError(error, '简历生成');
     }
   }

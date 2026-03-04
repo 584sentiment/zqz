@@ -4,7 +4,7 @@
 
 'use client';
 
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useMemo } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -24,7 +24,40 @@ import { Undo2, Redo2, Save, Sparkles } from 'lucide-react';
 import { useResumeEditorStore } from '../stores/resume-editor.store';
 import { EditableSection, ListItem, EmptyState } from './EditableSection';
 import { RichTextEditor, SimpleTextInput, TagsInput } from './RichTextEditor';
-import type { ResumeEditorProps, SectionData } from '../types/editor.types';
+import type { ResumeEditorProps, SectionData, RichTextContent } from '../types/editor.types';
+
+/**
+ * 解析内容为 TipTap JSONContent 格式
+ * 支持：JSON 字符串、普通文本字符串、JSONContent 对象
+ */
+function parseContent(content: string | RichTextContent | undefined): RichTextContent | undefined {
+  if (!content) return undefined;
+
+  if (typeof content === 'string') {
+    // 尝试解析为 JSON
+    try {
+      const parsed = JSON.parse(content);
+      // 检查是否是有效的 TipTap 内容结构
+      if (parsed && typeof parsed === 'object' && parsed.type) {
+        return parsed;
+      }
+    } catch {
+      // 不是 JSON，是普通文本，转换为 TipTap 段落格式
+      return {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: content }],
+          },
+        ],
+      };
+    }
+  }
+
+  // 已经是对象格式
+  return content as RichTextContent;
+}
 
 // 工具栏按钮
 function ToolbarButton({
@@ -387,8 +420,20 @@ function SummaryEditor({
   onChange: (summary: string | undefined) => void;
   readOnly: boolean;
 }) {
-  // 解析 JSON 内容
-  const parsedContent = data ? (typeof data === 'string' ? JSON.parse(data) : data) : undefined;
+  const parsedContent = useMemo(() => parseContent(data), [data]);
+
+  return (
+    <RichTextEditor
+      content={parsedContent}
+      onChange={(content) => onChange(JSON.stringify(content))}
+      placeholder="简要介绍您的专业背景和核心优势..."
+      minHeight={100}
+      readOnly={readOnly}
+    />
+  );
+}
+    return data;
+  }, [data]);
 
   return (
     <RichTextEditor
@@ -469,7 +514,7 @@ function ExperienceEditor({
             <div>
               <label className="block text-xs text-gray-500 mb-1">工作描述</label>
               <RichTextEditor
-                content={typeof exp.description === 'string' ? undefined : exp.description as any}
+                content={parseContent(exp.description)}
                 onChange={(content) => onUpdate(exp.id, { description: JSON.stringify(content) as any })}
                 placeholder="描述您的主要职责和成就..."
                 minHeight={80}
@@ -632,7 +677,7 @@ function ProjectsEditor({
             <div>
               <label className="block text-xs text-gray-500 mb-1">项目描述</label>
               <RichTextEditor
-                content={typeof proj.description === 'string' ? undefined : proj.description as any}
+                content={parseContent(proj.description)}
                 onChange={(content) => onUpdate(proj.id, { description: JSON.stringify(content) as any })}
                 placeholder="描述项目背景和您的贡献..."
                 minHeight={80}

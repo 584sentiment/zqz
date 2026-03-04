@@ -80,15 +80,26 @@ export function useAutoSave<T>({
     await performSave();
   }, [performSave]);
 
+  // 用于比较数据的 ref
+  const prevDataRef = useRef<string>('');
+
   // 监听数据变化，触发防抖保存
   useEffect(() => {
     // 跳过初始渲染
     if (initialRenderRef.current) {
       initialRenderRef.current = false;
+      prevDataRef.current = JSON.stringify(data);
       return;
     }
 
     if (!enabled) return;
+
+    // 深度比较：只在内容实际变化时才触发保存
+    const currentDataStr = JSON.stringify(data);
+    if (currentDataStr === prevDataRef.current) {
+      return;
+    }
+    prevDataRef.current = currentDataStr;
 
     // 标记有未保存的更改
     setHasUnsavedChanges(true);

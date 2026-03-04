@@ -11,6 +11,7 @@ import {
   Request,
   ForbiddenException,
 } from '@nestjs/common';
+import { IsOptional, IsArray, IsString, IsEnum } from 'class-validator';
 import { ResumesService } from './resumes.service';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { RequireQuota } from '@/common/decorators/quota.decorator';
@@ -19,6 +20,26 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 // 高级模板 ID 列表
 const PREMIUM_TEMPLATES = ['creative', 'executive'];
+
+// DTO 定义
+class GetSuggestionsDto {
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  sections?: string[];
+}
+
+class OptimizeSectionDto {
+  @IsString()
+  sectionType!: string;
+
+  @IsString()
+  content!: string;
+
+  @IsOptional()
+  @IsEnum(['professional', 'concise', 'detailed'])
+  style?: 'professional' | 'concise' | 'detailed';
+}
 
 @Controller('resumes')
 @UseGuards(JwtAuthGuard)
@@ -160,6 +181,49 @@ export class ResumesController {
   @Post(':id/generate')
   async generateResume(@Request() req: { user: { id: string } }, @Param('id') id: string) {
     return this.resumesService.generateResume(req.user.id, id);
+  }
+
+  /**
+   * 获取简历优化建议
+   */
+  @Post(':id/suggestions')
+  @RequireQuota('ai')
+  async getSuggestions(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() body: GetSuggestionsDto,
+  ) {
+    return this.resumesService.getSuggestions(req.user.id, id, body.sections);
+  }
+
+  /**
+   * 一键润色/重写区块
+   */
+  @Post(':id/optimize-section')
+  @RequireQuota('ai')
+  async optimizeSection(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() body: OptimizeSectionDto,
+  ) {
+    return this.resumesService.optimizeSection(
+      req.user.id,
+      id,
+      body.sectionType,
+      body.content,
+      body.style,
+    );
+  }
+
+  /**
+   * 获取岗位关键词
+   */
+  @Get(':id/job-keywords')
+  async getJobKeywords(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+  ) {
+    return this.resumesService.getJobKeywords(req.user.id, id);
   }
 
   /**

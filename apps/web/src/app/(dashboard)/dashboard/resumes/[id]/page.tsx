@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { resumesApi, Resume, MatchAnalysis, ResumeVersion } from '@/lib/api/resumes';
+import { resumesApi, Resume, MatchAnalysis, ResumeVersion, ResumeSuggestion, JobKeywordExtraction, SkillMatchResult } from '@/lib/api/resumes';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { useAutoSave } from '@/hooks/use-auto-save';
 import { AIErrorState } from '@/components/ai-error-state';
 import { InteractiveCanvas, getStylePreset, createRenderEngine, exportToPDF, downloadPDF } from '@/components/resume-canvas/v2';
 import type { ResumeContent as ResumeContentV2, RenderPlan } from '@/components/resume-canvas/v2/types';
+import { AIToolbar, SuggestionsPanel, JobKeywordsPanel, SectionPolishDialog } from '@/components/resume-ai-tools';
 import {
   ArrowLeft,
   Save,
@@ -40,6 +41,9 @@ import {
   Minimize2,
   ZoomIn,
   ZoomOut,
+  RefreshCw,
+  Key,
+  Lightbulb,
 } from 'lucide-react';
 
 export default function ResumeDetailPage() {
@@ -59,6 +63,8 @@ export default function ResumeDetailPage() {
   const [matchAnalysis, setMatchAnalysis] = useState<MatchAnalysis | null>(null);
   const [showMatchDetails, setShowMatchDetails] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showAiMenu, setShowAiMenu] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   // AI 错误状态
   const [aiError, setAiError] = useState<string | null>(null);
@@ -79,6 +85,26 @@ export default function ResumeDetailPage() {
   // 全屏预览
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fullscreenScale, setFullscreenScale] = useState(1);
+
+  // 画布缩放
+  const [canvasScale, setCanvasScale] = useState(0.8);
+
+  // AI 工具状态
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState<ResumeSuggestion[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [applyingSuggestionId, setApplyingSuggestionId] = useState<string | null>(null);
+
+  const [showKeywords, setShowKeywords] = useState(false);
+  const [jobKeywords, setJobKeywords] = useState<JobKeywordExtraction | null>(null);
+  const [skillMatch, setSkillMatch] = useState<SkillMatchResult | null>(null);
+  const [isLoadingKeywords, setIsLoadingKeywords] = useState(false);
+
+  const [polishDialog, setPolishDialog] = useState<{
+    isOpen: boolean;
+    sectionType: string;
+    content: string;
+  } | null>(null);
 
   // 将 API 返回的内容转换为 ResumeContentV2 格式
   // 编辑模式下使用 editedContent，预览模式下使用 resume.content
@@ -198,16 +224,16 @@ export default function ResumeDetailPage() {
   // 点击外部关闭导出菜单
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (showExportMenu) {
-        const target = event.target as HTMLElement;
-        if (!target.closest('.relative')) {
-          setShowExportMenu(false);
-        }
+      const target = event.target as HTMLElement;
+      if (!target.closest('.dropdown-menu')) {
+        setShowExportMenu(false);
+        setShowAiMenu(false);
+        setShowMoreMenu(false);
       }
     };
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
-  }, [showExportMenu]);
+  }, []);
 
   // ESC 键退出全屏
   useEffect(() => {
@@ -466,6 +492,155 @@ export default function ResumeDetailPage() {
     }
   };
 
+  // AI 工具处理函数
+  const handleGetSuggestions = async () => {
+    if (!resume) return;
+    setIsLoadingSuggestions(true);
+    setShowSuggestions(true);
+    try {
+      const result = await resumesApi.getSuggestions(resume.id);
+      setSuggestions(result.suggestions);
+    } catch (error) {
+      toast({ title: '获取建议失败', description: '请稍后重试', variant: 'destructive' });
+      setShowSuggestions(false);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+
+  const handleApplySuggestion = async (suggestion: ResumeSuggestion) => {
+    if (!resume) return;
+    setApplyingSuggestionId(suggestion.id);
+    try {
+      // 根据建议路径更新内容
+      const newContent = JSON.parse(JSON.stringify(editedContent)) as Record<string, unknown>;
+      const pathParts = suggestion.sectionPath.split('.');
+
+      let current: unknown = newContent;
+      for (let i = 0; i < pathParts.length - 1; i++) {
+        const part = pathParts[i];
+        if (current === null || current === undefined) break;
+
+        if (Array.isArray(current)) {
+          const index = parseInt(part);
+          if (!isNaN(index) && index >= 0 && index < current.length) {
+            current = current[index];
+          }
+        } else if (typeof current === 'object') {
+          current = (current as Record<string, unknown>)[part];
+        }
+      }
+
+      const lastPart = pathParts[pathParts.length - 1];
+      if (current !== null && current !== undefined) {
+        if (Array.isArray(current)) {
+          const index = parseInt(lastPart);
+          if (!isNaN(index)) {
+            current[index] = suggestion.suggestion;
+          }
+        } else if (typeof current === 'object') {
+          (current as Record<string, unknown>)[lastPart] = suggestion.suggestion;
+        }
+      }
+
+      setEditedContent(newContent);
+      setSuggestions((prev) => prev.filter((s) => s.id !== suggestion.id));
+      toast({ title: '已应用建议', description: '简历内容已更新' });
+    } catch (error) {
+      toast({ title: '应用失败', description: '请稍后重试', variant: 'destructive' });
+    } finally {
+      setApplyingSuggestionId(null);
+    }
+  };
+
+  const handleApplyAllSuggestions = async () => {
+    for (const suggestion of suggestions) {
+      await handleApplySuggestion(suggestion);
+    }
+  };
+
+  const handleGetJobKeywords = async () => {
+    if (!resume) return;
+    setIsLoadingKeywords(true);
+    setShowKeywords(true);
+    try {
+      const result = await resumesApi.getJobKeywords(resume.id);
+      setJobKeywords(result.keywords);
+      setSkillMatch(result.skillMatch);
+    } catch (error) {
+      toast({ title: '获取关键词失败', description: '请确保简历已关联岗位', variant: 'destructive' });
+      setShowKeywords(false);
+    } finally {
+      setIsLoadingKeywords(false);
+    }
+  };
+
+  const handleAddSkill = (skill: string) => {
+    const newContent = JSON.parse(JSON.stringify(editedContent)) as Record<string, unknown>;
+    let skillsList: string[] = [];
+
+    if (Array.isArray(newContent.skills)) {
+      skillsList = newContent.skills as string[];
+    } else if (newContent.skills && typeof newContent.skills === 'object') {
+      const skillsObj = newContent.skills as Record<string, unknown>;
+      skillsList = (skillsObj.list as string[]) || [];
+    }
+
+    if (!skillsList.some((s) => s.toLowerCase() === skill.toLowerCase())) {
+      skillsList.push(skill);
+
+      if (Array.isArray(newContent.skills)) {
+        newContent.skills = skillsList;
+      } else if (newContent.skills && typeof newContent.skills === 'object') {
+        (newContent.skills as Record<string, unknown>).list = skillsList;
+      }
+
+      setEditedContent(newContent);
+      toast({ title: '已添加技能', description: skill });
+    }
+  };
+
+  const handlePolishSection = (sectionType: string, content: string) => {
+    setPolishDialog({
+      isOpen: true,
+      sectionType,
+      content,
+    });
+  };
+
+  const handleApplyPolish = (optimized: string) => {
+    if (!polishDialog) return;
+
+    const newContent = JSON.parse(JSON.stringify(editedContent)) as Record<string, unknown>;
+    const pathParts = polishDialog.sectionType.split('.');
+
+    // 简单路径处理
+    if (pathParts.length === 1) {
+      const field = pathParts[0];
+      if (field === 'summary') {
+        if (typeof newContent.summary === 'string') {
+          newContent.summary = optimized;
+        } else if (newContent.summary && typeof newContent.summary === 'object') {
+          (newContent.summary as Record<string, unknown>).text = optimized;
+        }
+      }
+    }
+
+    setEditedContent(newContent);
+    toast({ title: '已应用优化', description: '简历内容已更新' });
+  };
+
+  // 获取简历技能列表
+  const resumeSkills = useMemo(() => {
+    const skillsData = editedContent?.skills;
+    if (Array.isArray(skillsData)) {
+      return skillsData as string[];
+    } else if (skillsData && typeof skillsData === 'object') {
+      return (skillsData as Record<string, unknown>).list as string[] || [];
+    }
+    return [];
+  }, [editedContent]);
+
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -502,35 +677,26 @@ export default function ResumeDetailPage() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handleDuplicate}>
-              <Copy className="w-4 h-4 mr-2" />
-              复制
-            </Button>
-            <Button variant="outline" onClick={handleDelete} className="text-red-600 hover:text-red-700">
-              <Trash2 className="w-4 h-4 mr-2" />
-              删除
-            </Button>
-          </div>
         </div>
 
         {/* 操作区 */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            {/* 左侧：状态信息 */}
+            <div className="flex items-center gap-3">
               {resume.status === 'completed' && resume.matchScore && (
                 <button
                   onClick={handleAnalyzeMatch}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-50 rounded-lg hover:bg-green-100 transition cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 rounded-lg hover:bg-green-100 transition cursor-pointer"
                 >
-                  <Star className="w-5 h-5 text-green-600" />
-                  <span className="font-medium text-green-700">
-                    {Math.round(resume.matchScore * 100)}% 岗位匹配
+                  <Star className="w-4 h-4 text-green-600" />
+                  <span className="font-medium text-green-700 text-sm">
+                    {Math.round(resume.matchScore * 100)}% 匹配
                   </span>
                 </button>
               )}
               <span
-                className={`px-3 py-1 rounded-full text-sm font-medium ${
+                className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                   resume.status === 'completed'
                     ? 'bg-green-100 text-green-700'
                     : resume.status === 'generating'
@@ -548,14 +714,10 @@ export default function ResumeDetailPage() {
                   ? '生成失败'
                   : '草稿'}
               </span>
-              <span className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-purple-50 text-purple-700">
-                <Languages className="w-3.5 h-3.5" />
-                {resume.language === 'en' ? 'English' : '中文'}
-              </span>
               {/* 自动保存状态 */}
               {isEditing && (
                 <div
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
                     isAutoSaving
                       ? 'bg-blue-50 text-blue-700'
                       : hasUnsavedChanges
@@ -564,122 +726,224 @@ export default function ResumeDetailPage() {
                   }`}
                 >
                   {isAutoSaving ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>保存中...</span>
-                    </>
+                    <Loader2 className="w-3 h-3 animate-spin" />
                   ) : hasUnsavedChanges ? (
-                    <>
-                      <CloudOff className="w-3.5 h-3.5" />
-                      <span>未保存</span>
-                    </>
+                    <CloudOff className="w-3 h-3" />
                   ) : (
-                    <>
-                      <Cloud className="w-3.5 h-3.5" />
-                      <span>{saveStatusText || '已保存'}</span>
-                    </>
+                    <Cloud className="w-3 h-3" />
                   )}
+                  <span>{isAutoSaving ? '保存中' : hasUnsavedChanges ? '未保存' : '已保存'}</span>
                 </div>
               )}
             </div>
+
+            {/* 右侧：操作按钮 */}
             <div className="flex items-center gap-2">
+              {/* 草稿/生成中/失败状态 */}
               {resume.status !== 'completed' && (
                 <Button
                   onClick={handleGenerate}
                   disabled={isGenerating}
-                  className="shadow-lg shadow-primary/20"
+                  size="sm"
                 >
                   {isGenerating ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
                       生成中...
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-4 h-4 mr-2" />
+                      <Sparkles className="w-4 h-4 mr-1.5" />
                       AI 生成简历
                     </>
                   )}
                 </Button>
               )}
+
+              {/* 完成状态 */}
               {resume.status === 'completed' && (
                 <>
-                  {resume.jobId && (
-                    <Button
-                      variant="outline"
-                      onClick={handleAnalyzeMatch}
-                      disabled={isAnalyzing}
-                    >
-                      {isAnalyzing ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Target className="w-4 h-4 mr-2" />
-                      )}
-                      匹配分析
-                    </Button>
-                  )}
+                  {/* 主操作：编辑/完成 */}
                   <Button
-                    variant="outline"
+                    variant={isEditing ? 'default' : 'outline'}
+                    size="sm"
                     onClick={isEditing ? handleExitEditMode : handleEnterEditMode}
                   >
-                    <Edit2 className="w-4 h-4 mr-2" />
-                    {isEditing ? '完成编辑' : '编辑'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleLoadVersionHistory}
-                    disabled={isLoadingVersions}
-                  >
-                    {isLoadingVersions ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {isEditing ? (
+                      <>
+                        <CheckCircle className="w-4 h-4 mr-1.5" />
+                        完成编辑
+                      </>
                     ) : (
-                      <History className="w-4 h-4 mr-2" />
+                      <>
+                        <Edit2 className="w-4 h-4 mr-1.5" />
+                        编辑
+                      </>
                     )}
-                    版本历史
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleGenerate}
-                    disabled={isGenerating}
-                  >
-                    {isGenerating ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Sparkles className="w-4 h-4 mr-2" />
-                    )}
-                    重新生成
-                  </Button>
-                  <div className="relative">
+
+                  {/* 导出按钮 */}
+                  <div className="relative dropdown-menu">
                     <Button
                       variant="outline"
-                      onClick={() => setShowExportMenu(!showExportMenu)}
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowExportMenu(!showExportMenu);
+                        setShowAiMenu(false);
+                        setShowMoreMenu(false);
+                      }}
                       disabled={isExporting || isExportingWord}
                     >
-                      {(isExporting || isExportingWord) ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Download className="w-4 h-4 mr-2" />
-                      )}
+                      <Download className="w-4 h-4 mr-1.5" />
                       导出
-                      <ChevronDown className="w-4 h-4 ml-1" />
+                      <ChevronDown className="w-3.5 h-3.5 ml-1" />
                     </Button>
                     {showExportMenu && (
-                      <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-10">
+                      <div className="absolute right-0 mt-2 w-36 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-10">
                         <button
-                          onClick={handleExportPdf}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          onClick={() => {
+                            handleExportPdf();
+                            setShowExportMenu(false);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                           disabled={isExporting}
                         >
                           <FileText className="w-4 h-4" />
-                          导出为 PDF
+                          导出 PDF
                         </button>
                         <button
-                          onClick={handleExportWord}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          onClick={() => {
+                            handleExportWord();
+                            setShowExportMenu(false);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                           disabled={isExportingWord}
                         >
                           <FileDown className="w-4 h-4" />
-                          导出为 Word
+                          导出 Word
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* AI 功能下拉 */}
+                  <div className="relative dropdown-menu">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowAiMenu(!showAiMenu);
+                        setShowExportMenu(false);
+                        setShowMoreMenu(false);
+                      }}
+                    >
+                      <Sparkles className="w-4 h-4 mr-1.5" />
+                      AI 工具
+                      <ChevronDown className="w-3.5 h-3.5 ml-1" />
+                    </Button>
+                    {showAiMenu && (
+                      <div className="absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-10">
+                        <button
+                          onClick={() => {
+                            handleGetSuggestions();
+                            setShowAiMenu(false);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          disabled={isLoadingSuggestions}
+                        >
+                          <Lightbulb className="w-4 h-4" />
+                          优化建议
+                        </button>
+                        {resume.jobId && (
+                          <button
+                            onClick={() => {
+                              handleGetJobKeywords();
+                              setShowAiMenu(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            disabled={isLoadingKeywords}
+                          >
+                            <Key className="w-4 h-4" />
+                            岗位关键词
+                          </button>
+                        )}
+                        {resume.jobId && (
+                          <button
+                            onClick={() => {
+                              handleAnalyzeMatch();
+                              setShowAiMenu(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            disabled={isAnalyzing}
+                          >
+                            <Target className="w-4 h-4" />
+                            匹配分析
+                          </button>
+                        )}
+                        <div className="border-t border-gray-100 my-1" />
+                        <button
+                          onClick={() => {
+                            handleGenerate();
+                            setShowAiMenu(false);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          disabled={isGenerating}
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          重新生成
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 更多操作下拉 */}
+                  <div className="relative dropdown-menu">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowMoreMenu(!showMoreMenu);
+                        setShowExportMenu(false);
+                        setShowAiMenu(false);
+                      }}
+                    >
+                      <BarChart3 className="w-4 h-4" />
+                    </Button>
+                    {showMoreMenu && (
+                      <div className="absolute right-0 mt-2 w-36 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-10">
+                        <button
+                          onClick={() => {
+                            handleLoadVersionHistory();
+                            setShowMoreMenu(false);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          disabled={isLoadingVersions}
+                        >
+                          <History className="w-4 h-4" />
+                          版本历史
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleDuplicate();
+                            setShowMoreMenu(false);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <Copy className="w-4 h-4" />
+                          复制简历
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleDelete();
+                            setShowMoreMenu(false);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          删除简历
                         </button>
                       </div>
                     )}
@@ -832,43 +1096,102 @@ export default function ResumeDetailPage() {
 
         {/* 主内容区域 - 左右分屏 */}
         <div className="flex-1 flex gap-4 min-h-0">
-          {/* 左侧：样式预设选择器 */}
+          {/* 左侧：样式预设选择器 + AI 润色 */}
           {resume.status === 'completed' && (
-            <div className="w-64 flex-shrink-0 overflow-y-auto bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-              <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2 sticky top-0 bg-white pb-2">
-                样式预设
-              </h2>
-              <div className="space-y-2">
-                {[
-                  { id: 'modern', name: '现代蓝色', desc: '左侧边栏布局' },
-                  { id: 'classic', name: '经典黑白', desc: '左侧边栏布局' },
-                  { id: 'creative', name: '创意紫色', desc: '顶部横幅布局' },
-                  { id: 'minimal', name: '极简纯净', desc: '单栏无装饰' },
-                  { id: 'executive', name: '高管专业', desc: '双栏布局' },
-                ].map((preset) => (
-                  <button
-                    key={preset.id}
-                    onClick={async () => {
-                      setSelectedPresetId(preset.id);
-                      if (resume) {
-                        try {
-                          await resumesApi.update(resume.id, { templateId: preset.id });
-                          setResume({ ...resume, templateId: preset.id });
-                        } catch {
-                          toast({ title: '保存失败', variant: 'destructive' });
+            <div className="w-64 flex-shrink-0 overflow-y-auto bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-6">
+              {/* 样式预设 */}
+              <div>
+                <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  样式预设
+                </h2>
+                <div className="space-y-2">
+                  {[
+                    { id: 'modern', name: '现代蓝色', desc: '左侧边栏布局' },
+                    { id: 'classic', name: '经典黑白', desc: '左侧边栏布局' },
+                    { id: 'creative', name: '创意紫色', desc: '顶部横幅布局' },
+                    { id: 'minimal', name: '极简纯净', desc: '单栏无装饰' },
+                    { id: 'executive', name: '高管专业', desc: '双栏布局' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.id}
+                      onClick={async () => {
+                        setSelectedPresetId(preset.id);
+                        if (resume) {
+                          try {
+                            await resumesApi.update(resume.id, { templateId: preset.id });
+                            setResume({ ...resume, templateId: preset.id });
+                          } catch {
+                            toast({ title: '保存失败', variant: 'destructive' });
+                          }
                         }
+                      }}
+                      className={`w-full text-left p-3 rounded-lg border-2 transition ${
+                        selectedPresetId === preset.id
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="font-medium text-gray-900 text-sm">{preset.name}</div>
+                      <p className="text-xs text-gray-500">{preset.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* AI 润色区块 */}
+              <div className="border-t border-gray-100 pt-4">
+                <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-purple-500" />
+                  AI 润色
+                </h2>
+                <p className="text-xs text-gray-500 mb-3">选择要优化的区块，AI 将帮您润色内容</p>
+                <div className="space-y-2">
+                  {/* 个人简介润色 */}
+                  {(() => {
+                    const summaryContent = (() => {
+                      const summary = editedContent?.summary;
+                      if (typeof summary === 'string') return summary;
+                      if (summary && typeof summary === 'object') {
+                        return (summary as Record<string, unknown>)?.text as string || '';
                       }
-                    }}
-                    className={`w-full text-left p-3 rounded-lg border-2 transition ${
-                      selectedPresetId === preset.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="font-medium text-gray-900 text-sm">{preset.name}</div>
-                    <p className="text-xs text-gray-500">{preset.desc}</p>
-                  </button>
-                ))}
+                      return '';
+                    })();
+                    return summaryContent ? (
+                      <button
+                        onClick={() => handlePolishSection('summary', summaryContent)}
+                        className="w-full text-left p-2 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition text-sm"
+                      >
+                        <span className="text-gray-700">个人简介</span>
+                      </button>
+                    ) : null;
+                  })()}
+
+                  {/* 工作经历润色 */}
+                  {(() => {
+                    const expList = (() => {
+                      const exp = editedContent?.experience;
+                      if (Array.isArray(exp)) return exp;
+                      if (exp && typeof exp === 'object') {
+                        return (exp as Record<string, unknown>)?.list as Array<Record<string, unknown>> || [];
+                      }
+                      return [];
+                    })();
+                    return expList.map((exp, index) => {
+                      const highlights = (exp.highlights as string[]) || [];
+                      const content = `${exp.company || ''} - ${exp.position || ''}\n${highlights.join('\n')}`;
+                      return (
+                        <button
+                          key={index}
+                          onClick={() => handlePolishSection(`experience.${index}`, content)}
+                          className="w-full text-left p-2 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition text-sm"
+                        >
+                          <span className="text-gray-700">{exp.position || `工作经历 ${index + 1}`}</span>
+                          <span className="text-xs text-gray-400 ml-1">({exp.company})</span>
+                        </button>
+                      );
+                    });
+                  })()}
+                </div>
               </div>
             </div>
           )}
@@ -907,14 +1230,14 @@ export default function ResumeDetailPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-600">缩放:</span>
                     <button
-                      onClick={() => {/* 缩小 */}}
+                      onClick={() => setCanvasScale(Math.max(0.5, canvasScale - 0.1))}
                       className="p-1.5 rounded hover:bg-gray-100"
                     >
                       <ZoomOut className="w-4 h-4" />
                     </button>
-                    <span className="text-sm text-gray-600 w-12 text-center">80%</span>
+                    <span className="text-sm text-gray-600 w-12 text-center">{Math.round(canvasScale * 100)}%</span>
                     <button
-                      onClick={() => {/* 放大 */}}
+                      onClick={() => setCanvasScale(Math.min(1.5, canvasScale + 0.1))}
                       className="p-1.5 rounded hover:bg-gray-100"
                     >
                       <ZoomIn className="w-4 h-4" />
@@ -942,7 +1265,7 @@ export default function ResumeDetailPage() {
                     <InteractiveCanvas
                       content={resumeContent}
                       presetId={selectedPresetId}
-                      scale={0.8}
+                      scale={canvasScale}
                       isEditing={isEditing}
                       onContentChange={handleCanvasContentChange}
                       onRenderPlanGenerated={(plan) => {
@@ -1058,6 +1381,42 @@ export default function ResumeDetailPage() {
             setIsFullscreen(false);
             setFullscreenScale(1);
           }}
+        />
+      )}
+
+      {/* AI 优化建议面板 */}
+      {showSuggestions && (
+        <SuggestionsPanel
+          suggestions={suggestions}
+          onApply={handleApplySuggestion}
+          onApplyAll={handleApplyAllSuggestions}
+          onClose={() => setShowSuggestions(false)}
+          isLoading={isLoadingSuggestions}
+          applyingId={applyingSuggestionId}
+        />
+      )}
+
+      {/* 岗位关键词面板 */}
+      {showKeywords && (
+        <JobKeywordsPanel
+          keywords={jobKeywords}
+          skillMatch={skillMatch}
+          resumeSkills={resumeSkills}
+          onClose={() => setShowKeywords(false)}
+          isLoading={isLoadingKeywords}
+          onAddSkill={handleAddSkill}
+        />
+      )}
+
+      {/* 区块润色对话框 */}
+      {polishDialog && (
+        <SectionPolishDialog
+          isOpen={polishDialog.isOpen}
+          onClose={() => setPolishDialog(null)}
+          sectionType={polishDialog.sectionType}
+          originalContent={polishDialog.content}
+          onApply={handleApplyPolish}
+          resumeId={resume.id}
         />
       )}
     </DashboardLayout>

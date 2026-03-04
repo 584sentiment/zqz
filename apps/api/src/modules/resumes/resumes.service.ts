@@ -2,7 +2,15 @@ import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { ResumeGenerationService, AIServiceError } from '@ai-job-assistant/ai';
+import {
+  ResumeGenerationService,
+  AIServiceError,
+  getResumeSuggestionService,
+  type ResumeSuggestion,
+  type SectionOptimizeResult,
+  type JobKeywordExtraction,
+  type SkillMatchResult,
+} from '@ai-job-assistant/ai';
 
 export interface MatchAnalysis {
   score: number;
@@ -1264,5 +1272,138 @@ export class ResumesService {
       sources: meta?.sourceReferences as Record<string, unknown> || {},
       contentBreakdown,
     };
+  }
+
+  /**
+   * 获取简历优化建议
+   */
+  async getSuggestions(
+    userId: string,
+    resumeId: string,
+    sections?: string[],
+  ): Promise<{ suggestions: ResumeSuggestion[] }> {
+    const resume = await this.getOne(userId, resumeId);
+
+    if (!resume.content) {
+      return { suggestions: [] };
+    }
+
+    const suggestionService = getResumeSuggestionService();
+
+    // 获取岗位上下文
+    let jobContext: string | undefined;
+    if (resume.job) {
+      jobContext = this.buildJobDescription(resume.job);
+    }
+
+    // 获取全面建议
+    const suggestions = await suggestionService.getFullResumeSuggestions(
+      resume.content as Record<string, unknown>,
+      jobContext,
+    );
+
+    // 如果指定了区块，过滤建议
+    if (sections && sections.length > 0) {
+      const filtered = suggestions.filter((s) =>
+        sections.some((sec) => s.section.includes(sec) || s.sectionPath.includes(sec)),
+      );
+      return { suggestions: filtered };
+    }
+
+    // 记录使用量
+    await this.subscriptionsService.recordUsage(userId, 'ai_chat', resumeId, {
+      feature: 'suggestion',
+      suggestionCount: suggestions.length,
+    });
+
+    return { suggestions };
+  }
+
+  /**
+   * 一键润色/重写区块
+   */
+  async optimizeSection(
+    userId: string,
+    resumeId: string,
+    sectionType: string,
+    content: string,
+    style: 'professional' | 'concise' | 'detailed' = 'professional',
+  ): Promise<SectionOptimizeResult> {
+    const resume = await this.getOne(userId, resumeId);
+
+    const suggestionService = getResumeSuggestionService();
+
+    // 获取岗位上下文
+    let jobContext: string | undefined;
+    if (resume.job) {
+      jobContext = this.buildJobDescription(resume.job);
+    }
+
+    const result = await suggestionService.rewriteSection(
+      sectionType,
+      content,
+      style,
+      jobContext,
+    );
+
+    if (!result) {
+      return {
+        optimized: content,
+        changes: [],
+      };
+    }
+
+    // 记录使用量
+    await this.subscriptionsService.recordUsage(userId, 'ai_chat', resumeId, {
+      feature: 'optimize_section',
+      sectionType,
+      style,
+    });
+
+    return result;
+  }
+
+  /**
+   * 获取岗位关键词
+   */
+  async getJobKeywords(
+    userId: string,
+    resumeId: string,
+  ): Promise<{
+    keywords: JobKeywordExtraction | null;
+    skillMatch: SkillMatchResult | null;
+  }> {
+    const resume = await this.getOne(userId, resumeId);
+
+    if (!resume.job) {
+      throw new NotFoundException('该简历未关联岗位，无法提取关键词');
+    }
+
+    const suggestionService = getResumeSuggestionService();
+
+    // 构建岗位描述
+    const jobDescription = this.buildJobDescription(resume.job);
+
+    // 提取关键词
+    const keywords = await suggestionService.extractJobKeywords(jobDescription);
+
+    if (!keywords) {
+      return { keywords: null, skillMatch: null };
+    }
+
+    // 获取简历技能
+    const content = (resume.content as Record<string, unknown>) || {};
+    let resumeSkills: string[] = [];
+    const skillsData = content.skills;
+    if (Array.isArray(skillsData)) {
+      resumeSkills = skillsData as string[];
+    } else if (skillsData && typeof skillsData === 'object') {
+      resumeSkills = (skillsData as Record<string, unknown>).list as string[] || [];
+    }
+
+    // 匹配技能
+    const skillMatch = suggestionService.matchSkills(resumeSkills, keywords);
+
+    return { keywords, skillMatch };
   }
 }

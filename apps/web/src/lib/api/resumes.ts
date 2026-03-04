@@ -74,6 +74,43 @@ export interface GenerateResult {
   error?: string;
 }
 
+// AI 优化相关类型
+export interface ResumeSuggestion {
+  id: string;
+  type: 'grammar' | 'content' | 'keyword' | 'format';
+  section: string;
+  sectionPath: string;
+  original: string;
+  suggestion: string;
+  reason: string;
+  confidence: number;
+  severity: 'low' | 'medium' | 'high';
+}
+
+export interface SectionOptimizeResult {
+  optimized: string;
+  changes: Array<{
+    original: string;
+    modified: string;
+    reason: string;
+  }>;
+}
+
+export interface JobKeywordExtraction {
+  technicalSkills: string[];
+  softSkills: string[];
+  requirements: string[];
+  responsibilities: string[];
+  industry: string;
+  experienceLevel: string;
+}
+
+export interface SkillMatchResult {
+  matched: string[];
+  missing: string[];
+  recommended: string[];
+}
+
 export const resumesApi = {
   async getList(params?: { jobId?: string; status?: string }): Promise<Resume[]> {
     const searchParams = new URLSearchParams();
@@ -150,6 +187,45 @@ export const resumesApi = {
 
   async generate(id: string): Promise<GenerateResult> {
     const response = await apiClient.post<GenerateResult>(`/resumes/${id}/generate`);
+    return response.data;
+  },
+
+  // 获取优化建议
+  async getSuggestions(
+    id: string,
+    sections?: string[],
+  ): Promise<{ suggestions: ResumeSuggestion[] }> {
+    const response = await apiClient.post<{ suggestions: ResumeSuggestion[] }>(
+      `/resumes/${id}/suggestions`,
+      { sections },
+    );
+    return response.data;
+  },
+
+  // 优化指定区块
+  async optimizeSection(
+    id: string,
+    data: {
+      sectionType: string;
+      content: string;
+      style?: 'professional' | 'concise' | 'detailed';
+    },
+  ): Promise<SectionOptimizeResult> {
+    const response = await apiClient.post<SectionOptimizeResult>(
+      `/resumes/${id}/optimize-section`,
+      data,
+    );
+    return response.data;
+  },
+
+  // 获取岗位关键词
+  async getJobKeywords(
+    id: string,
+  ): Promise<{ keywords: JobKeywordExtraction | null; skillMatch: SkillMatchResult | null }> {
+    const response = await apiClient.get<{
+      keywords: JobKeywordExtraction | null;
+      skillMatch: SkillMatchResult | null;
+    }>(`/resumes/${id}/job-keywords`);
     return response.data;
   },
 };

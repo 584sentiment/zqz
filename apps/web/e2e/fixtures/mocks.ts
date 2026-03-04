@@ -249,6 +249,54 @@ export const mockResponses = {
 };
 
 /**
+ * 订阅响应类型 - 支持所有变体
+ */
+type SubscriptionResponse = {
+  plan: string;
+  planName: string;
+  status: string;
+  startDate: string | null;
+  endDate: string | null;
+  canceledAt: string | null;
+  autoRenew: boolean;
+  quotaResetAt: string;
+  quotas: {
+    ai: { total: number; used: number; remaining: number; unlimited: boolean };
+    resume: { total: number; used: number; remaining: number; unlimited: boolean };
+    interview: { total: number; used: number; remaining: number; unlimited: boolean };
+  };
+  features: string[];
+};
+
+/**
+ * 支付历史项类型
+ */
+type PaymentHistoryItem = {
+  orderNo: string;
+  plan: string;
+  period: number;
+  amount: number;
+  status: string;
+  subject: string;
+  paidAt: string | null;
+  createdAt: string;
+};
+
+/**
+ * 支付状态响应类型
+ */
+type PaymentStatusResponse = {
+  orderNo: string;
+  plan: string;
+  period: number;
+  amount: number;
+  status: string;
+  subject: string;
+  paidAt: string | null;
+  createdAt: string;
+};
+
+/**
  * Mock API 路由处理器类型
  */
 type MockRouteHandler = (route: Route, request: Request) => Promise<void> | void;
@@ -257,11 +305,11 @@ type MockRouteHandler = (route: Route, request: Request) => Promise<void> | void
  * 创建 Mock API 路由
  */
 export function setupMockRoutes(page: Page, options: {
-  subscription?: typeof mockResponses.subscriptionFree;
+  subscription?: SubscriptionResponse;
   plans?: typeof mockResponses.plans;
-  paymentHistory?: typeof mockResponses.paymentHistory;
+  paymentHistory?: PaymentHistoryItem[];
   createPayment?: typeof mockResponses.createPayment;
-  paymentStatus?: typeof mockResponses.paymentPending;
+  paymentStatus?: PaymentStatusResponse;
   syncPayment?: typeof mockResponses.syncPaymentSuccess;
 }) {
   const apiBase = '/api/v1';

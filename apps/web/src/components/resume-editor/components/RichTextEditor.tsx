@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useCallback, useEffect } from 'react';
-import { useEditor, EditorContent, type JSONContent } from '@tiptap/react';
+import { useEditor, EditorContent, type JSONContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import CharacterCount from '@tiptap/extension-character-count';
@@ -42,7 +42,7 @@ function ToolbarButton({ onClick, active, disabled, title, children }: ToolbarBu
 
 // 编辑器工具栏
 interface EditorToolbarProps {
-  editor: ReturnType<typeof useEditor>;
+  editor: Editor | null;
   showHistory?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;

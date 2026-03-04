@@ -9,7 +9,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { useAutoSave } from '@/hooks/use-auto-save';
 import { AIErrorState } from '@/components/ai-error-state';
-import { ResumeRendererV2, getStylePreset, createLocalRenderPlanGenerator, createRenderEngine } from '@/components/resume-canvas/v2';
+import { ResumeRendererV2, getStylePreset, createLocalRenderPlanGenerator, createRenderEngine, exportToPDF, downloadPDF } from '@/components/resume-canvas/v2';
 import type { ResumeContent as ResumeContentV2, RenderPlan } from '@/components/resume-canvas/v2/types';
 import {
   ArrowLeft,
@@ -302,25 +302,32 @@ export default function ResumeDetailPage() {
   };
 
   const handleExportPdf = async () => {
-    if (!resume) return;
+    if (!resume || !v2RenderPlan) return;
     setIsExporting(true);
     try {
-      const result = await resumesApi.exportPdf(resume.id);
+      const preset = getStylePreset(selectedPresetId);
+      if (!preset) {
+        throw new Error('样式预设不存在');
+      }
 
-      // 创建 Blob 并下载
-      const blob = new Blob([result.html], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = result.filename.replace('.pdf', '.html'); // 暂时保存为 HTML
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // 使用 V2 渲染器直接导出 PDF
+      const pdfBytes = await exportToPDF(v2RenderPlan, preset, {
+        metadata: {
+          title: resume.name,
+          author: 'AI 求职助手',
+        },
+      });
+
+      // 下载 PDF
+      const filename = `${resume.name.replace(/\s+/g, '_')}_简历.pdf`;
+      downloadPDF(pdfBytes, filename);
+
+      // 记录导出使用量（调用后端 API）
+      await resumesApi.exportPdf(resume.id);
 
       toast({
         title: '导出成功',
-        description: '简历已导出为 HTML 文件，可使用浏览器打印功能转为 PDF',
+        description: '简历已导出为 PDF 文件',
       });
     } catch (error: unknown) {
       const errorResponse = error as { response?: { status?: number; data?: { data?: { upgradeRequired?: boolean } } } };
@@ -331,7 +338,8 @@ export default function ResumeDetailPage() {
           variant: 'destructive',
         });
       } else {
-        toast({ title: '导出失败', description: '请稍后重试', variant: 'destructive' });
+        const err = error as Error;
+        toast({ title: '导出失败', description: err.message || '请稍后重试', variant: 'destructive' });
       }
     } finally {
       setIsExporting(false);

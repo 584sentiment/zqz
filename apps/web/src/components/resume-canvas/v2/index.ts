@@ -90,6 +90,13 @@ export {
   createRenderEngine,
 } from './services/render-engine';
 
+// PDF 导出
+export {
+  exportToPDF,
+  downloadPDF,
+  createPDFExporter,
+} from './services/pdf-exporter';
+
 // 组件
 export { ResumeRendererV2 } from './components/ResumeRendererV2';
 export { default } from './components/ResumeRendererV2';

@@ -9,11 +9,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { useAutoSave } from '@/hooks/use-auto-save';
 import { AIErrorState } from '@/components/ai-error-state';
-import { ResumeRendererV2, getStylePreset, createLocalRenderPlanGenerator, createRenderEngine, exportToPDF, downloadPDF } from '@/components/resume-canvas/v2';
+import { InteractiveCanvas, getStylePreset, createRenderEngine, exportToPDF, downloadPDF } from '@/components/resume-canvas/v2';
 import type { ResumeContent as ResumeContentV2, RenderPlan } from '@/components/resume-canvas/v2/types';
-import { ResumeEditor, useResumeEditorStore } from '@/components/resume-editor';
-import type { SectionData } from '@/components/resume-editor/types/editor.types';
-import { apiToEditorData, editorDataToApi } from '@/lib/utils/resume-data-converter';
 import {
   ArrowLeft,
   Save,
@@ -43,8 +40,6 @@ import {
   Minimize2,
   ZoomIn,
   ZoomOut,
-  Eye,
-  EyeOff,
 } from 'lucide-react';
 
 export default function ResumeDetailPage() {
@@ -76,12 +71,6 @@ export default function ResumeDetailPage() {
 
   // 编辑状态
   const [editedContent, setEditedContent] = useState<Record<string, unknown>>({});
-
-  // 编辑器数据（SectionData 格式）
-  const [editorData, setEditorData] = useState<SectionData | null>(null);
-
-  // 预览模式（编辑时可以切换预览）
-  const [showPreviewInEdit, setShowPreviewInEdit] = useState(false);
 
   // 样式预设（默认使用高管双栏布局）
   const [selectedPresetId, setSelectedPresetId] = useState(resume?.templateId || 'executive');
@@ -186,8 +175,6 @@ export default function ResumeDetailPage() {
       setResume(data);
       const content = (data.content as Record<string, unknown>) || {};
       setEditedContent(content);
-      // 初始化编辑器数据
-      setEditorData(apiToEditorData(content));
       // 同步样式预设 ID
       if (data.templateId) {
         setSelectedPresetId(data.templateId);
@@ -238,13 +225,9 @@ export default function ResumeDetailPage() {
     if (!resume) return;
     setIsSaving(true);
     try {
-      // 优先使用编辑器数据，否则使用原始 editedContent
-      const contentToSave = editorData ? editorDataToApi(editorData) : editedContent;
-      await resumesApi.update(resume.id, { content: contentToSave });
-      setResume({ ...resume, content: contentToSave });
-      setEditedContent(contentToSave);
+      await resumesApi.update(resume.id, { content: editedContent });
+      setResume({ ...resume, content: editedContent });
       setIsEditing(false);
-      setShowPreviewInEdit(false);
       toast({ title: '保存成功', description: '简历已更新' });
     } catch (error) {
       toast({ title: '保存失败', description: '请稍后重试', variant: 'destructive' });
@@ -253,29 +236,24 @@ export default function ResumeDetailPage() {
     }
   };
 
-  // 处理编辑器内容变化
-  const handleEditorChange = useCallback((data: SectionData) => {
-    setEditorData(data);
-    // 同时更新 editedContent 以支持自动保存
-    setEditedContent(editorDataToApi(data));
+  // 处理画布内容变化
+  const handleCanvasContentChange = useCallback((newContent: ResumeContentV2) => {
+    setEditedContent(newContent as unknown as Record<string, unknown>);
   }, []);
 
   // 进入编辑模式
   const handleEnterEditMode = useCallback(() => {
     if (!resume?.content) return;
-    // 初始化编辑器数据
-    setEditorData(apiToEditorData((resume.content as Record<string, unknown>) || {}));
+    setEditedContent((resume.content as Record<string, unknown>) || {});
     setIsEditing(true);
-    setShowPreviewInEdit(false);
   }, [resume]);
 
   // 退出编辑模式
   const handleExitEditMode = useCallback(() => {
     setIsEditing(false);
-    setShowPreviewInEdit(false);
-    // 重置编辑器数据
+    // 重置编辑内容
     if (resume?.content) {
-      setEditorData(apiToEditorData((resume.content as Record<string, unknown>) || {}));
+      setEditedContent((resume.content as Record<string, unknown>) || {});
     }
   }, [resume]);
 
@@ -301,8 +279,6 @@ export default function ResumeDetailPage() {
       const newContent = (updatedResume.content as Record<string, unknown>) || {};
       setResume(updatedResume);
       setEditedContent(newContent);
-      // 同步更新编辑器数据
-      setEditorData(apiToEditorData(newContent));
 
       // 显示匹配分析结果（如果有）
       if (result.matchAnalysis) {
@@ -479,8 +455,6 @@ export default function ResumeDetailPage() {
       const newContent = (updatedResume.content as Record<string, unknown>) || {};
       setResume(updatedResume);
       setEditedContent(newContent);
-      // 同步更新编辑器数据
-      setEditorData(apiToEditorData(newContent));
       setShowVersionHistory(false);
       toast({ title: '恢复成功', description: '已恢复到历史版本' });
       // 重新加载版本历史
@@ -649,7 +623,7 @@ export default function ResumeDetailPage() {
                     onClick={isEditing ? handleExitEditMode : handleEnterEditMode}
                   >
                     <Edit2 className="w-4 h-4 mr-2" />
-                    {isEditing ? '取消编辑' : '编辑'}
+                    {isEditing ? '完成编辑' : '编辑'}
                   </Button>
                   <Button
                     variant="outline"
@@ -663,33 +637,6 @@ export default function ResumeDetailPage() {
                     )}
                     版本历史
                   </Button>
-                  {isEditing && (
-                    <>
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowPreviewInEdit(!showPreviewInEdit)}
-                        title={showPreviewInEdit ? '返回编辑' : '预览效果'}
-                      >
-                        {showPreviewInEdit ? (
-                          <Edit2 className="w-4 h-4 mr-2" />
-                        ) : (
-                          <Eye className="w-4 h-4 mr-2" />
-                        )}
-                        {showPreviewInEdit ? '继续编辑' : '预览'}
-                      </Button>
-                      <Button
-                        onClick={handleSave}
-                        disabled={isAutoSaving || isSaving}
-                      >
-                        {(isAutoSaving || isSaving) ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <Save className="w-4 h-4 mr-2" />
-                        )}
-                        完成编辑
-                      </Button>
-                    </>
-                  )}
                   <Button
                     variant="outline"
                     onClick={handleGenerate}
@@ -885,8 +832,8 @@ export default function ResumeDetailPage() {
 
         {/* 主内容区域 - 左右分屏 */}
         <div className="flex-1 flex gap-4 min-h-0">
-          {/* 左侧：样式预设选择器（非编辑模式或编辑预览模式时显示） */}
-          {resume.status === 'completed' && (!isEditing || showPreviewInEdit) && (
+          {/* 左侧：样式预设选择器 */}
+          {resume.status === 'completed' && (
             <div className="w-64 flex-shrink-0 overflow-y-auto bg-white rounded-xl shadow-sm border border-gray-100 p-4">
               <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2 sticky top-0 bg-white pb-2">
                 样式预设
@@ -952,40 +899,65 @@ export default function ResumeDetailPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">正在生成简历...</h3>
                 <p className="text-gray-500">AI 正在分析岗位要求并为您定制简历内容</p>
               </div>
-            ) : isEditing && !showPreviewInEdit && editorData ? (
-              /* 编辑模式：显示富文本编辑器 */
-              <div className="h-full">
-                <ResumeEditor
-                  initialContent={editorData}
-                  onChange={handleEditorChange}
-                  onSave={(data) => {
-                    setEditorData(data);
-                    setEditedContent(editorDataToApi(data));
-                  }}
-                />
-              </div>
             ) : resumeContent ? (
-              /* 预览模式：显示 Canvas 渲染 */
-              <div className="h-full">
-                <ResumeRendererV2
-                  content={resumeContent}
-                  presetId={selectedPresetId}
-                  scale={0.8}
-                  showToolbar={!isEditing}
-                  showPresetSelector={false}
-                  onRenderPlanGenerated={(plan) => {
-                    setV2RenderPlan(plan);
-                    console.log('渲染方案生成完成:', plan);
-                  }}
-                  onError={(error) => {
-                    toast({
-                      title: '渲染失败',
-                      description: error.message,
-                      variant: 'destructive',
-                    });
-                  }}
-                  onFullscreen={() => setIsFullscreen(true)}
-                />
+              /* 交互式画布：支持直接在画布上编辑 */
+              <div className="h-full flex flex-col">
+                {/* 工具栏 */}
+                <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">缩放:</span>
+                    <button
+                      onClick={() => {/* 缩小 */}}
+                      className="p-1.5 rounded hover:bg-gray-100"
+                    >
+                      <ZoomOut className="w-4 h-4" />
+                    </button>
+                    <span className="text-sm text-gray-600 w-12 text-center">80%</span>
+                    <button
+                      onClick={() => {/* 放大 */}}
+                      className="p-1.5 rounded hover:bg-gray-100"
+                    >
+                      <ZoomIn className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isEditing && (
+                      <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                        编辑模式 - 点击文字进行编辑
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setIsFullscreen(true)}
+                      className="p-1.5 rounded hover:bg-gray-100"
+                      title="全屏预览"
+                    >
+                      <Maximize2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 画布区域 */}
+                <div className="flex-1 overflow-auto flex items-center justify-center p-8 bg-gray-50">
+                  <div className="shadow-xl">
+                    <InteractiveCanvas
+                      content={resumeContent}
+                      presetId={selectedPresetId}
+                      scale={0.8}
+                      isEditing={isEditing}
+                      onContentChange={handleCanvasContentChange}
+                      onRenderPlanGenerated={(plan) => {
+                        setV2RenderPlan(plan);
+                      }}
+                      onError={(error) => {
+                        toast({
+                          title: '渲染失败',
+                          description: error.message,
+                          variant: 'destructive',
+                        });
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="text-center py-12 text-gray-500">

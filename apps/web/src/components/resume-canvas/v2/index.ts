@@ -97,6 +97,14 @@ export {
   createPDFExporter,
 } from './services/pdf-exporter';
 
+// 交互式渲染方案生成器
+export {
+  InteractiveRenderPlanGenerator,
+  createInteractiveGenerator,
+} from './services/interactive-generator';
+export type { InteractiveRenderPlan, EditableRegion } from './services/interactive-generator';
+
 // 组件
 export { ResumeRendererV2 } from './components/ResumeRendererV2';
+export { InteractiveCanvas } from './components/InteractiveCanvas';
 export { default } from './components/ResumeRendererV2';

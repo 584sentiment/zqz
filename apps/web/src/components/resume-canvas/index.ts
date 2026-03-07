@@ -23,6 +23,14 @@ export {
   modernTemplate,
 } from './templates/template-registry';
 
+// 编辑器
+export { TldrawResumeEditor } from './editor/components/TldrawResumeEditor';
+export type {
+  ResumeContentForEditor,
+  ExportOptions,
+  TldrawResumeEditorRef
+} from './editor/components/TldrawResumeEditor';
+
 // 类型
 export type {
   ResumeElementType,

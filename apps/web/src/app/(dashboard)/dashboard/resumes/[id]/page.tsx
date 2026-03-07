@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { resumesApi, Resume, MatchAnalysis, ResumeVersion, ResumeSuggestion, JobKeywordExtraction, SkillMatchResult } from '@/lib/api/resumes';
@@ -10,9 +11,16 @@ import { Button } from '@/components/ui/button';
 import { useAutoSave } from '@/hooks/use-auto-save';
 import { useResumeHistory } from '@/hooks/use-resume-history';
 import { AIErrorState } from '@/components/ai-error-state';
-import { InteractiveCanvas, getStylePreset, createRenderEngine, exportToPDF, downloadPDF } from '@/components/resume-canvas/v2';
-import type { ResumeContent as ResumeContentV2, RenderPlan } from '@/components/resume-canvas/v2/types';
 import { AIToolbar, SuggestionsPanel, JobKeywordsPanel, SectionPolishDialog } from '@/components/resume-ai-tools';
+import type { ResumeContent } from '@/components/resume-canvas';
+import type { ColorTheme } from '@ai-job-assistant/shared';
+
+// 动态导入 tldraw 编辑器，禁用 SSR
+const TldrawResumeEditor = dynamic(
+  () => import('@/components/resume-canvas').then((mod) => mod.TldrawResumeEditor),
+  { ssr: false, loading: () => <div className="w-full h-full flex items-center justify-center bg-gray-100"><div className="text-gray-500">加载编辑器...</div></div> }
+);
+
 import {
   ArrowLeft,
   Save,
@@ -38,17 +46,10 @@ import {
   CloudOff,
   History,
   RotateCcw,
-  Maximize2,
-  Minimize2,
-  ZoomIn,
-  ZoomOut,
   RefreshCw,
   Key,
   Lightbulb,
-  Undo2,
-  Redo2,
 } from 'lucide-react';
-
 export default function ResumeDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -119,14 +120,6 @@ export default function ResumeDetailPage() {
 
   // 样式预设（默认使用高管双栏布局）
   const [selectedPresetId, setSelectedPresetId] = useState(resume?.templateId || 'executive');
-  const [v2RenderPlan, setV2RenderPlan] = useState<RenderPlan | null>(null);
-
-  // 全屏预览
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [fullscreenScale, setFullscreenScale] = useState(1);
-
-  // 画布缩放
-  const [canvasScale, setCanvasScale] = useState(0.8);
 
   // AI 工具状态
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -135,6 +128,8 @@ export default function ResumeDetailPage() {
   const [applyingSuggestionId, setApplyingSuggestionId] = useState<string | null>(null);
 
   const [showKeywords, setShowKeywords] = useState(false);
+
+  // 画布编辑器对话框
   const [jobKeywords, setJobKeywords] = useState<JobKeywordExtraction | null>(null);
   const [skillMatch, setSkillMatch] = useState<SkillMatchResult | null>(null);
   const [isLoadingKeywords, setIsLoadingKeywords] = useState(false);
@@ -145,9 +140,9 @@ export default function ResumeDetailPage() {
     content: string;
   } | null>(null);
 
-  // 将 API 返回的内容转换为 ResumeContentV2 格式
+  // 将 API 返回的内容转换为 ResumeContent 格式
   // 编辑模式下使用 editedContent，预览模式下使用 resume.content
-  const resumeContent = useMemo((): ResumeContentV2 | null => {
+  const resumeContent = useMemo((): ResumeContent | null => {
     // 编辑模式下优先使用 editedContent（实时更新）
     const sourceContent = isEditing && Object.keys(editedContent).length > 0
       ? editedContent
@@ -174,45 +169,45 @@ export default function ResumeDetailPage() {
     }
 
     // 处理 experience - 可能是对象 { list: [...], _source, _basedOn } 或数组
-    let experienceList: ResumeContentV2['experience'] = [];
+    let experienceList: ResumeContent['experience'] = [];
     if (Array.isArray(content.experience)) {
-      experienceList = content.experience as ResumeContentV2['experience'];
+      experienceList = content.experience as ResumeContent['experience'];
     } else if (content.experience && typeof content.experience === 'object') {
       const expObj = content.experience as Record<string, unknown>;
-      experienceList = (expObj.list as ResumeContentV2['experience']) || [];
+      experienceList = (expObj.list as ResumeContent['experience']) || [];
     }
 
     // 处理 projects - 可能是对象 { list: [...], _source, _basedOn } 或数组
-    let projectsList: ResumeContentV2['projects'] = undefined;
+    let projectsList: ResumeContent['projects'] = undefined;
     if (Array.isArray(content.projects)) {
-      projectsList = content.projects as ResumeContentV2['projects'];
+      projectsList = content.projects as ResumeContent['projects'];
     } else if (content.projects && typeof content.projects === 'object') {
       const projObj = content.projects as Record<string, unknown>;
       if (Array.isArray(projObj.list)) {
-        projectsList = projObj.list as ResumeContentV2['projects'];
+        projectsList = projObj.list as ResumeContent['projects'];
       }
     }
 
     // 处理 education - 可能是对象 { list: [...], _source, _basedOn } 或数组
-    let educationList: ResumeContentV2['education'] = [];
+    let educationList: ResumeContent['education'] = [];
     if (Array.isArray(content.education)) {
-      educationList = content.education as ResumeContentV2['education'];
+      educationList = content.education as ResumeContent['education'];
     } else if (content.education && typeof content.education === 'object') {
       const eduObj = content.education as Record<string, unknown>;
-      educationList = (eduObj.list as ResumeContentV2['education']) || [];
+      educationList = (eduObj.list as ResumeContent['education']) || [];
     }
 
     return {
       name: (content.name as string) || resume?.name || '未命名',
       title: content.title as string | undefined,
-      contact: content.contact as ResumeContentV2['contact'],
+      contact: content.contact as ResumeContent['contact'],
       summary: summaryText,
       experience: experienceList,
       skills: skillsList,
       matchedSkills: content.matchedSkills as string[] | undefined,
       projects: projectsList,
       education: educationList,
-      _meta: content._meta as ResumeContentV2['_meta'],
+      _meta: content._meta as ResumeContent['_meta'],
     };
   }, [resume, isEditing, editedContent]);
 
@@ -232,6 +227,12 @@ export default function ResumeDetailPage() {
     debounceMs: 2000,
     enabled: isEditing && resume?.status === 'completed',
   });
+
+  // 处理画布编辑器变化
+  const handleCanvasEditorChange = useCallback((snapshot: unknown) => {
+    // 可以在这里实现将 tldraw 快照转换回简历内容
+    console.log('Canvas editor changed:', snapshot);
+  }, []);
 
   const loadResume = useCallback(async () => {
     setIsLoading(true);
@@ -274,18 +275,6 @@ export default function ResumeDetailPage() {
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
-  // ESC 键退出全屏
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isFullscreen) {
-        setIsFullscreen(false);
-        setFullscreenScale(1);
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen]);
-
   const handleSave = async () => {
     if (!resume) return;
     setIsSaving(true);
@@ -302,7 +291,7 @@ export default function ResumeDetailPage() {
   };
 
   // 处理画布内容变化（支持撤销/重做）
-  const handleCanvasContentChange = useCallback((newContent: ResumeContentV2) => {
+  const handleCanvasContentChange = useCallback((newContent: ResumeContent) => {
     setHistoryContent(newContent as unknown as Record<string, unknown>);
   }, [setHistoryContent]);
 
@@ -399,27 +388,10 @@ export default function ResumeDetailPage() {
   };
 
   const handleExportPdf = async () => {
-    if (!resume || !v2RenderPlan) return;
+    if (!resume || !resumeContent) return;
     setIsExporting(true);
     try {
-      const preset = getStylePreset(selectedPresetId);
-      if (!preset) {
-        throw new Error('样式预设不存在');
-      }
-
-      // 使用 V2 渲染器直接导出 PDF
-      const pdfBytes = await exportToPDF(v2RenderPlan, preset, {
-        metadata: {
-          title: resume.name,
-          author: 'AI 求职助手',
-        },
-      });
-
-      // 下载 PDF
-      const filename = `${resume.name.replace(/\s+/g, '_')}_简历.pdf`;
-      downloadPDF(pdfBytes, filename);
-
-      // 记录导出使用量（调用后端 API）
+      // 调用后端 API 导出 PDF
       await resumesApi.exportPdf(resume.id);
 
       toast({
@@ -436,7 +408,7 @@ export default function ResumeDetailPage() {
         });
       } else {
         const err = error as Error;
-        toast({ title: '导出失败', description: err.message || '请稍后重试', variant: 'destructive' });
+        toast({ title: '导出失败', description: err.message || '请稀后重试', variant: 'destructive' });
       }
     } finally {
       setIsExporting(false);
@@ -1266,97 +1238,14 @@ export default function ResumeDetailPage() {
                 <p className="text-gray-500">AI 正在分析岗位要求并为您定制简历内容</p>
               </div>
             ) : resumeContent ? (
-              /* 交互式画布：支持直接在画布上编辑 */
-              <div className="h-full flex flex-col">
-                {/* 工具栏 */}
-                <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">缩放:</span>
-                    <button
-                      onClick={() => setCanvasScale(Math.max(0.5, canvasScale - 0.1))}
-                      className="p-1.5 rounded hover:bg-gray-100"
-                    >
-                      <ZoomOut className="w-4 h-4" />
-                    </button>
-                    <span className="text-sm text-gray-600 w-12 text-center">{Math.round(canvasScale * 100)}%</span>
-                    <button
-                      onClick={() => setCanvasScale(Math.min(1.5, canvasScale + 0.1))}
-                      className="p-1.5 rounded hover:bg-gray-100"
-                    >
-                      <ZoomIn className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {isEditing && (
-                      <>
-                        <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                          编辑模式 - 点击文字进行编辑
-                        </span>
-                        {/* 撤销/重做按钮 */}
-                        <div className="flex items-center gap-1 ml-2">
-                          <button
-                            onClick={undo}
-                            disabled={!canUndo}
-                            className={`p-1.5 rounded ${
-                              canUndo
-                                ? 'hover:bg-gray-100 text-gray-600'
-                                : 'text-gray-300 cursor-not-allowed'
-                            }`}
-                            title="撤销 (Ctrl+Z)"
-                          >
-                            <Undo2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={redo}
-                            disabled={!canRedo}
-                            className={`p-1.5 rounded ${
-                              canRedo
-                                ? 'hover:bg-gray-100 text-gray-600'
-                                : 'text-gray-300 cursor-not-allowed'
-                            }`}
-                            title="重做 (Ctrl+Shift+Z)"
-                          >
-                            <Redo2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </>
-                    )}
-                    <button
-                      onClick={() => setIsFullscreen(true)}
-                      className="p-1.5 rounded hover:bg-gray-100"
-                      title="全屏预览"
-                    >
-                      <Maximize2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* 画布区域 */}
-                <div className="flex-1 overflow-auto flex items-center justify-center p-8 bg-gray-50">
-                  <div className="shadow-xl" style={{ marginLeft: isEditing ? '30px' : '0' }}>
-                    <InteractiveCanvas
-                      content={resumeContent}
-                      presetId={selectedPresetId}
-                      scale={canvasScale}
-                      isEditing={isEditing}
-                      enableSectionDrag={isEditing}
-                      onContentChange={handleCanvasContentChange}
-                      onSectionOrderChange={(newSections) => {
-                        // 区块顺序已变化，可用于持久化
-                      }}
-                      onRenderPlanGenerated={(plan) => {
-                        setV2RenderPlan(plan);
-                      }}
-                      onError={(error) => {
-                        toast({
-                          title: '渲染失败',
-                          description: error.message,
-                          variant: 'destructive',
-                        });
-                      }}
-                    />
-                  </div>
-                </div>
+              /* Tldraw 画布：无限画布，自带缩放和编辑功能 */
+              <div className="h-full">
+                <TldrawResumeEditor
+                  resumeContent={resumeContent}
+                  theme={(selectedPresetId as ColorTheme) || 'modern'}
+                  readOnly={!isEditing}
+                  showMarginGuides={isEditing}
+                />
               </div>
             ) : (
               <div className="text-center py-12 text-gray-500">
@@ -1445,21 +1334,6 @@ export default function ResumeDetailPage() {
         </div>
       )}
 
-      {/* 全屏预览模态框 */}
-      {isFullscreen && resumeContent && v2RenderPlan && (
-        <FullscreenPreview
-          resumeName={resume.name}
-          presetId={selectedPresetId}
-          renderPlan={v2RenderPlan}
-          scale={fullscreenScale}
-          onScaleChange={setFullscreenScale}
-          onClose={() => {
-            setIsFullscreen(false);
-            setFullscreenScale(1);
-          }}
-        />
-      )}
-
       {/* AI 优化建议面板 */}
       {showSuggestions && (
         <SuggestionsPanel
@@ -1496,124 +1370,5 @@ export default function ResumeDetailPage() {
         />
       )}
     </DashboardLayout>
-  );
-}
-
-/** 全屏预览组件 */
-function FullscreenPreview({
-  resumeName,
-  presetId,
-  renderPlan,
-  scale,
-  onScaleChange,
-  onClose,
-}: {
-  resumeName: string;
-  presetId: string;
-  renderPlan: RenderPlan;
-  scale: number;
-  onScaleChange: (scale: number) => void;
-  onClose: () => void;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const preset = getStylePreset(presetId);
-  const [currentPage, setCurrentPage] = useState(0);
-
-  // 渲染 Canvas
-  useEffect(() => {
-    if (!canvasRef.current || !preset || !renderPlan.pages[currentPage]) return;
-
-    const engine = createRenderEngine(preset);
-    engine.renderPage(renderPlan.pages[currentPage], canvasRef.current, scale);
-  }, [preset, renderPlan, currentPage, scale]);
-
-  // ESC 键退出
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
-  const presetName = presetId === 'modern' ? '现代蓝色' :
-    presetId === 'classic' ? '经典黑白' :
-    presetId === 'creative' ? '创意紫色' :
-    presetId === 'minimal' ? '极简纯净' : '高管专业';
-
-  return (
-    <div className="fixed inset-0 z-50 bg-gray-900/95 flex flex-col">
-      {/* 顶部工具栏 */}
-      <div className="flex items-center justify-between px-6 py-3 bg-gray-800 border-b border-gray-700">
-        <div className="flex items-center gap-4">
-          <h2 className="text-white font-medium">{resumeName}</h2>
-          <span className="text-gray-400 text-sm">{presetName}</span>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* 页面导航 */}
-          {renderPlan.pages.length > 1 && (
-            <div className="flex items-center gap-2 text-gray-300">
-              <button
-                onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
-                disabled={currentPage === 0}
-                className="p-1 hover:text-white disabled:opacity-40"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <span className="text-sm">{currentPage + 1} / {renderPlan.pages.length}</span>
-              <button
-                onClick={() => setCurrentPage(Math.min(renderPlan.pages.length - 1, currentPage + 1))}
-                disabled={currentPage === renderPlan.pages.length - 1}
-                className="p-1 hover:text-white disabled:opacity-40"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-          )}
-          {/* 缩放控制 */}
-          <div className="flex items-center gap-2 bg-gray-700 rounded-lg px-3 py-1.5">
-            <button
-              onClick={() => onScaleChange(Math.max(0.5, scale - 0.1))}
-              className="text-gray-300 hover:text-white p-1"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <span className="text-white text-sm w-14 text-center">{Math.round(scale * 100)}%</span>
-            <button
-              onClick={() => onScaleChange(Math.min(2, scale + 0.1))}
-              className="text-gray-300 hover:text-white p-1"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-          </div>
-          {/* 关闭按钮 */}
-          <button
-            onClick={onClose}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition"
-          >
-            <Minimize2 className="w-4 h-4" />
-            退出全屏
-          </button>
-        </div>
-      </div>
-
-      {/* Canvas 预览区域 */}
-      <div className="flex-1 overflow-auto">
-        <div className="flex justify-center py-8 px-4 min-h-full">
-          <div className="shadow-2xl bg-white flex-shrink-0">
-            <canvas ref={canvasRef} />
-          </div>
-        </div>
-      </div>
-
-      {/* 底部提示 */}
-      <div className="text-center py-2 bg-gray-800 text-gray-500 text-sm">
-        按 <kbd className="px-2 py-0.5 bg-gray-700 rounded text-gray-300">ESC</kbd> 退出全屏
-      </div>
-    </div>
   );
 }

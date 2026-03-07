@@ -8,8 +8,10 @@ AI 求职辅助平台 - 基于 AI 技术的智能求职辅助系统，提供岗�
 
 ## 技术栈
 
-- **前端**: Next.js 14 + React 18 + TypeScript + TailwindCSS + shadcn/ui + Zustand + React Query
-- **后端**: NestJS + TypeScript + Prisma ORM + Passport JWT
+- **前端**: Next.js 14 + React 18 + TypeScript + TailwindCSS + shadcn/ui + Zustand + TanStack Query
+  - 画布编辑: Konva + react-konva
+  - 富文本: TipTap
+- **后端**: NestJS + TypeScript + Prisma ORM + Passport JWT + Socket.io
 - **数据库**: PostgreSQL + Redis (ioredis)
 - **AI**: LangChain.js + OpenAI
 - **Monorepo**: npm workspaces + Turborepo
@@ -48,7 +50,7 @@ npm run db:studio        # 打开 Prisma Studio
 ├── apps/
 │   ├── api/                 # NestJS 后端 API
 │   │   └── src/
-│   │       ├── modules/     # 业务模块 (auth, users, jobs, resumes, interviews, skills, subscriptions)
+│   │       ├── modules/     # 业务模块 (auth, users, jobs, resumes, interviews, skills, subscriptions, payments, admin, notifications)
 │   │       ├── common/      # 公共组件 (guards, decorators, filters, interceptors)
 │   │       └── app.module.ts
 │   └── web/                 # Next.js 14 前端 (App Router)
@@ -148,10 +150,18 @@ import { ResumeStatus } from '@ai-job-assistant/shared/types';
 ### TypeScript 配置
 根目录 `tsconfig.json` 定义了严格的基础配置，各子项目可扩展。启用 `noUncheckedIndexedAccess`，访问数组/对象索引时需处理 undefined。
 
+### 代码风格
+项目使用 Prettier 格式化，配置见 `.prettierrc`：
+- 单引号
+- Tab 宽度: 2
+- 尾随逗号: es5
+- 打印宽度: 100
+
 ### 前端路由结构
 使用 Next.js 路由组组织页面：
 - `(auth)/` - 认证相关页面：login, register, forgot-password, verify-email
 - `(dashboard)/dashboard/` - 主要功能：jobs, resumes, interviews, skills, profile, settings, subscription
+- `(demo)/` - 演示页面
 
 ### 后端模块结构
 每个业务模块遵循 NestJS 约定：

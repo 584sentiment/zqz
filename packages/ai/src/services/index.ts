@@ -1,7 +1,7 @@
 // AI 服务封装
 
 import { getAIManager } from '../providers';
-import { getPromptTemplate } from '../prompts';
+import { promptTemplates, fillPromptTemplate, getPromptTemplate } from '../prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { HumanMessage, SystemMessage, AIMessage, BaseMessage } from '@langchain/core/messages';
@@ -87,11 +87,9 @@ export async function withTimeoutAndMetrics<T>(
   // 创建超时 Promise
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => {
-      reject(new AIServiceError(
-        `${operation}超时（${timeout}ms）`,
-        AIServiceErrorCode.TIMEOUT,
-        true
-      ));
+      reject(
+        new AIServiceError(`${operation}超时（${timeout}ms）`, AIServiceErrorCode.TIMEOUT, true)
+      );
     }, timeout);
   });
 
@@ -111,12 +109,16 @@ export async function withTimeoutAndMetrics<T>(
 
     // 检查首字节时间
     if (firstByteTime > firstByteTimeout) {
-      console.warn(`[AI Performance] ${operation} 首字节响应时间过长: ${firstByteTime}ms (阈值: ${firstByteTimeout}ms)`);
+      console.warn(
+        `[AI Performance] ${operation} 首字节响应时间过长: ${firstByteTime}ms (阈值: ${firstByteTimeout}ms)`
+      );
     }
 
     // 检查总响应时间
     if (totalTime > timeout * 0.8) {
-      console.warn(`[AI Performance] ${operation} 总响应时间接近超时: ${totalTime}ms (阈值: ${timeout}ms)`);
+      console.warn(
+        `[AI Performance] ${operation} 总响应时间接近超时: ${totalTime}ms (阈值: ${timeout}ms)`
+      );
     }
 
     AIPerformanceMonitor.recordMetric(metrics);
@@ -283,22 +285,13 @@ export class ContentSafetyService {
     let sanitized = content;
 
     // 脱敏身份证号
-    sanitized = sanitized.replace(
-      /\b(\d{6})\d{8}(\d{4})\b/g,
-      '$1********$2'
-    );
+    sanitized = sanitized.replace(/\b(\d{6})\d{8}(\d{4})\b/g, '$1********$2');
 
     // 脱敏手机号
-    sanitized = sanitized.replace(
-      /\b(\d{3})\d{4}(\d{4})\b/g,
-      '$1****$2'
-    );
+    sanitized = sanitized.replace(/\b(\d{3})\d{4}(\d{4})\b/g, '$1****$2');
 
     // 脱敏银行卡号
-    sanitized = sanitized.replace(
-      /\b(\d{4})\d{8,12}(\d{4})\b/g,
-      '$1********$2'
-    );
+    sanitized = sanitized.replace(/\b(\d{4})\d{8,12}(\d{4})\b/g, '$1********$2');
 
     return sanitized;
   }
@@ -360,7 +353,11 @@ function handleAIError(error: unknown, operation: string): never {
     );
   }
 
-  if (errorMessage.includes('network') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('ENOTFOUND')) {
+  if (
+    errorMessage.includes('network') ||
+    errorMessage.includes('ECONNREFUSED') ||
+    errorMessage.includes('ENOTFOUND')
+  ) {
     throw new AIServiceError(
       '网络连接失败，请检查网络设置',
       AIServiceErrorCode.NETWORK_ERROR,
@@ -388,12 +385,7 @@ function handleAIError(error: unknown, operation: string): never {
   }
 
   // 默认错误
-  throw new AIServiceError(
-    `${operation}失败，请稍后重试`,
-    AIServiceErrorCode.UNKNOWN,
-    true,
-    error
-  );
+  throw new AIServiceError(`${operation}失败，请稍后重试`, AIServiceErrorCode.UNKNOWN, true, error);
 }
 
 /**
@@ -412,7 +404,7 @@ export class JobParsingService {
         '岗位解析',
         chain.invoke({ jobDescription }),
         30000, // 30 秒超时
-        3000   // 3 秒首字节阈值
+        3000 // 3 秒首字节阈值
       );
 
       try {
@@ -454,9 +446,12 @@ export class ResumeGenerationService {
       }
 
       const llm = manager.getProvider('deepseek');
-      const prompt = PromptTemplate.fromTemplate(getPromptTemplate('resumeGeneration'));
+      const promptTemplate = promptTemplates.jobParsing;
+      const filledPrompt = fillPromptTemplate(promptTemplate, { jobDescription });
 
-      const chain = prompt.pipe(llm).pipe(new StringOutputParser());
+      const chain = PromptTemplate.fromTemplate(filledPrompt)
+        .pipe(llm)
+        .pipe(new StringOutputParser());
 
       console.log('[ResumeGeneration] 开始调用 AI 服务...');
 
@@ -465,7 +460,7 @@ export class ResumeGenerationService {
         '简历生成',
         chain.invoke({ userProfile, jobDescription }),
         90000, // 90 秒超时（简历生成是复杂任务）
-        5000   // 5 秒首字节阈值
+        5000 // 5 秒首字节阈值
       );
 
       console.log('[ResumeGeneration] AI 响应长度:', result?.length || 0);
@@ -510,14 +505,13 @@ export class SkillDiscoveryService {
   }> {
     try {
       const llm = getAIManager().getProvider('deepseek');
-      const systemPrompt = getPromptTemplate('skillDiscovery');
+      const promptTemplate = promptTemplates.skillDiscovery;
+      const systemPrompt = promptTemplate;
 
       const messages: BaseMessage[] = [
         new SystemMessage(systemPrompt),
         ...conversationHistory.map((msg) =>
-          msg.role === 'user'
-            ? new HumanMessage(msg.content)
-            : new AIMessage(msg.content)
+          msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content)
         ),
         new HumanMessage(message),
       ];
@@ -527,7 +521,7 @@ export class SkillDiscoveryService {
         '技能发掘',
         llm.invoke(messages),
         30000, // 30 秒超时
-        3000   // 3 秒首字节阈值
+        3000 // 3 秒首字节阈值
       );
 
       const content = result.content as string;
@@ -586,7 +580,7 @@ export class InterviewService {
         '面试问题生成',
         chain.invoke({ jobInfo, resumeSummary }),
         30000, // 30 秒超时
-        3000   // 3 秒首字节阈值
+        3000 // 3 秒首字节阈值
       );
 
       try {
@@ -619,7 +613,7 @@ export class InterviewService {
         '答案评估',
         chain.invoke({ question, answer }),
         30000, // 30 秒超时
-        3000   // 3 秒首字节阈值
+        3000 // 3 秒首字节阈值
       );
 
       try {
@@ -642,13 +636,16 @@ export class InterviewService {
 }
 
 // 导出简历建议服务
-export {
-  ResumeSuggestionService,
-  getResumeSuggestionService,
-} from './resume-suggestion';
+export { ResumeSuggestionService, getResumeSuggestionService } from './resume-suggestion';
+
+// 导出 AI 增强服务
+export { AIEnhancementService, getAIEnhancementService } from './ai-enhancement';
+
 export type {
   ResumeSuggestion,
   SectionOptimizeResult,
   JobKeywordExtraction,
   SkillMatchResult,
 } from './resume-suggestion';
+
+export type { EnhancementSuggestion } from './ai-enhancement';

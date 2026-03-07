@@ -188,6 +188,42 @@ export interface ResumeProject {
   link?: string;
 }
 
+// ============== 简历排版相关 ==============
+
+export {
+  // 类型
+  type ResumeBlockType,
+  type EmphasisLevel,
+  type DisplayStyle,
+  type ResumeLayoutHint,
+  type ResumeHeaderContent,
+  type ResumeSummaryContent,
+  type StarHighlight,
+  type ResumeExperienceItem,
+  type ResumeExperienceContent,
+  type ResumeSkillItem,
+  type ResumeSkillCategory,
+  type ResumeSkillContent,
+  type ResumeProjectItem,
+  type ResumeProjectContent,
+  type ResumeEducationItem,
+  type ResumeEducationContent,
+  type ResumeBlockContent,
+  type ResumeLayoutBlock,
+  type LayoutType,
+  type ColorTheme,
+  type ResumeLayoutConfig,
+  type ResumeMeta,
+  type LayoutResume,
+  // 类型守卫函数
+  isHeaderContent,
+  isSummaryContent,
+  isExperienceContent,
+  isSkillContent,
+  isProjectContent,
+  isEducationContent,
+} from './resume-layout';
+
 // ============== 面试相关 ==============
 
 export interface Interview {

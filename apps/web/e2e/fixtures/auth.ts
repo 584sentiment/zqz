@@ -21,11 +21,19 @@ export interface AuthState {
 }
 
 /**
+ * 测试账号凭据
+ */
+export const testCredentials = {
+  email: '1610126460@qq.com',
+  password: 'wkk12345',
+};
+
+/**
  * 模拟的测试用户
  */
 export const mockTestUser: TestUser = {
   id: 'test-user-001',
-  email: 'test@example.com',
+  email: testCredentials.email,
   name: '测试用户',
   avatarUrl: undefined,
   emailVerified: true,

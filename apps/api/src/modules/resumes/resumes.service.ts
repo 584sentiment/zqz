@@ -10,6 +10,7 @@ import {
   type SectionOptimizeResult,
   type JobKeywordExtraction,
   type SkillMatchResult,
+  type LayoutAnalyzeResult,
 } from '@ai-job-assistant/ai';
 
 export interface MatchAnalysis {
@@ -33,7 +34,7 @@ export class ResumesService {
   constructor(
     private prisma: PrismaService,
     private subscriptionsService: SubscriptionsService,
-    private notificationsService: NotificationsService,
+    private notificationsService: NotificationsService
   ) {
     this.resumeGenerationService = new ResumeGenerationService();
   }
@@ -87,7 +88,7 @@ export class ResumesService {
       jobId?: string;
       templateId?: string;
       language?: string;
-    },
+    }
   ) {
     return this.prisma.resume.create({
       data: {
@@ -324,9 +325,10 @@ export class ResumesService {
       (req) => !resumeSkills.some((skill) => skill.includes(req) || req.includes(skill))
     );
 
-    const skillsScore = requiredSkills.length > 0
-      ? Math.round((matchedSkills.length / requiredSkills.length) * 100)
-      : 70;
+    const skillsScore =
+      requiredSkills.length > 0
+        ? Math.round((matchedSkills.length / requiredSkills.length) * 100)
+        : 70;
 
     // 分析工作经历匹配度
     const experiences = (content.experience as Array<Record<string, unknown>>) || [];
@@ -337,7 +339,9 @@ export class ResumesService {
     const educationScore = this.calculateEducationScore(education, jobRequirements);
 
     // 计算总分
-    const overallScore = Math.round(skillsScore * 0.5 + experienceScore * 0.35 + educationScore * 0.15);
+    const overallScore = Math.round(
+      skillsScore * 0.5 + experienceScore * 0.35 + educationScore * 0.15
+    );
 
     // 生成建议
     const recommendations = this.generateRecommendations(
@@ -365,23 +369,21 @@ export class ResumesService {
         },
         experience: {
           score: experienceScore,
-          details: experiences.length > 0
-            ? `${experiences.length} 段相关工作经历`
-            : '建议添加工作经历',
+          details:
+            experiences.length > 0 ? `${experiences.length} 段相关工作经历` : '建议添加工作经历',
         },
         education: {
           score: educationScore,
-          details: education.length > 0
-            ? '教育背景符合要求'
-            : '建议完善教育经历',
+          details: education.length > 0 ? '教育背景符合要求' : '建议完善教育经历',
         },
         overall: {
           score: overallScore,
-          details: overallScore >= 80
-            ? '简历与岗位高度匹配'
-            : overallScore >= 60
-            ? '简历与岗位基本匹配，建议优化'
-            : '简历与岗位匹配度较低，建议大幅调整',
+          details:
+            overallScore >= 80
+              ? '简历与岗位高度匹配'
+              : overallScore >= 60
+                ? '简历与岗位基本匹配，建议优化'
+                : '简历与岗位匹配度较低，建议大幅调整',
         },
       },
     };
@@ -404,12 +406,35 @@ export class ResumesService {
 
     // 从描述中提取常见技能关键词
     const commonSkills = [
-      'javascript', 'typescript', 'python', 'java', 'go', 'rust', 'c++',
-      'react', 'vue', 'angular', 'nextjs', 'node.js', 'express',
-      'postgresql', 'mysql', 'mongodb', 'redis',
-      'docker', 'kubernetes', 'aws', 'azure', 'gcp',
-      'git', 'linux', 'agile', 'scrum',
-      'machine learning', 'ai', 'data analysis',
+      'javascript',
+      'typescript',
+      'python',
+      'java',
+      'go',
+      'rust',
+      'c++',
+      'react',
+      'vue',
+      'angular',
+      'nextjs',
+      'node.js',
+      'express',
+      'postgresql',
+      'mysql',
+      'mongodb',
+      'redis',
+      'docker',
+      'kubernetes',
+      'aws',
+      'azure',
+      'gcp',
+      'git',
+      'linux',
+      'agile',
+      'scrum',
+      'machine learning',
+      'ai',
+      'data analysis',
     ];
 
     const lowerDesc = description.toLowerCase();
@@ -509,7 +534,9 @@ export class ResumesService {
     }
 
     if (matchedSkills.length > 0) {
-      recommendations.push(`技能匹配良好，建议在简历中突出展示：${matchedSkills.slice(0, 5).join('、')}`);
+      recommendations.push(
+        `技能匹配良好，建议在简历中突出展示：${matchedSkills.slice(0, 5).join('、')}`
+      );
     }
 
     recommendations.push('建议使用量化数据展示工作成果');
@@ -545,7 +572,10 @@ export class ResumesService {
   /**
    * 生成 Word 文档（返回 Word 兼容的 HTML）
    */
-  async generateWord(userId: string, resumeId: string): Promise<{ html: string; filename: string }> {
+  async generateWord(
+    userId: string,
+    resumeId: string
+  ): Promise<{ html: string; filename: string }> {
     const resume = await this.getOne(userId, resumeId);
 
     if (resume.status !== 'completed') {
@@ -680,37 +710,61 @@ export class ResumesService {
 
   ${summary ? `<h2>个人简介</h2><p class="summary">${summary}</p>` : ''}
 
-  ${skills.length > 0 ? `
+  ${
+    skills.length > 0
+      ? `
   <h2>专业技能</h2>
   <div class="skills">
     ${skills.map((s) => `<span class="skill">${s}</span>`).join('')}
   </div>
-  ` : ''}
+  `
+      : ''
+  }
 
-  ${experiences.length > 0 ? `
+  ${
+    experiences.length > 0
+      ? `
   <h2>工作经历</h2>
-  ${experiences.map((exp) => `
+  ${experiences
+    .map(
+      (exp) => `
     <div class="experience-item">
       <h3>${exp.position as string}</h3>
       <div class="meta">${exp.company as string} | ${exp.period as string}</div>
-      ${((exp.highlights as string[]) || []).length > 0 ? `
+      ${
+        ((exp.highlights as string[]) || []).length > 0
+          ? `
         <ul class="highlights">
           ${(exp.highlights as string[]).map((h) => `<li>${h}</li>`).join('')}
         </ul>
-      ` : ''}
+      `
+          : ''
+      }
     </div>
-  `).join('')}
-  ` : ''}
+  `
+    )
+    .join('')}
+  `
+      : ''
+  }
 
-  ${education.length > 0 ? `
+  ${
+    education.length > 0
+      ? `
   <h2>教育经历</h2>
-  ${education.map((edu) => `
+  ${education
+    .map(
+      (edu) => `
     <div class="education-item">
       <h3>${edu.school as string}</h3>
       <div class="meta">${edu.major as string} · ${edu.degree as string} | ${edu.period as string}</div>
     </div>
-  `).join('')}
-  ` : ''}
+  `
+    )
+    .join('')}
+  `
+      : ''
+  }
 </body>
 </html>
     `.trim();
@@ -784,37 +838,61 @@ export class ResumesService {
 
   ${summary ? `<h2>个人简介</h2><p class="summary">${summary}</p>` : ''}
 
-  ${skills.length > 0 ? `
+  ${
+    skills.length > 0
+      ? `
   <h2>专业技能</h2>
   <div class="skills">
     ${skills.map((s) => `<span class="skill">${s}</span>`).join('')}
   </div>
-  ` : ''}
+  `
+      : ''
+  }
 
-  ${experiences.length > 0 ? `
+  ${
+    experiences.length > 0
+      ? `
   <h2>工作经历</h2>
-  ${experiences.map((exp) => `
+  ${experiences
+    .map(
+      (exp) => `
     <div class="experience-item">
       <h3>${exp.position as string}</h3>
       <div class="meta">${exp.company as string} | ${exp.period as string}</div>
-      ${((exp.highlights as string[]) || []).length > 0 ? `
+      ${
+        ((exp.highlights as string[]) || []).length > 0
+          ? `
         <ul class="highlights">
           ${(exp.highlights as string[]).map((h) => `<li>${h}</li>`).join('')}
         </ul>
-      ` : ''}
+      `
+          : ''
+      }
     </div>
-  `).join('')}
-  ` : ''}
+  `
+    )
+    .join('')}
+  `
+      : ''
+  }
 
-  ${education.length > 0 ? `
+  ${
+    education.length > 0
+      ? `
   <h2>教育经历</h2>
-  ${education.map((edu) => `
+  ${education
+    .map(
+      (edu) => `
     <div class="education-item">
       <h3>${edu.school as string}</h3>
       <div class="meta">${edu.major as string} · ${edu.degree as string} | ${edu.period as string}</div>
     </div>
-  `).join('')}
-  ` : ''}
+  `
+    )
+    .join('')}
+  `
+      : ''
+  }
 </body>
 </html>
     `.trim();
@@ -825,7 +903,7 @@ export class ResumesService {
    */
   async generateResume(
     userId: string,
-    resumeId: string,
+    resumeId: string
   ): Promise<{
     success: boolean;
     content?: Record<string, unknown>;
@@ -858,7 +936,7 @@ export class ResumesService {
 
       const aiResult = await this.resumeGenerationService.generate(
         JSON.stringify(userProfile, null, 2),
-        jobDescription,
+        jobDescription
       );
 
       // 提取匹配分析
@@ -914,9 +992,11 @@ export class ResumesService {
       });
 
       // 发送简历生成完成通知
-      await this.notificationsService.notifyResumeCompleted(userId, resumeId, resume.name).catch((err) => {
-        this.logger.warn(`发送简历完成通知失败: ${err.message}`);
-      });
+      await this.notificationsService
+        .notifyResumeCompleted(userId, resumeId, resume.name)
+        .catch((err) => {
+          this.logger.warn(`发送简历完成通知失败: ${err.message}`);
+        });
 
       // 记录使用量
       await this.subscriptionsService.recordUsage(userId, 'resume_generate', resumeId, {
@@ -933,9 +1013,8 @@ export class ResumesService {
         sourceReferences,
       };
     } catch (error) {
-      const errorMessage = error instanceof AIServiceError
-        ? error.message
-        : '简历生成失败，请稍后重试';
+      const errorMessage =
+        error instanceof AIServiceError ? error.message : '简历生成失败，请稍后重试';
 
       this.logger.error(`简历生成失败: ${errorMessage}`, error);
 
@@ -1071,10 +1150,14 @@ export class ResumesService {
     userProfile: Record<string, unknown>,
     job: { id: string; title?: string | null; company?: string | null }
   ): Record<string, unknown> {
-    const experiences = userProfile.experiences as Array<{ id?: string; company?: string; position?: string }> || [];
-    const projects = userProfile.projects as Array<{ id?: string; name?: string; role?: string }> || [];
-    const skills = userProfile.skills as Array<{ id?: string; name?: string }> || [];
-    const educations = userProfile.educations as Array<{ id?: string; school?: string; major?: string }> || [];
+    const experiences =
+      (userProfile.experiences as Array<{ id?: string; company?: string; position?: string }>) ||
+      [];
+    const projects =
+      (userProfile.projects as Array<{ id?: string; name?: string; role?: string }>) || [];
+    const skills = (userProfile.skills as Array<{ id?: string; name?: string }>) || [];
+    const educations =
+      (userProfile.educations as Array<{ id?: string; school?: string; major?: string }>) || [];
 
     return {
       generatedAt: new Date().toISOString(),
@@ -1208,7 +1291,10 @@ export class ResumesService {
   /**
    * 获取简历内容的来源追溯信息
    */
-  async getContentSources(userId: string, resumeId: string): Promise<{
+  async getContentSources(
+    userId: string,
+    resumeId: string
+  ): Promise<{
     resume: {
       id: string;
       name: string;
@@ -1232,32 +1318,49 @@ export class ResumesService {
     const contentBreakdown = [
       {
         section: '个人简介',
-        source: (content?.summary as Record<string, unknown>)?._source as string || 'ai_generated',
-        basedOn: (content?.summary as Record<string, unknown>)?._basedOn as string[] || ['档案信息', '岗位要求'],
+        source:
+          ((content?.summary as Record<string, unknown>)?._source as string) || 'ai_generated',
+        basedOn: ((content?.summary as Record<string, unknown>)?._basedOn as string[]) || [
+          '档案信息',
+          '岗位要求',
+        ],
         details: '根据用户档案亮点和目标岗位要求，由 AI 生成个性化的个人简介',
       },
       {
         section: '技能列表',
-        source: (content?.skills as Record<string, unknown>)?._source as string || 'ai_curated',
-        basedOn: (content?.skills as Record<string, unknown>)?._basedOn as string[] || ['用户技能', '岗位技能要求'],
+        source: ((content?.skills as Record<string, unknown>)?._source as string) || 'ai_curated',
+        basedOn: ((content?.skills as Record<string, unknown>)?._basedOn as string[]) || [
+          '用户技能',
+          '岗位技能要求',
+        ],
         details: '根据岗位要求从用户技能库中筛选和排序最相关的技能',
       },
       {
         section: '工作经历',
-        source: (content?.experience as Record<string, unknown>)?._source as string || 'ai_optimized',
-        basedOn: (content?.experience as Record<string, unknown>)?._basedOn as string[] || ['用户工作经历'],
+        source:
+          ((content?.experience as Record<string, unknown>)?._source as string) || 'ai_optimized',
+        basedOn: ((content?.experience as Record<string, unknown>)?._basedOn as string[]) || [
+          '用户工作经历',
+        ],
         details: '基于用户真实工作经历，由 AI 优化描述以匹配目标岗位',
       },
       {
         section: '项目经历',
-        source: (content?.projects as Record<string, unknown>)?._source as string || 'ai_optimized',
-        basedOn: (content?.projects as Record<string, unknown>)?._basedOn as string[] || ['用户项目经历'],
+        source:
+          ((content?.projects as Record<string, unknown>)?._source as string) || 'ai_optimized',
+        basedOn: ((content?.projects as Record<string, unknown>)?._basedOn as string[]) || [
+          '用户项目经历',
+        ],
         details: '基于用户真实项目经历，由 AI 优化描述以匹配目标岗位',
       },
       {
         section: '教育背景',
-        source: (content?.education as Record<string, unknown>)?._source as string || 'profile_original',
-        basedOn: (content?.education as Record<string, unknown>)?._basedOn as string[] || ['用户教育经历'],
+        source:
+          ((content?.education as Record<string, unknown>)?._source as string) ||
+          'profile_original',
+        basedOn: ((content?.education as Record<string, unknown>)?._basedOn as string[]) || [
+          '用户教育经历',
+        ],
         details: '直接使用用户填写的教育背景信息',
       },
     ];
@@ -1269,7 +1372,7 @@ export class ResumesService {
         generatedAt: (meta?.generatedAt as string) || null,
         aiModel: (meta?.aiModel as string) || null,
       },
-      sources: meta?.sourceReferences as Record<string, unknown> || {},
+      sources: (meta?.sourceReferences as Record<string, unknown>) || {},
       contentBreakdown,
     };
   }
@@ -1280,7 +1383,7 @@ export class ResumesService {
   async getSuggestions(
     userId: string,
     resumeId: string,
-    sections?: string[],
+    sections?: string[]
   ): Promise<{ suggestions: ResumeSuggestion[] }> {
     const resume = await this.getOne(userId, resumeId);
 
@@ -1299,13 +1402,13 @@ export class ResumesService {
     // 获取全面建议
     const suggestions = await suggestionService.getFullResumeSuggestions(
       resume.content as Record<string, unknown>,
-      jobContext,
+      jobContext
     );
 
     // 如果指定了区块，过滤建议
     if (sections && sections.length > 0) {
       const filtered = suggestions.filter((s) =>
-        sections.some((sec) => s.section.includes(sec) || s.sectionPath.includes(sec)),
+        sections.some((sec) => s.section.includes(sec) || s.sectionPath.includes(sec))
       );
       return { suggestions: filtered };
     }
@@ -1327,7 +1430,7 @@ export class ResumesService {
     resumeId: string,
     sectionType: string,
     content: string,
-    style: 'professional' | 'concise' | 'detailed' = 'professional',
+    style: 'professional' | 'concise' | 'detailed' = 'professional'
   ): Promise<SectionOptimizeResult> {
     const resume = await this.getOne(userId, resumeId);
 
@@ -1339,12 +1442,7 @@ export class ResumesService {
       jobContext = this.buildJobDescription(resume.job);
     }
 
-    const result = await suggestionService.rewriteSection(
-      sectionType,
-      content,
-      style,
-      jobContext,
-    );
+    const result = await suggestionService.rewriteSection(sectionType, content, style, jobContext);
 
     if (!result) {
       return {
@@ -1368,7 +1466,7 @@ export class ResumesService {
    */
   async getJobKeywords(
     userId: string,
-    resumeId: string,
+    resumeId: string
   ): Promise<{
     keywords: JobKeywordExtraction | null;
     skillMatch: SkillMatchResult | null;
@@ -1398,12 +1496,47 @@ export class ResumesService {
     if (Array.isArray(skillsData)) {
       resumeSkills = skillsData as string[];
     } else if (skillsData && typeof skillsData === 'object') {
-      resumeSkills = (skillsData as Record<string, unknown>).list as string[] || [];
+      resumeSkills = ((skillsData as Record<string, unknown>).list as string[]) || [];
     }
 
     // 匹配技能
     const skillMatch = suggestionService.matchSkills(resumeSkills, keywords);
 
     return { keywords, skillMatch };
+  }
+
+  /**
+   * 分析简历布局
+   */
+  async analyzeLayout(
+    userId: string,
+    resumeId: string,
+    shapes: Array<{
+      id: string;
+      type: string;
+      x: number;
+      y: number;
+      bounds?: { x: number; y: number; w: number; h: number };
+      props?: Record<string, unknown>;
+    }>,
+    textContent?: Array<{ id: string; text: string; type: string }>
+  ): Promise<LayoutAnalyzeResult | null> {
+    // 验证简历存在
+    await this.getOne(userId, resumeId);
+
+    if (!shapes || shapes.length === 0) {
+      return null;
+    }
+
+    const suggestionService = getResumeSuggestionService();
+    const result = await suggestionService.analyzeLayout(shapes, textContent);
+
+    // 记录使用量
+    await this.subscriptionsService.recordUsage(userId, 'ai_chat', resumeId, {
+      feature: 'layout_analysis',
+      shapeCount: shapes.length,
+    });
+
+    return result;
   }
 }

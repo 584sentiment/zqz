@@ -37,7 +37,7 @@ export const ENHANCED_RESUME_GENERATION_PROMPT = `你是一位资深的简历写
    - 控制在 3-4 句话
    - 第1句：总结从业年限和专业领域
    - 第2句：突出与岗位最匹配的核心能力
-   - 第3-4句：说明职业定位和求职动机
+   - 第3-4 句：说明职业定位和求职动机
    - 使用行业关键词，避免泛泛而谈
 
 2. **技能排序与扩充**：
@@ -46,7 +46,7 @@ export const ENHANCED_RESUME_GENERATION_PROMPT = `你是一位资深的简历写
      * 如果用户写了"React"，自动补充相关技术栈："JavaScript, TypeScript, React Router, Redux, HTML5/CSS3"
      * 如果用户写了"Python"，补充："Python, Django/Flask, NumPy, Pandas, 数据分析"
      * 技能标签控制在 15-20 个
-   - 每个技能最多 2-3 个词
+   - 每个技能最多 2-3 个词（简短、准确）
 
 3. **工作经历优化**：
    - 使用 STAR 法则优化每个亮点（Situation-Task-Action-Result）
@@ -55,6 +55,7 @@ export const ENHANCED_RESUME_GENERATION_PROMPT = `你是一位资深的简历写
      * "管理团队" → "带领[X]人团队，完成[项目]，达成[目标]"
    - 每段经历控制在 3-5 个亮点
    - 突出与目标岗位匹配的经验
+   - 每个亮点控制在 1-2 句话，避免过长
 
 4. **项目经历选择**：
    - 选择与岗位最相关的 2-3 个项目
@@ -64,6 +65,13 @@ export const ENHANCED_RESUME_GENERATION_PROMPT = `你是一位资深的简历写
 5. **教育经历**：
    - 简洁呈现学校、专业、学位、时间
    - 如果用户有相关课程或荣誉，可以适当补充（但不要虚构）
+
+6. **排版要求（重要）**：
+   - **行间距控制**：每个文本块之间必须有明确的间距，避免文字重叠
+   - **技能标签格式**：
+     * 技能名称必须是 2-4 个字的简短词汇
+     * 不要使用过长的技能描述
+     * 技能标签之间保持一致的格式
 
 请以严格的 JSON 格式返回简历内容：
 

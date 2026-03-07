@@ -41,6 +41,27 @@ export interface SkillMatchResult {
   recommended: string[];
 }
 
+/** 布局优化建议 */
+export interface LayoutOptimizeSuggestion {
+  id: string;
+  type: 'spacing' | 'alignment' | 'hierarchy' | 'readability' | 'balance';
+  targetShapeIds: string[];
+  description: string;
+  action: {
+    type: 'move' | 'resize' | 'reorder' | 'group';
+    params: Record<string, unknown>;
+  };
+  priority: 'high' | 'medium' | 'low';
+  reason: string;
+}
+
+/** 布局分析结果 */
+export interface LayoutAnalyzeResult {
+  score: number;
+  suggestions: LayoutOptimizeSuggestion[];
+  summary: string;
+}
+
 export class ResumeSuggestionService {
   /**
    * 获取内容优化建议
@@ -468,6 +489,122 @@ ${jobDescription}
     }
 
     return parts.join('\n\n');
+  }
+
+  /**
+   * 分析简历布局并生成优化建议
+   * @param shapes 画布上的形状信息
+   * @param textContent 文本内容（可选，用于更准确的分析）
+   */
+  async analyzeLayout(
+    shapes: Array<{
+      id: string;
+      type: string;
+      x: number;
+      y: number;
+      bounds?: { x: number; y: number; w: number; h: number };
+      props?: Record<string, unknown>;
+    }>,
+    textContent?: Array<{ id: string; text: string; type: string }>
+  ): Promise<LayoutAnalyzeResult | null> {
+    if (!shapes || shapes.length === 0) {
+      return null;
+    }
+
+    const llm = getAIManager().getProvider('deepseek');
+
+    // 构建形状信息摘要
+    const shapesInfo = shapes.map((s) => {
+      const bounds = s.bounds || { x: s.x, y: s.y, w: 100, h: 50 };
+      const text = textContent?.find((t) => t.id === s.id)?.text || '';
+      return {
+        id: s.id,
+        type: s.type,
+        position: { x: Math.round(bounds.x), y: Math.round(bounds.y) },
+        size: { w: Math.round(bounds.w), h: Math.round(bounds.h) },
+        textPreview: text.slice(0, 50),
+      };
+    });
+
+    const prompt = `你是一位专业的简历排版设计师。请分析以下简历画布上的元素布局，并提供优化建议。
+
+画布元素信息（JSON格式）：
+${JSON.stringify(shapesInfo, null, 2)}
+
+分析要点：
+1. 整体布局评分（0-100分）
+2. 元素对齐情况
+3. 间距是否合理
+4. 层次结构是否清晰
+5. 是否有重叠或溢出
+6. 视觉重点是否突出
+
+请以 JSON 格式返回：
+{
+  "score": 75,
+  "summary": "整体布局评价摘要",
+  "suggestions": [
+    {
+      "shapeId": "shape-id-here",
+      "action": "move",
+      "params": { "dx": 10, "dy": 20 },
+      "priority": "medium",
+      "reason": "原因说明"
+    },
+    {
+      "shapeId": "shape-id-here",
+      "action": "resize",
+      "params": { "width": 200, "height": 100 },
+      "priority": "low",
+      "reason": "原因说明"
+    }
+  ]
+}
+
+action 类型说明：
+- move: 移动位置，params: { dx: number, dy: number }
+- resize: 调整大小，params: { width: number, height: number }
+- reorder: 调整层级，params: { order: "front" | "back" | "forward" | "backward" }
+- group: 建议分组，params: { groupWith: ["other-shape-id"] }
+
+priority: high（严重影响阅读）、medium（有改进空间）、low（微调优化）
+
+要求：
+1. 只返回真正需要优化的建议，不要强行找问题
+2. 建议要具体可操作，包含精确的数值
+3. 如果布局已经很好，score 给高分，suggestions 可以返回空数组
+4. 最多返回 5 条建议
+
+直接返回 JSON，不要包含其他文字：`;
+
+    try {
+      const { result } = await withTimeoutAndMetrics(
+        '布局分析',
+        llm.invoke(prompt),
+        30000,
+        5000
+      );
+
+      const text = result.content as string;
+      const jsonMatch = text.match(/\{[\s\S]*"score"[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          score: parsed.score ?? 70,
+          summary: parsed.summary ?? '布局分析完成',
+          suggestions: (parsed.suggestions || []).map(
+            (s: Omit<LayoutOptimizeSuggestion, 'id'>, i: number) => ({
+              ...s,
+              id: `layout-${Date.now()}-${i}`,
+            })
+          ),
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('布局分析失败:', error);
+      return null;
+    }
   }
 }
 

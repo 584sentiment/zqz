@@ -111,6 +111,41 @@ export interface SkillMatchResult {
   recommended: string[];
 }
 
+// 布局分析相关类型
+export interface LayoutOptimizeSuggestion {
+  id: string;
+  type: 'spacing' | 'alignment' | 'hierarchy' | 'readability' | 'balance';
+  targetShapeIds: string[];
+  description: string;
+  action: {
+    type: 'move' | 'resize' | 'reorder' | 'group';
+    params: Record<string, unknown>;
+  };
+  priority: 'high' | 'medium' | 'low';
+  reason: string;
+}
+
+export interface LayoutAnalyzeResult {
+  score: number;
+  suggestions: LayoutOptimizeSuggestion[];
+  summary: string;
+}
+
+export interface ShapeInfo {
+  id: string;
+  type: string;
+  x: number;
+  y: number;
+  bounds?: { x: number; y: number; w: number; h: number };
+  props?: Record<string, unknown>;
+}
+
+export interface TextContent {
+  id: string;
+  text: string;
+  type: string;
+}
+
 export const resumesApi = {
   async getList(params?: { jobId?: string; status?: string }): Promise<Resume[]> {
     const searchParams = new URLSearchParams();
@@ -176,7 +211,9 @@ export const resumesApi = {
   },
 
   async getVersion(id: string, versionId: string): Promise<ResumeVersionDetail> {
-    const response = await apiClient.get<ResumeVersionDetail>(`/resumes/${id}/versions/${versionId}`);
+    const response = await apiClient.get<ResumeVersionDetail>(
+      `/resumes/${id}/versions/${versionId}`
+    );
     return response.data;
   },
 
@@ -193,11 +230,11 @@ export const resumesApi = {
   // 获取优化建议
   async getSuggestions(
     id: string,
-    sections?: string[],
+    sections?: string[]
   ): Promise<{ suggestions: ResumeSuggestion[] }> {
     const response = await apiClient.post<{ suggestions: ResumeSuggestion[] }>(
       `/resumes/${id}/suggestions`,
-      { sections },
+      { sections }
     );
     return response.data;
   },
@@ -209,23 +246,52 @@ export const resumesApi = {
       sectionType: string;
       content: string;
       style?: 'professional' | 'concise' | 'detailed';
-    },
+    }
   ): Promise<SectionOptimizeResult> {
     const response = await apiClient.post<SectionOptimizeResult>(
       `/resumes/${id}/optimize-section`,
-      data,
+      data
     );
     return response.data;
   },
 
   // 获取岗位关键词
   async getJobKeywords(
-    id: string,
+    id: string
   ): Promise<{ keywords: JobKeywordExtraction | null; skillMatch: SkillMatchResult | null }> {
     const response = await apiClient.get<{
       keywords: JobKeywordExtraction | null;
       skillMatch: SkillMatchResult | null;
     }>(`/resumes/${id}/job-keywords`);
     return response.data;
+  },
+
+  // 布局分析
+  async analyzeLayout(
+    id: string,
+    shapes: ShapeInfo[],
+    textContent?: TextContent[]
+  ): Promise<LayoutAnalyzeResult | null> {
+    const response = await apiClient.post<{ success: boolean; data: LayoutAnalyzeResult | null }>(
+      `/resume/${id}/analyze-layout`,
+      { shapes, textContent }
+    );
+    return response.data.data;
+  },
+
+  // 应用布局优化
+  async applyOptimizations(
+    id: string,
+    suggestions: Array<{
+      shapeId: string;
+      action: string;
+      params: Record<string, unknown>;
+    }>
+  ): Promise<{ success: boolean; appliedCount: number; errors: string[] }> {
+    const response = await apiClient.post<{
+      success: boolean;
+      data: { appliedCount: number; errors: string[] };
+    }>(`/resume/${id}/apply-optimizations`, { suggestions });
+    return { ...response.data, ...response.data.data };
   },
 };

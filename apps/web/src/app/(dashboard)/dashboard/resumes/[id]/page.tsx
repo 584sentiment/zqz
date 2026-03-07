@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -11,8 +11,10 @@ import { Button } from '@/components/ui/button';
 import { useAutoSave } from '@/hooks/use-auto-save';
 import { useResumeHistory } from '@/hooks/use-resume-history';
 import { AIErrorState } from '@/components/ai-error-state';
-import { AIToolbar, SuggestionsPanel, JobKeywordsPanel, SectionPolishDialog } from '@/components/resume-ai-tools';
+import { AIToolbar, SuggestionsPanel, JobKeywordsPanel, SectionPolishDialog, AIFloatingToolbar, AISmartOptimizeDialog } from '@/components/resume-ai-tools';
+import { useAICanvasAgent } from '@/lib/ai-canvas-agent';
 import type { ResumeContent } from '@/components/resume-canvas';
+import type { TldrawResumeEditorRef } from '@/components/resume-canvas';
 import type { ColorTheme } from '@ai-job-assistant/shared';
 
 // 动态导入 tldraw 编辑器，禁用 SSR
@@ -72,6 +74,20 @@ export default function ResumeDetailPage() {
 
   // AI 错误状态
   const [aiError, setAiError] = useState<string | null>(null);
+
+  // 编辑器引用
+  const editorRef = useRef<TldrawResumeEditorRef>(null);
+
+  // AI Canvas Agent
+  const {
+    isProcessing: isAIAgentProcessing,
+    currentAction: aiAgentCurrentAction,
+    error: aiAgentError,
+    getSelectedShapes,
+  } = useAICanvasAgent(editorRef.current?.getEditor() ?? null);
+
+  // AI 智能优化对话框状态
+  const [showSmartOptimizeDialog, setShowSmartOptimizeDialog] = useState(false);
 
   // 版本历史
   const [showVersionHistory, setShowVersionHistory] = useState(false);
@@ -141,10 +157,10 @@ export default function ResumeDetailPage() {
   } | null>(null);
 
   // 将 API 返回的内容转换为 ResumeContent 格式
-  // 编辑模式下使用 editedContent，预览模式下使用 resume.content
+  // 优先使用 editedContent（AI 润色后或编辑中的内容），否则使用 resume.content
   const resumeContent = useMemo((): ResumeContent | null => {
-    // 编辑模式下优先使用 editedContent（实时更新）
-    const sourceContent = isEditing && Object.keys(editedContent).length > 0
+    // 如果 editedContent 有内容（可能是 AI 润色或编辑的结果），优先使用
+    const sourceContent = Object.keys(editedContent).length > 0
       ? editedContent
       : resume?.content as Record<string, unknown> | undefined;
 
@@ -628,14 +644,63 @@ export default function ResumeDetailPage() {
     const newContent = JSON.parse(JSON.stringify(editedContent)) as Record<string, unknown>;
     const pathParts = polishDialog.sectionType.split('.');
 
-    // 简单路径处理
+    // 处理不同类型的路径
     if (pathParts.length === 1) {
+      // 简单路径：summary
       const field = pathParts[0];
       if (field === 'summary') {
         if (typeof newContent.summary === 'string') {
           newContent.summary = optimized;
         } else if (newContent.summary && typeof newContent.summary === 'object') {
           (newContent.summary as Record<string, unknown>).text = optimized;
+        }
+      }
+    } else if (pathParts.length === 2) {
+      // 嵌套路径：experience.0, projects.0 等
+      const [section, indexStr] = pathParts;
+      const index = parseInt(indexStr, 10);
+
+      if (!isNaN(index)) {
+        // 获取列表数据
+        let list: Array<Record<string, unknown>> = [];
+        if (Array.isArray(newContent[section])) {
+          list = newContent[section] as Array<Record<string, unknown>>;
+        } else if (newContent[section] && typeof newContent[section] === 'object') {
+          const sectionObj = newContent[section] as Record<string, unknown>;
+          if (Array.isArray(sectionObj.list)) {
+            list = sectionObj.list as Array<Record<string, unknown>>;
+          }
+        }
+
+        // 更新指定索引的元素
+        if (list[index]) {
+          // 解析优化后的内容
+          const lines = optimized.split('\n');
+          if (section === 'experience' || section === 'projects') {
+            // 第一行可能是 "公司 - 职位" 格式
+            const firstLine = lines[0] || '';
+            const separatorIndex = firstLine.indexOf(' - ');
+            if (separatorIndex > 0) {
+              if (section === 'experience') {
+                list[index].company = firstLine.substring(0, separatorIndex).trim();
+                list[index].position = firstLine.substring(separatorIndex + 3).trim();
+              } else if (section === 'projects') {
+                list[index].name = firstLine.substring(0, separatorIndex).trim();
+                list[index].role = firstLine.substring(separatorIndex + 3).trim();
+              }
+              // 剩余行作为 highlights
+              list[index].highlights = lines.slice(1).filter((line) => line.trim());
+            } else {
+              // 直接作为 highlights
+              list[index].highlights = lines.filter((line) => line.trim());
+            }
+          }
+          // 更新列表
+          if (Array.isArray(newContent[section])) {
+            newContent[section] = list;
+          } else if (newContent[section] && typeof newContent[section] === 'object') {
+            (newContent[section] as Record<string, unknown>).list = list;
+          }
         }
       }
     }
@@ -897,6 +962,17 @@ export default function ResumeDetailPage() {
                           </button>
                         )}
                         <div className="border-t border-gray-100 my-1" />
+                        <button
+                          onClick={() => {
+                            setShowSmartOptimizeDialog(true);
+                            setShowAiMenu(false);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          disabled={isAIAgentProcessing}
+                        >
+                          <Sparkles className="w-4 h-4" />
+                          智能优化布局
+                        </button>
                         <button
                           onClick={() => {
                             handleGenerate();
@@ -1241,6 +1317,7 @@ export default function ResumeDetailPage() {
               /* Tldraw 画布：无限画布，自带缩放和编辑功能 */
               <div className="h-full">
                 <TldrawResumeEditor
+                  ref={editorRef}
                   resumeContent={resumeContent}
                   theme={(selectedPresetId as ColorTheme) || 'modern'}
                   readOnly={!isEditing}
@@ -1367,6 +1444,23 @@ export default function ResumeDetailPage() {
           originalContent={polishDialog.content}
           onApply={handleApplyPolish}
           resumeId={resume.id}
+        />
+      )}
+
+      {/* AI 悬浮工具栏 - 显示 AI 处理状态 */}
+      <AIFloatingToolbar
+        isProcessing={isAIAgentProcessing}
+        currentAction={aiAgentCurrentAction}
+        errorMessage={aiAgentError ?? undefined}
+      />
+
+      {/* AI 智能优化对话框 */}
+      {showSmartOptimizeDialog && resume && (
+        <AISmartOptimizeDialog
+          isOpen={showSmartOptimizeDialog}
+          onClose={() => setShowSmartOptimizeDialog(false)}
+          resumeId={resume.id}
+          selectedShapeIds={getSelectedShapes().map((s) => String(s.id))}
         />
       )}
     </DashboardLayout>

@@ -41,12 +41,28 @@ class OptimizeSectionDto {
   style?: 'professional' | 'concise' | 'detailed';
 }
 
+class AnalyzeLayoutDto {
+  @IsArray()
+  shapes!: Array<{
+    id: string;
+    type: string;
+    x: number;
+    y: number;
+    bounds?: { x: number; y: number; w: number; h: number };
+    props?: Record<string, unknown>;
+  }>;
+
+  @IsOptional()
+  @IsArray()
+  textContent?: Array<{ id: string; text: string; type: string }>;
+}
+
 @Controller('resumes')
 @UseGuards(JwtAuthGuard)
 export class ResumesController {
   constructor(
     private resumesService: ResumesService,
-    private subscriptionsService: SubscriptionsService,
+    private subscriptionsService: SubscriptionsService
   ) {}
 
   /**
@@ -56,7 +72,7 @@ export class ResumesController {
   async getList(
     @Request() req: { user: { id: string } },
     @Query('jobId') jobId?: string,
-    @Query('status') status?: string,
+    @Query('status') status?: string
   ) {
     return this.resumesService.getList(req.user.id, { jobId, status });
   }
@@ -100,7 +116,7 @@ export class ResumesController {
   async getVersion(
     @Request() req: { user: { id: string } },
     @Param('id') id: string,
-    @Param('versionId') versionId: string,
+    @Param('versionId') versionId: string
   ) {
     return this.resumesService.getVersion(req.user.id, id, versionId);
   }
@@ -112,7 +128,7 @@ export class ResumesController {
   async restoreVersion(
     @Request() req: { user: { id: string } },
     @Param('id') id: string,
-    @Param('versionId') versionId: string,
+    @Param('versionId') versionId: string
   ) {
     return this.resumesService.restoreVersion(req.user.id, id, versionId);
   }
@@ -124,7 +140,7 @@ export class ResumesController {
   @RequireQuota('resume')
   async create(
     @Request() req: { user: { id: string } },
-    @Body() body: { name: string; jobId?: string; templateId?: string; language?: string },
+    @Body() body: { name: string; jobId?: string; templateId?: string; language?: string }
   ) {
     // 检查高级模板权限
     if (body.templateId && PREMIUM_TEMPLATES.includes(body.templateId)) {
@@ -154,7 +170,7 @@ export class ResumesController {
   async update(
     @Request() req: { user: { id: string } },
     @Param('id') id: string,
-    @Body() body: Record<string, unknown>,
+    @Body() body: Record<string, unknown>
   ) {
     return this.resumesService.update(req.user.id, id, body);
   }
@@ -191,7 +207,7 @@ export class ResumesController {
   async getSuggestions(
     @Request() req: { user: { id: string } },
     @Param('id') id: string,
-    @Body() body: GetSuggestionsDto,
+    @Body() body: GetSuggestionsDto
   ) {
     return this.resumesService.getSuggestions(req.user.id, id, body.sections);
   }
@@ -204,14 +220,14 @@ export class ResumesController {
   async optimizeSection(
     @Request() req: { user: { id: string } },
     @Param('id') id: string,
-    @Body() body: OptimizeSectionDto,
+    @Body() body: OptimizeSectionDto
   ) {
     return this.resumesService.optimizeSection(
       req.user.id,
       id,
       body.sectionType,
       body.content,
-      body.style,
+      body.style
     );
   }
 
@@ -219,10 +235,7 @@ export class ResumesController {
    * 获取岗位关键词
    */
   @Get(':id/job-keywords')
-  async getJobKeywords(
-    @Request() req: { user: { id: string } },
-    @Param('id') id: string,
-  ) {
+  async getJobKeywords(@Request() req: { user: { id: string } }, @Param('id') id: string) {
     return this.resumesService.getJobKeywords(req.user.id, id);
   }
 
@@ -250,5 +263,35 @@ export class ResumesController {
   @Delete(':id')
   async delete(@Request() req: { user: { id: string } }, @Param('id') id: string) {
     return this.resumesService.delete(req.user.id, id);
+  }
+
+  /**
+   * AI 布局分析
+   */
+  @Post(':id/analyze-layout')
+  @RequireQuota('ai')
+  async analyzeLayout(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() body: AnalyzeLayoutDto
+  ) {
+    try {
+      const result = await this.resumesService.analyzeLayout(
+        req.user.id,
+        id,
+        body.shapes,
+        body.textContent
+      );
+
+      return {
+        success: true,
+        data: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '布局分析失败',
+      };
+    }
   }
 }

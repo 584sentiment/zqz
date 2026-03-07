@@ -646,6 +646,8 @@ export type {
   SectionOptimizeResult,
   JobKeywordExtraction,
   SkillMatchResult,
+  LayoutOptimizeSuggestion,
+  LayoutAnalyzeResult,
 } from './resume-suggestion';
 
 export type { EnhancementSuggestion } from './ai-enhancement';

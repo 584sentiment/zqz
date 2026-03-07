@@ -122,12 +122,12 @@ function isLayoutResume(content: unknown): content is LayoutResume {
 const A4_WIDTH = 794;
 const A4_HEIGHT = 1123;
 
-/** 页边距 */
+/** 页边距 - 减小边距提高页面利用率 */
 const PAGE_MARGINS = {
-  top: 50,
-  right: 50,
-  bottom: 50,
-  left: 50,
+  top: 40,
+  right: 40,
+  bottom: 40,
+  left: 40,
 };
 
 /** 内容区域宽度 */
@@ -330,78 +330,78 @@ const themeConfigs: Record<ColorTheme, ThemeConfig> = {
 
 // ============== 样式系统 ==============
 
-/** 排版样式 */
+/** 排版样式 - 根据导出效果优化 */
 const typographyStyles = {
   /** 页面标题（姓名） */
   pageTitle: {
     fontFamily: '"PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif',
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold' as const,
-    lineHeight: 1.3,
+    lineHeight: 1.4,
   },
-  /** 副标题（职位） */
+  /** 副标题（职位） - 加粗突出 */
   subtitle: {
     fontFamily: '"PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif',
-    fontSize: 14,
-    fontWeight: 'normal' as const,
-    lineHeight: 1.4,
+    fontSize: 11,
+    fontWeight: '600' as const,
+    lineHeight: 1.5,
   },
-  /** 区块标题 */
+  /** 区块标题 - 增大字号提升区分度 */
   sectionTitle: {
     fontFamily: '"PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold' as const,
-    lineHeight: 1.4,
+    lineHeight: 1.5,
     letterSpacing: 0.5,
   },
   /** 小标题（公司名、学校名） */
   itemTitle: {
     fontFamily: '"PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif',
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: 'bold' as const,
-    lineHeight: 1.4,
+    lineHeight: 1.5,
   },
-  /** 正文 */
+  /** 正文 - 适当行高提升可读性 */
   body: {
     fontFamily: '"PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 'normal' as const,
     lineHeight: 1.6,
   },
   /** 说明文字（时间、地点等） */
   caption: {
     fontFamily: '"PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 'normal' as const,
     lineHeight: 1.4,
   },
   /** 技能标签 */
   label: {
     fontFamily: '"PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 'normal' as const,
     lineHeight: 1.3,
   },
 };
 
-/** 间距系统 */
+/** 间距系统 - 增加间距防止重叠 */
 const spacing = {
   /** 区块间距 */
-  sectionGap: 28,
+  sectionGap: 24,
   /** 区块内标题与内容间距 */
   sectionTitleGap: 14,
-  /** 项目间距 */
-  itemGap: 18,
-  /** 段落间距 */
-  paragraphGap: 12,
-  /** 行间距 */
-  lineGap: 8,
+  /** 项目间距 - 增加以防止重叠 */
+  itemGap: 24,
+  /** 段落间距 - 增加 */
+  paragraphGap: 16,
+  /** 行间距 - 增加 */
+  lineGap: 14,
   /** 左缩进 */
-  leftIndent: 15,
+  leftIndent: 12,
   /** 技能标签间距 */
-  tagGap: 8,
-  /** 文本高度缓冲值（用于防止重叠） */
-  heightBuffer: 4,
+  tagGap: 16,
+  /** 文本高度缓冲值 - 增加以防止重叠 */
+  heightBuffer: 8,
 };
 
 // ============== 辅助函数 ==============
@@ -641,7 +641,7 @@ function createSkillTags(
   let currentY = y;
   let maxHeightInRow = 0;
   const tagHeight = 24;
-  const tagPaddingX = 12;
+  const tagPaddingX = 14;
   const tagPaddingY = 5;
   const tagGap = spacing.tagGap;
   const fontSize = typographyStyles.label.fontSize;
@@ -649,8 +649,8 @@ function createSkillTags(
   skills.forEach((skill) => {
     // 使用更准确的宽度计算
     const textWidth = estimateTextWidth(skill.name, fontSize);
-    // 增加额外的缓冲空间以确保文本不会超出背景框
-    const tagWidth = textWidth + tagPaddingX * 2 + 4;
+    // 增加足够的缓冲空间以确保文本不会超出背景框（tldraw 文本渲染可能更宽）
+    const tagWidth = textWidth + tagPaddingX * 2 + 12;
 
     // 检查是否需要换行
     if (currentX + tagWidth > x + width && currentX > x) {
@@ -676,11 +676,12 @@ function createSkillTags(
       },
     });
 
-    // 创建标签文本（使用 autoSize: false 并设置固定宽度，确保文本居中）
+    // 创建标签文本(使用固定内边距，确保文本在背景框内)
+    // 文本位置：左边界留出 tagPaddingX/2 的空间，顶部留出 tagPaddingY 的空间
     editor.createShape({
       id: createShapeId(),
       type: 'text',
-      x: currentX + tagPaddingX,
+      x: currentX + tagPaddingX / 2,
       y: currentY + tagPaddingY,
       props: {
         richText: toRichText(skill.name),
@@ -834,7 +835,7 @@ function renderHeaderBlock(
       x,
       y: currentY,
       props: {
-        richText: toRichText(contactParts.join('  |  ')),
+        richText: toRichText(contactParts.join('    •    ')),
         color: 'grey',
         textAlign: 'middle',
         autoSize: false,
@@ -953,7 +954,7 @@ function renderExperienceBlock(
         size: 'm',
       },
     });
-    currentY += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + spacing.heightBuffer;
+    currentY += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + 12 + spacing.heightBuffer;
 
     // 公司和时间段
     const period = formatPeriod(item.startDate, item.endDate, item.current);
@@ -995,7 +996,7 @@ function renderExperienceBlock(
           size: 's',
         },
       });
-      currentY += typographyStyles.body.fontSize * typographyStyles.body.lineHeight + 4 + spacing.heightBuffer;
+      currentY += typographyStyles.body.fontSize * typographyStyles.body.lineHeight + 8 + spacing.heightBuffer;
     });
 
     // 添加左侧竖线装饰
@@ -1104,9 +1105,9 @@ function renderProjectsBlock(
         size: 'm',
       },
     });
-    currentY += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + spacing.heightBuffer;
+    currentY += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + 12 + spacing.heightBuffer;
 
-    // 角色和时间段
+    // 角色和时间段 - 增加间距
     const period = formatPeriod(project.startDate, project.endDate, project.ongoing);
     const roleParts = [project.role, period].filter(Boolean);
 
@@ -1124,13 +1125,13 @@ function renderProjectsBlock(
         size: 's',
       },
     });
-    currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 6 + spacing.heightBuffer;
+    currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 12 + spacing.heightBuffer;
 
-    // 技术栈标签
+    // 技术栈标签 - 增加间距
     if (project.technologies && project.technologies.length > 0) {
       const techTags = project.technologies.map((t: string) => ({ name: t, matched: false }));
       const tagsHeight = createSkillTags(editor, techTags, x, currentY, width, theme);
-      currentY += tagsHeight + 6;
+      currentY += tagsHeight + 10;
     }
 
     // 成就列表
@@ -1149,7 +1150,7 @@ function renderProjectsBlock(
           size: 's',
         },
       });
-      currentY += typographyStyles.body.fontSize * typographyStyles.body.lineHeight + 4 + spacing.heightBuffer;
+      currentY += typographyStyles.body.fontSize * typographyStyles.body.lineHeight + 8 + spacing.heightBuffer;
     });
 
     currentY += spacing.itemGap;
@@ -1188,7 +1189,7 @@ function renderEducationBlock(
         size: 'm',
       },
     });
-    currentY += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + spacing.heightBuffer;
+    currentY += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + 15 + spacing.heightBuffer;
 
     // 专业、学位、时间段
     const period = formatPeriod(edu.startDate, edu.endDate);
@@ -1282,7 +1283,7 @@ function populateLegacyResumeContent(
         x,
         y,
         props: {
-          richText: toRichText(contactParts.join('  |  ')),
+          richText: toRichText(contactParts.join('    •    ')),
           color: 'grey',
           textAlign: 'middle',
           autoSize: false,
@@ -1574,15 +1575,12 @@ function EditorSetup({
 
       console.log('[TldrawResumeEditor] 渲染完成，shapes 数量:', editor.getCurrentPageShapes().length);
 
-      // 设置只读模式
-      if (readOnly) {
-        editor.updateInstanceState({ isReadonly: true });
-      }
+      // 设置只读/编辑模式
+      editor.updateInstanceState({ isReadonly: readOnly });
 
-      // 适应视图
+      // 适应视图 - zoomToFit 使用编辑器的 zoomToFitPadding 设置
       setTimeout(() => {
         editor.zoomToFit();
-        editor.setCamera({ x: 20, y: 20 });
       }, 100);
     }
   }, [editor, resumeContent, readOnly, theme, showMarginGuides, layoutConfig]);
@@ -1608,6 +1606,44 @@ function EditorSetup({
       };
     }
   }, [editor, onChange]);
+
+  // 键盘方向键移动选中元素
+  useEffect(() => {
+    if (!editor || readOnly) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const selectedShapes = editor.getSelectedShapes();
+      if (selectedShapes.length === 0) return;
+
+      // 方向键移动
+      const moveStep = e.shiftKey ? 10 : 1; // Shift 键加速
+      let dx = 0;
+      let dy = 0;
+
+      switch (e.key) {
+        case 'ArrowUp':
+          dy = -moveStep;
+          break;
+        case 'ArrowDown':
+          dy = moveStep;
+          break;
+        case 'ArrowLeft':
+          dx = -moveStep;
+          break;
+        case 'ArrowRight':
+          dx = moveStep;
+          break;
+        default:
+          return;
+      }
+
+      e.preventDefault();
+      editor.nudgeShapes(selectedShapes.map((s) => s.id), { x: dx, y: dy });
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editor, readOnly]);
 
   return null;
 }

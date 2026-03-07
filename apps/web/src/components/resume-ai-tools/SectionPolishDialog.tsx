@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { SectionOptimizeResult, resumesApi } from '@/lib/api/resumes';
 import {
@@ -69,6 +69,9 @@ export function SectionPolishDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 防止重复请求的 ref
+  const isRequestInProgress = useRef(false);
+
   // 打开时重置状态
   useEffect(() => {
     if (isOpen) {
@@ -80,6 +83,12 @@ export function SectionPolishDialog({
 
   // 执行润色
   const handlePolish = async () => {
+    // 防止重复调用
+    if (isRequestInProgress.current) {
+      return;
+    }
+
+    isRequestInProgress.current = true;
     setIsLoading(true);
     setError(null);
     setResult(null);
@@ -100,6 +109,7 @@ export function SectionPolishDialog({
       setError(err instanceof Error ? err.message : '优化失败，请稍后重试');
     } finally {
       setIsLoading(false);
+      isRequestInProgress.current = false;
     }
   };
 
@@ -280,6 +290,9 @@ export function SectionPolishDialog({
  * 获取区块标签
  */
 function getSectionLabel(sectionType: string): string {
+  // 处理嵌套路径，如 "experience.0" -> "experience"
+  const baseSection = sectionType.split('.')[0] ?? sectionType;
+
   const labels: Record<string, string> = {
     summary: '个人简介',
     skills: '技能',
@@ -287,7 +300,7 @@ function getSectionLabel(sectionType: string): string {
     projects: '项目经历',
     education: '教育经历',
   };
-  return labels[sectionType] || sectionType;
+  return labels[baseSection] || baseSection;
 }
 
 export default SectionPolishDialog;

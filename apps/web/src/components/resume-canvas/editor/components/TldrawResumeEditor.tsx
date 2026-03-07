@@ -387,19 +387,21 @@ const typographyStyles = {
 /** 间距系统 */
 const spacing = {
   /** 区块间距 */
-  sectionGap: 20,
+  sectionGap: 28,
   /** 区块内标题与内容间距 */
-  sectionTitleGap: 12,
+  sectionTitleGap: 14,
   /** 项目间距 */
-  itemGap: 16,
+  itemGap: 18,
   /** 段落间距 */
-  paragraphGap: 8,
+  paragraphGap: 12,
   /** 行间距 */
-  lineGap: 6,
+  lineGap: 8,
   /** 左缩进 */
   leftIndent: 15,
   /** 技能标签间距 */
   tagGap: 8,
+  /** 文本高度缓冲值（用于防止重叠） */
+  heightBuffer: 4,
 };
 
 // ============== 辅助函数 ==============
@@ -557,7 +559,7 @@ function createSectionHeader(
     },
   });
 
-  const titleHeight = style.fontSize * style.lineHeight;
+  const titleHeight = style.fontSize * style.lineHeight + spacing.heightBuffer;
 
   // 创建下划线装饰（使用细矩形）
   editor.createShape({
@@ -576,7 +578,7 @@ function createSectionHeader(
     },
   });
 
-  return titleHeight + 8; // 标题高度 + 下划线间距
+  return titleHeight + 10; // 标题高度 + 下划线间距 + 缓冲
 }
 
 /**
@@ -608,6 +610,23 @@ function createExperienceDecoration(
 }
 
 /**
+ * 计算文本宽度的辅助函数
+ * 中文字符约 14px 宽度，英文字符约 8px 宽度（基于 10px 字体大小）
+ */
+function estimateTextWidth(text: string, fontSize: number): number {
+  let width = 0;
+  for (const char of text) {
+    // 检测是否为中文字符（包括中文标点）
+    if (/[\u4e00-\u9fa5\u3000-\u303f\uff00-\uffef]/.test(char)) {
+      width += fontSize * 1.0; // 中文字符宽度约等于字体大小
+    } else {
+      width += fontSize * 0.6; // 英文字符宽度约为字体大小的 0.6 倍
+    }
+  }
+  return Math.ceil(width);
+}
+
+/**
  * 创建技能标签
  */
 function createSkillTags(
@@ -622,14 +641,16 @@ function createSkillTags(
   let currentY = y;
   let maxHeightInRow = 0;
   const tagHeight = 24;
-  const tagPaddingX = 10;
-  const tagPaddingY = 4;
+  const tagPaddingX = 12;
+  const tagPaddingY = 5;
   const tagGap = spacing.tagGap;
+  const fontSize = typographyStyles.label.fontSize;
 
   skills.forEach((skill) => {
-    // 估算文本宽度（中文字符约等于字号，英文约为一半）
-    const textWidth = skill.name.length * typographyStyles.label.fontSize * 0.8;
-    const tagWidth = textWidth + tagPaddingX * 2;
+    // 使用更准确的宽度计算
+    const textWidth = estimateTextWidth(skill.name, fontSize);
+    // 增加额外的缓冲空间以确保文本不会超出背景框
+    const tagWidth = textWidth + tagPaddingX * 2 + 4;
 
     // 检查是否需要换行
     if (currentX + tagWidth > x + width && currentX > x) {
@@ -655,7 +676,7 @@ function createSkillTags(
       },
     });
 
-    // 创建标签文本
+    // 创建标签文本（使用 autoSize: false 并设置固定宽度，确保文本居中）
     editor.createShape({
       id: createShapeId(),
       type: 'text',
@@ -674,7 +695,7 @@ function createSkillTags(
     maxHeightInRow = Math.max(maxHeightInRow, tagHeight);
   });
 
-  return currentY + maxHeightInRow - y;
+  return currentY + maxHeightInRow - y + spacing.heightBuffer;
 }
 
 /**
@@ -779,7 +800,7 @@ function renderHeaderBlock(
       size: 'xl',
     },
   });
-  currentY += typographyStyles.pageTitle.fontSize * typographyStyles.pageTitle.lineHeight + 8;
+  currentY += typographyStyles.pageTitle.fontSize * typographyStyles.pageTitle.lineHeight + 10 + spacing.heightBuffer;
 
   // 求职意向
   if (content.targetPosition) {
@@ -797,7 +818,7 @@ function renderHeaderBlock(
         size: 'm',
       },
     });
-    currentY += typographyStyles.subtitle.fontSize * typographyStyles.subtitle.lineHeight + 8;
+    currentY += typographyStyles.subtitle.fontSize * typographyStyles.subtitle.lineHeight + 10 + spacing.heightBuffer;
   }
 
   // 联系方式
@@ -821,7 +842,7 @@ function renderHeaderBlock(
         size: 's',
       },
     });
-    currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 8;
+    currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 10 + spacing.heightBuffer;
   }
 
   // 链接
@@ -841,10 +862,10 @@ function renderHeaderBlock(
         size: 's',
       },
     });
-    currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 8;
+    currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 10 + spacing.heightBuffer;
   }
 
-  return currentY - y;
+  return currentY - y + spacing.heightBuffer;
 }
 
 /**
@@ -877,7 +898,7 @@ function renderSummaryBlock(
     },
   });
 
-  let height = typographyStyles.body.fontSize * typographyStyles.body.lineHeight * 4; // 估算高度
+  let height = typographyStyles.body.fontSize * typographyStyles.body.lineHeight * 4 + spacing.heightBuffer * 2; // 估算高度 + 缓冲
 
   // 核心优势标签
   if (content.coreStrengths && content.coreStrengths.length > 0) {
@@ -885,11 +906,11 @@ function renderSummaryBlock(
       editor,
       content.coreStrengths.map((s: string) => ({ name: s, matched: true })),
       x,
-      y + height + 8,
+      y + height + 10,
       width,
       theme
     );
-    height += tagsHeight + 8;
+    height += tagsHeight + 12;
   }
 
   return height + spacing.paragraphGap;
@@ -932,7 +953,7 @@ function renderExperienceBlock(
         size: 'm',
       },
     });
-    currentY += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight;
+    currentY += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + spacing.heightBuffer;
 
     // 公司和时间段
     const period = formatPeriod(item.startDate, item.endDate, item.current);
@@ -952,7 +973,7 @@ function renderExperienceBlock(
         size: 's',
       },
     });
-    currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 4;
+    currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 6 + spacing.heightBuffer;
 
     // 成就列表
     const achievements = item.achievements ?? [];
@@ -974,7 +995,7 @@ function renderExperienceBlock(
           size: 's',
         },
       });
-      currentY += typographyStyles.body.fontSize * typographyStyles.body.lineHeight + 2;
+      currentY += typographyStyles.body.fontSize * typographyStyles.body.lineHeight + 4 + spacing.heightBuffer;
     });
 
     // 添加左侧竖线装饰
@@ -986,7 +1007,7 @@ function renderExperienceBlock(
     currentY += isCompact ? spacing.lineGap : spacing.itemGap;
   });
 
-  return currentY - y;
+  return currentY - y + spacing.heightBuffer;
 }
 
 /**
@@ -1026,7 +1047,7 @@ function renderSkillsBlock(
           size: 's',
         },
       });
-      currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 4;
+      currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 6 + spacing.heightBuffer;
 
       // 技能标签
       const skills = category.skills.map((s) => ({
@@ -1035,7 +1056,7 @@ function renderSkillsBlock(
       }));
 
       const tagsHeight = createSkillTags(editor, skills, x, currentY, width, theme);
-      currentY += tagsHeight + 12;
+      currentY += tagsHeight + 14;
     });
   } else if (content.items) {
     // 扁平显示
@@ -1045,7 +1066,7 @@ function renderSkillsBlock(
     }));
 
     const tagsHeight = createSkillTags(editor, skills, x, currentY, width, theme);
-    currentY += tagsHeight;
+    currentY += tagsHeight + spacing.heightBuffer;
   }
 
   return currentY - y + spacing.paragraphGap;
@@ -1083,7 +1104,7 @@ function renderProjectsBlock(
         size: 'm',
       },
     });
-    currentY += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight;
+    currentY += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + spacing.heightBuffer;
 
     // 角色和时间段
     const period = formatPeriod(project.startDate, project.endDate, project.ongoing);
@@ -1103,13 +1124,13 @@ function renderProjectsBlock(
         size: 's',
       },
     });
-    currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 4;
+    currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 6 + spacing.heightBuffer;
 
     // 技术栈标签
     if (project.technologies && project.technologies.length > 0) {
       const techTags = project.technologies.map((t: string) => ({ name: t, matched: false }));
       const tagsHeight = createSkillTags(editor, techTags, x, currentY, width, theme);
-      currentY += tagsHeight + 4;
+      currentY += tagsHeight + 6;
     }
 
     // 成就列表
@@ -1128,13 +1149,13 @@ function renderProjectsBlock(
           size: 's',
         },
       });
-      currentY += typographyStyles.body.fontSize * typographyStyles.body.lineHeight + 2;
+      currentY += typographyStyles.body.fontSize * typographyStyles.body.lineHeight + 4 + spacing.heightBuffer;
     });
 
     currentY += spacing.itemGap;
   });
 
-  return currentY - y;
+  return currentY - y + spacing.heightBuffer;
 }
 
 /**
@@ -1167,7 +1188,7 @@ function renderEducationBlock(
         size: 'm',
       },
     });
-    currentY += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight;
+    currentY += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + spacing.heightBuffer;
 
     // 专业、学位、时间段
     const period = formatPeriod(edu.startDate, edu.endDate);
@@ -1187,10 +1208,10 @@ function renderEducationBlock(
         size: 's',
       },
     });
-    currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 8;
+    currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 12 + spacing.heightBuffer;
   });
 
-  return currentY - y;
+  return currentY - y + spacing.heightBuffer;
 }
 
 /**
@@ -1226,7 +1247,7 @@ function populateLegacyResumeContent(
       size: 'xl',
     },
   });
-  y += typographyStyles.pageTitle.fontSize * typographyStyles.pageTitle.lineHeight + 8;
+  y += typographyStyles.pageTitle.fontSize * typographyStyles.pageTitle.lineHeight + 10 + spacing.heightBuffer;
 
   // 职位
   if (content.title) {
@@ -1244,7 +1265,7 @@ function populateLegacyResumeContent(
         size: 'm',
       },
     });
-    y += typographyStyles.subtitle.fontSize * typographyStyles.subtitle.lineHeight + 8;
+    y += typographyStyles.subtitle.fontSize * typographyStyles.subtitle.lineHeight + 10 + spacing.heightBuffer;
   }
 
   // 联系方式
@@ -1269,7 +1290,7 @@ function populateLegacyResumeContent(
           size: 's',
         },
       });
-      y += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 8;
+      y += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 10 + spacing.heightBuffer;
     }
   }
 
@@ -1294,7 +1315,7 @@ function populateLegacyResumeContent(
         size: 's',
       },
     });
-    y += typographyStyles.body.fontSize * typographyStyles.body.lineHeight * 3 + spacing.sectionGap;
+    y += typographyStyles.body.fontSize * typographyStyles.body.lineHeight * 3 + spacing.sectionGap + spacing.heightBuffer;
   }
 
   // 工作经历
@@ -1320,7 +1341,7 @@ function populateLegacyResumeContent(
           size: 'm',
         },
       });
-      y += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight;
+      y += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + spacing.heightBuffer;
 
       // 公司和时间段
       editor.createShape({
@@ -1337,7 +1358,7 @@ function populateLegacyResumeContent(
           size: 's',
         },
       });
-      y += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 4;
+      y += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 6 + spacing.heightBuffer;
 
       // 成就列表
       exp.highlights.forEach((highlight) => {
@@ -1355,7 +1376,7 @@ function populateLegacyResumeContent(
             size: 's',
           },
         });
-        y += typographyStyles.body.fontSize * typographyStyles.body.lineHeight + 2;
+        y += typographyStyles.body.fontSize * typographyStyles.body.lineHeight + 4 + spacing.heightBuffer;
       });
 
       // 左侧竖线装饰
@@ -1404,7 +1425,7 @@ function populateLegacyResumeContent(
           size: 'm',
         },
       });
-      y += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight;
+      y += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + spacing.heightBuffer;
 
       // 角色和时间段
       if (project.role || project.period) {
@@ -1422,14 +1443,14 @@ function populateLegacyResumeContent(
             size: 's',
           },
         });
-        y += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 4;
+        y += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 6 + spacing.heightBuffer;
       }
 
       // 技术栈标签
       if (project.techStack && project.techStack.length > 0) {
         const techTags = project.techStack.map((t) => ({ name: t, matched: false }));
         const tagsHeight = createSkillTags(editor, techTags, x, y, CONTENT_WIDTH, themeConfig);
-        y += tagsHeight + 4;
+        y += tagsHeight + 6;
       }
 
       // 成就列表
@@ -1448,7 +1469,7 @@ function populateLegacyResumeContent(
             size: 's',
           },
         });
-        y += typographyStyles.body.fontSize * typographyStyles.body.lineHeight + 2;
+        y += typographyStyles.body.fontSize * typographyStyles.body.lineHeight + 4 + spacing.heightBuffer;
       });
 
       y += spacing.itemGap;
@@ -1476,7 +1497,7 @@ function populateLegacyResumeContent(
           size: 'm',
         },
       });
-      y += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight;
+      y += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + spacing.heightBuffer;
 
       // 专业、学位、时间段
       editor.createShape({
@@ -1493,7 +1514,7 @@ function populateLegacyResumeContent(
           size: 's',
         },
       });
-      y += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 12;
+      y += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 14 + spacing.heightBuffer;
     });
   }
 }

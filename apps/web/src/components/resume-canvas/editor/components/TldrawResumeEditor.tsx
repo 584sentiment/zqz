@@ -1796,38 +1796,30 @@ export const TldrawResumeEditor = forwardRef<TldrawResumeEditorRef, TldrawResume
       setIsMounted(true);
     }, []);
 
-    // 导出为 PNG（使用编辑器的 toImage 方法）
+    // 导出为 PNG（使用 tldraw 的 toImage API）
     const exportToPNG = useCallback(
       async (options?: Partial<ExportOptions>): Promise<Blob | null> => {
         const editor = editorRef.current;
         if (!editor) return null;
 
         try {
-          // 获取所有形状
+          // 获取所有形状 ID
           const shapeIds = editor.getCurrentPageShapes().map((s) => s.id);
 
-          // 创建离屏 Canvas 进行渲染
-          const canvas = document.createElement('canvas');
-          const scale = options?.scale ?? 2;
-          canvas.width = A4_WIDTH * scale;
-          canvas.height = A4_HEIGHT * scale;
-
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return null;
-
-          // 填充背景
-          if (options?.background !== false) {
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          if (shapeIds.length === 0) {
+            console.warn('没有可导出的形状');
+            return null;
           }
 
-          // 使用编辑器的 toImage 功能（如果可用）
-          // 否则使用 canvas 方法
-          const blob = await new Promise<Blob | null>((resolve) => {
-            canvas.toBlob((b) => resolve(b), 'image/png');
+          // 使用 tldraw 的 toImage API
+          const result = await editor.toImage(shapeIds, {
+            format: 'png',
+            pixelRatio: options?.scale ?? 2,
+            background: options?.background !== false,
+            padding: 0, // 不添加额外边距
           });
 
-          return blob;
+          return result?.blob ?? null;
         } catch (error) {
           console.error('导出 PNG 失败:', error);
           return null;

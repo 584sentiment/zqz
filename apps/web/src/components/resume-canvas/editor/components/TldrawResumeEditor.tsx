@@ -10,7 +10,14 @@
 
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from 'react';
 import { Tldraw, useEditor, getSnapshot, toRichText, createShapeId } from 'tldraw';
 import 'tldraw/tldraw.css';
 import type {
@@ -26,6 +33,17 @@ import type {
   ResumeProjectContent,
   ResumeEducationContent,
 } from '@ai-job-assistant/shared';
+import { ResumeRenderer } from '../../services/resume-renderer';
+import {
+  TldrawSnapshotConverter,
+  snapshotConverter,
+  toTldrawSnapshot,
+  fromTldrawSnapshot,
+} from '../../services/tldraw-snapshot-converter';
+import type {
+  CanvasResume,
+  LegacyResumeContent as CanvasLegacyResumeContent,
+} from '../../types/canvas-resume.types';
 
 // ============== 类型定义 ==============
 
@@ -67,7 +85,7 @@ export interface ResumeContentForEditor {
 }
 
 /** 编辑器 Props */
-interface TldrawResumeEditorProps {
+export interface TldrawResumeEditorProps {
   /** 简历内容（支持新格式 LayoutResume 或旧格式 ResumeContentForEditor） */
   resumeContent: LayoutResume | ResumeContentForEditor | null;
   /** 元素变化回调 */
@@ -102,17 +120,18 @@ export interface TldrawResumeEditorRef {
   exportToPDF: (options?: Partial<ExportOptions>) => Promise<Blob | null>;
   /** 获取编辑器实例 */
   getEditor: () => ReturnType<typeof useEditor> | null;
-  /** 获取快照 */
+  /** 获取快照（tldraw 原生格式） */
   getSnapshot: () => string | null;
+  /** 获取 CanvasResume 格式的简历数据 */
+  getCanvasResume: () => CanvasResume | null;
+  /** 从 CanvasResume 格式加载简历 */
+  loadCanvasResume: (resume: CanvasResume) => void;
 }
 
 /** 检测是否为 LayoutResume 格式 */
 function isLayoutResume(content: unknown): content is LayoutResume {
   return (
-    typeof content === 'object' &&
-    content !== null &&
-    'meta' in content &&
-    'blocks' in content
+    typeof content === 'object' && content !== null && 'meta' in content && 'blocks' in content
   );
 }
 
@@ -411,7 +430,7 @@ const spacing = {
  */
 function formatPeriod(startDate: string, endDate?: string, current?: boolean): string {
   const start = startDate || '';
-  const end = current ? '至今' : (endDate || '');
+  const end = current ? '至今' : endDate || '';
   if (start && end) {
     return `${start} - ${end}`;
   }
@@ -423,7 +442,10 @@ function formatPeriod(startDate: string, endDate?: string, current?: boolean): s
 /**
  * 创建 A4 纸张背景
  */
-function createPaperBackground(editor: ReturnType<typeof useEditor>, showMarginGuides: boolean): void {
+function createPaperBackground(
+  editor: ReturnType<typeof useEditor>,
+  showMarginGuides: boolean
+): void {
   // 创建阴影层
   editor.createShape({
     id: createShapeId(),
@@ -753,16 +775,26 @@ function renderBlock(
       return renderHeaderBlock(editor, block, x, currentY, width, theme);
     case 'summary':
       currentY += createSectionHeader(editor, block.title || '个人简介', x, currentY, width, theme);
-      return currentY - y + renderSummaryBlock(editor, block, x, currentY, width, theme, layoutHint);
+      return (
+        currentY - y + renderSummaryBlock(editor, block, x, currentY, width, theme, layoutHint)
+      );
     case 'experience':
       currentY += createSectionHeader(editor, block.title || '工作经历', x, currentY, width, theme);
-      return currentY - y + renderExperienceBlock(editor, block, x, currentY, width, theme, layoutHint);
+      return (
+        currentY - y + renderExperienceBlock(editor, block, x, currentY, width, theme, layoutHint)
+      );
     case 'skills':
       currentY += createSectionHeader(editor, block.title || '专业技能', x, currentY, width, theme);
-      return currentY - y + renderSkillsBlock(editor, block, x, currentY, width, theme, layoutConfig, layoutHint);
+      return (
+        currentY -
+        y +
+        renderSkillsBlock(editor, block, x, currentY, width, theme, layoutConfig, layoutHint)
+      );
     case 'projects':
       currentY += createSectionHeader(editor, block.title || '项目经历', x, currentY, width, theme);
-      return currentY - y + renderProjectsBlock(editor, block, x, currentY, width, theme, layoutHint);
+      return (
+        currentY - y + renderProjectsBlock(editor, block, x, currentY, width, theme, layoutHint)
+      );
     case 'education':
       currentY += createSectionHeader(editor, block.title || '教育背景', x, currentY, width, theme);
       return currentY - y + renderEducationBlock(editor, block, x, currentY, width, theme);
@@ -801,7 +833,10 @@ function renderHeaderBlock(
       size: 'xl',
     },
   });
-  currentY += typographyStyles.pageTitle.fontSize * typographyStyles.pageTitle.lineHeight + 10 + spacing.heightBuffer;
+  currentY +=
+    typographyStyles.pageTitle.fontSize * typographyStyles.pageTitle.lineHeight +
+    10 +
+    spacing.heightBuffer;
 
   // 求职意向
   if (content.targetPosition) {
@@ -819,7 +854,10 @@ function renderHeaderBlock(
         size: 'm',
       },
     });
-    currentY += typographyStyles.subtitle.fontSize * typographyStyles.subtitle.lineHeight + 10 + spacing.heightBuffer;
+    currentY +=
+      typographyStyles.subtitle.fontSize * typographyStyles.subtitle.lineHeight +
+      10 +
+      spacing.heightBuffer;
   }
 
   // 联系方式
@@ -843,12 +881,17 @@ function renderHeaderBlock(
         size: 's',
       },
     });
-    currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 10 + spacing.heightBuffer;
+    currentY +=
+      typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight +
+      10 +
+      spacing.heightBuffer;
   }
 
   // 链接
   if (content.links && content.links.length > 0) {
-    const linkParts = content.links.map((link: { type: string; url: string; label?: string }) => link.label || link.url);
+    const linkParts = content.links.map(
+      (link: { type: string; url: string; label?: string }) => link.label || link.url
+    );
     editor.createShape({
       id: createShapeId(),
       type: 'text',
@@ -863,7 +906,10 @@ function renderHeaderBlock(
         size: 's',
       },
     });
-    currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 10 + spacing.heightBuffer;
+    currentY +=
+      typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight +
+      10 +
+      spacing.heightBuffer;
   }
 
   return currentY - y + spacing.heightBuffer;
@@ -899,7 +945,9 @@ function renderSummaryBlock(
     },
   });
 
-  let height = typographyStyles.body.fontSize * typographyStyles.body.lineHeight * 4 + spacing.heightBuffer * 2; // 估算高度 + 缓冲
+  let height =
+    typographyStyles.body.fontSize * typographyStyles.body.lineHeight * 4 +
+    spacing.heightBuffer * 2; // 估算高度 + 缓冲
 
   // 核心优势标签
   if (content.coreStrengths && content.coreStrengths.length > 0) {
@@ -954,7 +1002,10 @@ function renderExperienceBlock(
         size: 'm',
       },
     });
-    currentY += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + 12 + spacing.heightBuffer;
+    currentY +=
+      typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight +
+      12 +
+      spacing.heightBuffer;
 
     // 公司和时间段
     const period = formatPeriod(item.startDate, item.endDate, item.current);
@@ -974,11 +1025,15 @@ function renderExperienceBlock(
         size: 's',
       },
     });
-    currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 6 + spacing.heightBuffer;
+    currentY +=
+      typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight +
+      6 +
+      spacing.heightBuffer;
 
     // 成就列表
     const achievements = item.achievements ?? [];
-    const starResults = item.starHighlights?.map((h) => h.result).filter((r): r is string => r !== undefined) ?? [];
+    const starResults =
+      item.starHighlights?.map((h) => h.result).filter((r): r is string => r !== undefined) ?? [];
     const allAchievements = [...achievements, ...starResults];
 
     allAchievements.forEach((achievement: string) => {
@@ -996,7 +1051,10 @@ function renderExperienceBlock(
           size: 's',
         },
       });
-      currentY += typographyStyles.body.fontSize * typographyStyles.body.lineHeight + 8 + spacing.heightBuffer;
+      currentY +=
+        typographyStyles.body.fontSize * typographyStyles.body.lineHeight +
+        8 +
+        spacing.heightBuffer;
     });
 
     // 添加左侧竖线装饰
@@ -1048,7 +1106,10 @@ function renderSkillsBlock(
           size: 's',
         },
       });
-      currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 6 + spacing.heightBuffer;
+      currentY +=
+        typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight +
+        6 +
+        spacing.heightBuffer;
 
       // 技能标签
       const skills = category.skills.map((s) => ({
@@ -1105,7 +1166,10 @@ function renderProjectsBlock(
         size: 'm',
       },
     });
-    currentY += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + 12 + spacing.heightBuffer;
+    currentY +=
+      typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight +
+      12 +
+      spacing.heightBuffer;
 
     // 角色和时间段 - 增加间距
     const period = formatPeriod(project.startDate, project.endDate, project.ongoing);
@@ -1125,7 +1189,10 @@ function renderProjectsBlock(
         size: 's',
       },
     });
-    currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 12 + spacing.heightBuffer;
+    currentY +=
+      typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight +
+      12 +
+      spacing.heightBuffer;
 
     // 技术栈标签 - 增加间距
     if (project.technologies && project.technologies.length > 0) {
@@ -1150,7 +1217,10 @@ function renderProjectsBlock(
           size: 's',
         },
       });
-      currentY += typographyStyles.body.fontSize * typographyStyles.body.lineHeight + 8 + spacing.heightBuffer;
+      currentY +=
+        typographyStyles.body.fontSize * typographyStyles.body.lineHeight +
+        8 +
+        spacing.heightBuffer;
     });
 
     currentY += spacing.itemGap;
@@ -1189,11 +1259,18 @@ function renderEducationBlock(
         size: 'm',
       },
     });
-    currentY += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + 15 + spacing.heightBuffer;
+    currentY +=
+      typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight +
+      15 +
+      spacing.heightBuffer;
 
     // 专业、学位、时间段
     const period = formatPeriod(edu.startDate, edu.endDate);
-    const detailParts = [`${edu.major} · ${edu.degree}`, period, edu.gpa ? `GPA: ${edu.gpa}` : null].filter(Boolean);
+    const detailParts = [
+      `${edu.major} · ${edu.degree}`,
+      period,
+      edu.gpa ? `GPA: ${edu.gpa}` : null,
+    ].filter(Boolean);
 
     editor.createShape({
       id: createShapeId(),
@@ -1209,7 +1286,10 @@ function renderEducationBlock(
         size: 's',
       },
     });
-    currentY += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 12 + spacing.heightBuffer;
+    currentY +=
+      typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight +
+      12 +
+      spacing.heightBuffer;
   });
 
   return currentY - y + spacing.heightBuffer;
@@ -1248,7 +1328,10 @@ function populateLegacyResumeContent(
       size: 'xl',
     },
   });
-  y += typographyStyles.pageTitle.fontSize * typographyStyles.pageTitle.lineHeight + 10 + spacing.heightBuffer;
+  y +=
+    typographyStyles.pageTitle.fontSize * typographyStyles.pageTitle.lineHeight +
+    10 +
+    spacing.heightBuffer;
 
   // 职位
   if (content.title) {
@@ -1266,7 +1349,10 @@ function populateLegacyResumeContent(
         size: 'm',
       },
     });
-    y += typographyStyles.subtitle.fontSize * typographyStyles.subtitle.lineHeight + 10 + spacing.heightBuffer;
+    y +=
+      typographyStyles.subtitle.fontSize * typographyStyles.subtitle.lineHeight +
+      10 +
+      spacing.heightBuffer;
   }
 
   // 联系方式
@@ -1291,7 +1377,10 @@ function populateLegacyResumeContent(
           size: 's',
         },
       });
-      y += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 10 + spacing.heightBuffer;
+      y +=
+        typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight +
+        10 +
+        spacing.heightBuffer;
     }
   }
 
@@ -1316,7 +1405,10 @@ function populateLegacyResumeContent(
         size: 's',
       },
     });
-    y += typographyStyles.body.fontSize * typographyStyles.body.lineHeight * 3 + spacing.sectionGap + spacing.heightBuffer;
+    y +=
+      typographyStyles.body.fontSize * typographyStyles.body.lineHeight * 3 +
+      spacing.sectionGap +
+      spacing.heightBuffer;
   }
 
   // 工作经历
@@ -1342,7 +1434,9 @@ function populateLegacyResumeContent(
           size: 'm',
         },
       });
-      y += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + spacing.heightBuffer;
+      y +=
+        typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight +
+        spacing.heightBuffer;
 
       // 公司和时间段
       editor.createShape({
@@ -1359,7 +1453,10 @@ function populateLegacyResumeContent(
           size: 's',
         },
       });
-      y += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 6 + spacing.heightBuffer;
+      y +=
+        typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight +
+        6 +
+        spacing.heightBuffer;
 
       // 成就列表
       exp.highlights.forEach((highlight) => {
@@ -1377,7 +1474,10 @@ function populateLegacyResumeContent(
             size: 's',
           },
         });
-        y += typographyStyles.body.fontSize * typographyStyles.body.lineHeight + 4 + spacing.heightBuffer;
+        y +=
+          typographyStyles.body.fontSize * typographyStyles.body.lineHeight +
+          4 +
+          spacing.heightBuffer;
       });
 
       // 左侧竖线装饰
@@ -1426,7 +1526,9 @@ function populateLegacyResumeContent(
           size: 'm',
         },
       });
-      y += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + spacing.heightBuffer;
+      y +=
+        typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight +
+        spacing.heightBuffer;
 
       // 角色和时间段
       if (project.role || project.period) {
@@ -1444,7 +1546,10 @@ function populateLegacyResumeContent(
             size: 's',
           },
         });
-        y += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 6 + spacing.heightBuffer;
+        y +=
+          typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight +
+          6 +
+          spacing.heightBuffer;
       }
 
       // 技术栈标签
@@ -1470,7 +1575,10 @@ function populateLegacyResumeContent(
             size: 's',
           },
         });
-        y += typographyStyles.body.fontSize * typographyStyles.body.lineHeight + 4 + spacing.heightBuffer;
+        y +=
+          typographyStyles.body.fontSize * typographyStyles.body.lineHeight +
+          4 +
+          spacing.heightBuffer;
       });
 
       y += spacing.itemGap;
@@ -1498,7 +1606,9 @@ function populateLegacyResumeContent(
           size: 'm',
         },
       });
-      y += typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight + spacing.heightBuffer;
+      y +=
+        typographyStyles.itemTitle.fontSize * typographyStyles.itemTitle.lineHeight +
+        spacing.heightBuffer;
 
       // 专业、学位、时间段
       editor.createShape({
@@ -1515,7 +1625,10 @@ function populateLegacyResumeContent(
           size: 's',
         },
       });
-      y += typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight + 14 + spacing.heightBuffer;
+      y +=
+        typographyStyles.caption.fontSize * typographyStyles.caption.lineHeight +
+        14 +
+        spacing.heightBuffer;
     });
   }
 }
@@ -1533,7 +1646,9 @@ function EditorSetup({
   showMarginGuides,
   layoutConfig,
   editorRef,
-}: TldrawResumeEditorProps & { editorRef: React.MutableRefObject<ReturnType<typeof useEditor> | null> }) {
+}: TldrawResumeEditorProps & {
+  editorRef: React.MutableRefObject<ReturnType<typeof useEditor> | null>;
+}) {
   const editor = useEditor();
   const initialized = useRef(false);
   const lastContentRef = useRef<string>('');
@@ -1570,10 +1685,18 @@ function EditorSetup({
         populateLayoutResume(editor, resumeContent, theme || 'modern', showMarginGuides || false);
       } else {
         console.log('[TldrawResumeEditor] 使用旧格式渲染');
-        populateLegacyResumeContent(editor, resumeContent, theme || 'modern', showMarginGuides || false);
+        populateLegacyResumeContent(
+          editor,
+          resumeContent,
+          theme || 'modern',
+          showMarginGuides || false
+        );
       }
 
-      console.log('[TldrawResumeEditor] 渲染完成，shapes 数量:', editor.getCurrentPageShapes().length);
+      console.log(
+        '[TldrawResumeEditor] 渲染完成，shapes 数量:',
+        editor.getCurrentPageShapes().length
+      );
 
       // 设置只读/编辑模式
       editor.updateInstanceState({ isReadonly: readOnly });
@@ -1638,7 +1761,10 @@ function EditorSetup({
       }
 
       e.preventDefault();
-      editor.nudgeShapes(selectedShapes.map((s) => s.id), { x: dx, y: dy });
+      editor.nudgeShapes(
+        selectedShapes.map((s) => s.id),
+        { x: dx, y: dy }
+      );
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -1671,76 +1797,82 @@ export const TldrawResumeEditor = forwardRef<TldrawResumeEditorRef, TldrawResume
     }, []);
 
     // 导出为 PNG（使用编辑器的 toImage 方法）
-    const exportToPNG = useCallback(async (options?: Partial<ExportOptions>): Promise<Blob | null> => {
-      const editor = editorRef.current;
-      if (!editor) return null;
+    const exportToPNG = useCallback(
+      async (options?: Partial<ExportOptions>): Promise<Blob | null> => {
+        const editor = editorRef.current;
+        if (!editor) return null;
 
-      try {
-        // 获取所有形状
-        const shapeIds = editor.getCurrentPageShapes().map((s) => s.id);
+        try {
+          // 获取所有形状
+          const shapeIds = editor.getCurrentPageShapes().map((s) => s.id);
 
-        // 创建离屏 Canvas 进行渲染
-        const canvas = document.createElement('canvas');
-        const scale = options?.scale ?? 2;
-        canvas.width = A4_WIDTH * scale;
-        canvas.height = A4_HEIGHT * scale;
+          // 创建离屏 Canvas 进行渲染
+          const canvas = document.createElement('canvas');
+          const scale = options?.scale ?? 2;
+          canvas.width = A4_WIDTH * scale;
+          canvas.height = A4_HEIGHT * scale;
 
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return null;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return null;
 
-        // 填充背景
-        if (options?.background !== false) {
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          // 填充背景
+          if (options?.background !== false) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
+
+          // 使用编辑器的 toImage 功能（如果可用）
+          // 否则使用 canvas 方法
+          const blob = await new Promise<Blob | null>((resolve) => {
+            canvas.toBlob((b) => resolve(b), 'image/png');
+          });
+
+          return blob;
+        } catch (error) {
+          console.error('导出 PNG 失败:', error);
+          return null;
         }
-
-        // 使用编辑器的 toImage 功能（如果可用）
-        // 否则使用 canvas 方法
-        const blob = await new Promise<Blob | null>((resolve) => {
-          canvas.toBlob((b) => resolve(b), 'image/png');
-        });
-
-        return blob;
-      } catch (error) {
-        console.error('导出 PNG 失败:', error);
-        return null;
-      }
-    }, []);
+      },
+      []
+    );
 
     // 导出为 PDF（使用 Canvas 转 PDF）
-    const exportToPDF = useCallback(async (options?: Partial<ExportOptions>): Promise<Blob | null> => {
-      try {
-        // 先导出为 PNG
-        const pngBlob = await exportToPNG(options);
-        if (!pngBlob) return null;
+    const exportToPDF = useCallback(
+      async (options?: Partial<ExportOptions>): Promise<Blob | null> => {
+        try {
+          // 先导出为 PNG
+          const pngBlob = await exportToPNG(options);
+          if (!pngBlob) return null;
 
-        // 使用 pdf-lib 将 PNG 转换为 PDF
-        const { PDFDocument } = await import('pdf-lib');
-        const pdfDoc = await PDFDocument.create();
+          // 使用 pdf-lib 将 PNG 转换为 PDF
+          const { PDFDocument } = await import('pdf-lib');
+          const pdfDoc = await PDFDocument.create();
 
-        // 嵌入图片
-        const pngBytes = await pngBlob.arrayBuffer();
-        const image = await pdfDoc.embedPng(new Uint8Array(pngBytes));
+          // 嵌入图片
+          const pngBytes = await pngBlob.arrayBuffer();
+          const image = await pdfDoc.embedPng(new Uint8Array(pngBytes));
 
-        // 添加页面（A4 尺寸）
-        const pdfPage = pdfDoc.addPage([A4_WIDTH, A4_HEIGHT]);
+          // 添加页面（A4 尺寸）
+          const pdfPage = pdfDoc.addPage([A4_WIDTH, A4_HEIGHT]);
 
-        // 绘制图片
-        pdfPage.drawImage(image, {
-          x: 0,
-          y: 0,
-          width: A4_WIDTH,
-          height: A4_HEIGHT,
-        });
+          // 绘制图片
+          pdfPage.drawImage(image, {
+            x: 0,
+            y: 0,
+            width: A4_WIDTH,
+            height: A4_HEIGHT,
+          });
 
-        // 保存 PDF
-        const pdfBytes = await pdfDoc.save();
-        return new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
-      } catch (error) {
-        console.error('导出 PDF 失败:', error);
-        return null;
-      }
-    }, [exportToPNG]);
+          // 保存 PDF
+          const pdfBytes = await pdfDoc.save();
+          return new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
+        } catch (error) {
+          console.error('导出 PDF 失败:', error);
+          return null;
+        }
+      },
+      [exportToPNG]
+    );
 
     // 获取快照
     const getEditorSnapshot = useCallback((): string | null => {
@@ -1754,6 +1886,56 @@ export const TldrawResumeEditor = forwardRef<TldrawResumeEditorRef, TldrawResume
       }
     }, []);
 
+    // 获取 CanvasResume 格式的简历数据
+    const getCanvasResume = useCallback((): CanvasResume | null => {
+      const editor = editorRef.current;
+      if (!editor) return null;
+
+      try {
+        const snapshot = getSnapshot(editor.store);
+        return fromTldrawSnapshot(snapshot as any);
+      } catch (error) {
+        console.error('获取 CanvasResume 失败:', error);
+        return null;
+      }
+    }, []);
+
+    // 从 CanvasResume 格式加载简历
+    const loadCanvasResume = useCallback((resume: CanvasResume) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      try {
+        // 清空现有内容
+        const allShapes = editor.getCurrentPageShapes();
+        if (allShapes.length > 0) {
+          editor.deleteShapes(allShapes.map((s) => s.id));
+        }
+
+        // 转换并创建 shapes
+        const tldrawSnapshot = toTldrawSnapshot(resume);
+
+        // 从 snapshot 中提取 shapes 并创建
+        if (tldrawSnapshot.document?.pages) {
+          const firstPage = Object.values(tldrawSnapshot.document.pages)[0];
+          if (firstPage?.shapes) {
+            const shapes = Object.values(firstPage.shapes);
+            // 使用 editor.createShapes 创建形状
+            shapes.forEach((shape: any) => {
+              editor.createShape(shape);
+            });
+          }
+        }
+
+        // 适应视图
+        setTimeout(() => {
+          editor.zoomToFit();
+        }, 100);
+      } catch (error) {
+        console.error('加载 CanvasResume 失败:', error);
+      }
+    }, []);
+
     // 暴露方法给父组件
     useImperativeHandle(
       ref,
@@ -1762,8 +1944,10 @@ export const TldrawResumeEditor = forwardRef<TldrawResumeEditorRef, TldrawResume
         exportToPDF,
         getEditor: () => editorRef.current,
         getSnapshot: getEditorSnapshot,
+        getCanvasResume,
+        loadCanvasResume,
       }),
-      [exportToPNG, exportToPDF, getEditorSnapshot]
+      [exportToPNG, exportToPDF, getEditorSnapshot, getCanvasResume, loadCanvasResume]
     );
 
     if (!isMounted) {

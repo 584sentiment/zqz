@@ -3,41 +3,20 @@
  * 主入口文件
  */
 
-// 组件
-export { ResumeCanvas } from './components/ResumeCanvas';
+// ============== 编辑器组件 ==============
 
-// 核心
-export { LayoutEngine } from './core/layout-engine';
-export { TextMeasurer } from './core/text-measurer';
-
-// 导出器
-export { PDFExporter } from './exporters/pdf-exporter';
-
-// 模板
 export {
-  templates,
-  templateMap,
-  getTemplate,
-  getAllTemplates,
-  hasTemplate,
-  modernTemplate,
-} from './templates/template-registry';
-
-// 编辑器
-export { TldrawResumeEditor } from './editor/components/TldrawResumeEditor';
-export type {
-  ResumeContentForEditor,
-  ExportOptions,
-  TldrawResumeEditorRef
+  default as TldrawResumeEditor,
+  type ResumeContentForEditor,
+  type TldrawResumeEditorProps,
+  type ExportOptions,
+  type TldrawResumeEditorRef,
 } from './editor/components/TldrawResumeEditor';
 
-// 类型
+// ============== 旧类型（兼容） ==============
+
 export type {
   ResumeElementType,
-  ContentSourceType,
-  TextStyle,
-  ContentSource,
-  ResumeElementBase,
   ResumeElement,
   TextElement,
   SectionHeaderElement,
@@ -49,7 +28,7 @@ export type {
   PageData,
   LayoutResult,
   ResumeContent,
-  LayoutContext,
+  LayoutContext as LegacyLayoutContext,
 } from './types/resume-canvas.types';
 
 export type {
@@ -61,3 +40,70 @@ export type {
 } from './types/template.types';
 
 export { A4_PAGE, COLOR_THEMES, DEFAULT_FONTS } from './types/template.types';
+
+// ============== 新类型（Canvas Resume） ==============
+
+export {
+  // 常量
+  A4_SIZE,
+  DEFAULT_MARGINS,
+  CONTENT_WIDTH,
+  // 类型
+  type TextAlign,
+  type FontSize,
+  type TldrawColor,
+  type ResumeShapeType,
+  type BaseShapeProps,
+  type TextShapeProps,
+  type SectionTitleShapeProps,
+  type DividerShapeProps,
+  type TagShapeProps,
+  type CardShapeProps,
+  type SidebarShapeProps,
+  type BannerShapeProps,
+  type IconShapeProps,
+  type ResumeShape,
+  type ResumePage,
+  type CanvasResumeMeta,
+  type CanvasResume,
+  type LegacyResumeContent,
+  type ShapeConverter,
+  type DocumentConverter,
+  type ShapeLayoutResult,
+  type LayoutContext,
+  // 类型守卫
+  isTextShape,
+  isSectionTitleShape,
+  isDividerShape,
+  isTagShape,
+  isCardShape,
+  isSidebarShape,
+  isBannerShape,
+  isIconShape,
+  // 工厂函数
+  createTextShape,
+  createSectionTitleShape,
+  createDividerShape,
+  createTagShape,
+  createResumePage,
+  createCanvasResume,
+} from './types/canvas-resume.types';
+
+// ============== 服务 ==============
+
+export {
+  TldrawSnapshotConverter,
+  snapshotConverter,
+  toTldrawSnapshot,
+  fromTldrawSnapshot,
+} from './services/tldraw-snapshot-converter';
+
+export {
+  TemplateRenderer,
+  createTemplateRenderer,
+  renderResumeWithTemplate,
+} from './services/template-renderer';
+
+// ============== 渲染服务 ==============
+
+export { ResumeRenderer, resumeRenderer, createResumeRenderer } from './services/resume-renderer';

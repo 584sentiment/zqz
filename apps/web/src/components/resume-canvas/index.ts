@@ -107,3 +107,24 @@ export {
 // ============== 渲染服务 ==============
 
 export { ResumeRenderer, resumeRenderer, createResumeRenderer } from './services/resume-renderer';
+
+// ============== AI 内容转换器 ==============
+
+export {
+  AIContentConverter,
+  aiContentConverter,
+  createAIContentConverter,
+  convertLayoutResumeToCanvas,
+  convertLegacyContentToCanvas,
+} from './services/ai-content-converter';
+
+// ============== AI 编辑面板 ==============
+
+export {
+  default as AIEditorPanel,
+  type AIEditAction,
+  type AIEditRequest,
+  type AIEditResponse,
+  type BlockPolishOption,
+  type AIEditorPanelProps,
+} from './editor/AIEditorPanel';

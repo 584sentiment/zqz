@@ -90,7 +90,7 @@ export class ResumeShapeGenerator {
   async generateResumeShapes(
     userProfile: any,
     jobDescription: string,
-    template: string = 'modern'
+    _template: string = 'modern' // TODO: 未来根据模板生成不同样式
   ): Promise<ResumeContent> {
     // 1. 调用 AI 生成简历内容
     const resumeContent = await this.generateResumeContent(userProfile, jobDescription);
@@ -207,7 +207,7 @@ ${jobDescription}
    * 获取主题配置
    */
   getTheme(template: string): ResumeTheme {
-    return RESUME_THEMES[template] || RESUME_THEMES.modern;
+    return RESUME_THEMES[template] ?? RESUME_THEMES.modern!;
   }
 }
 

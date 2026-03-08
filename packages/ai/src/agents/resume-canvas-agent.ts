@@ -4,6 +4,7 @@
  */
 
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { getAIManager } from '../providers';
 import { withTimeoutAndMetrics, AIServiceError, AIServiceErrorCode } from '../services';
 
@@ -119,20 +120,14 @@ export class ResumeCanvasAgent {
       const response = await withTimeoutAndMetrics(
         'AI 简历代理理解',
         this.llm.invoke([
-          {
-            role: 'system',
-            content: this.buildSystemPrompt(perception),
-          },
-          {
-            role: 'user',
-            content: userMessage,
-          },
+          new SystemMessage(this.buildSystemPrompt(perception)),
+          new HumanMessage(userMessage),
         ]),
         30000, // 30 秒超时
         5000 // 5 秒首字节阈值
       );
 
-      const text = response.content as string;
+      const text = response.result.content as string;
 
       // 提取 JSON
       const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -325,15 +320,18 @@ ${JSON.stringify(perception.shapes, null, 2)}
    * Blob 转 Base64
    */
   private async blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        resolve(base64);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+    // 使用 Blob.arrayBuffer() 方法（Node.js 和浏览器都支持）
+    const buffer = await blob.arrayBuffer();
+    if (!buffer) {
+      throw new Error('Failed to read blob data');
+    }
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const length = bytes.length; // 使用 length 而不是 byteLength
+    for (let i = 0; i < length; i++) {
+      binary += String.fromCharCode(bytes[i]!); // 非空断言
+    }
+    return `data:${blob.type};base64,${btoa(binary)}`;
   }
 }
 

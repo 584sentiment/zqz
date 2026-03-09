@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -13,7 +13,8 @@ import type {
   ResumeContent,
   ResumeShape,
 } from '@/components/resume-canvas';
-import { AIEditorPanel } from '@/components/resume-canvas';
+import { AIEditorPanel, TldrawResumeEditor } from '@/components/resume-canvas';
+import type { TldrawResumeEditorRef } from '@/components/resume-canvas';
 import { convertLegacyContentToCanvas } from '@/components/resume-canvas';
 import type { ColorTheme } from '@ai-job-assistant/shared';
 
@@ -91,6 +92,9 @@ export default function ResumeDetailPage() {
 
   // 选中的形状（用于 AI 编辑面板）
   const [selectedShapes, setSelectedShapes] = useState<ResumeShape[]>([]);
+
+  // 编辑器 ref（用于获取快照）
+  const editorRef = useRef<TldrawResumeEditorRef>(null);
 
   // 编辑器快照（用于保存）
   const [editorSnapshot, setEditorSnapshot] = useState<string | null>(null);
@@ -353,15 +357,27 @@ export default function ResumeDetailPage() {
 
     setIsSaving(true);
     try {
-      // 如果有编辑器快照，将快照保存到 content 中
-      const contentToUpdate = editorSnapshot
-        ? { ...resume.content, _canvasSnapshot: editorSnapshot }
-        : resume.content;
+      // 使用 ref 获取编辑器当前快照
+      const currentSnapshot = editorRef.current?.getSnapshot?.() || null;
+
+      console.log('[ResumePage] 保存快照:', {
+        hasEditorRef: !!editorRef.current,
+        hasGetSnapshot: !!editorRef.current?.getSnapshot,
+        snapshotLength: currentSnapshot?.length || 0,
+      });
+
+      // 如果能获取到编辑器快照，保存它
+      const contentToUpdate = currentSnapshot
+        ? { ...resume.content, _canvasSnapshot: currentSnapshot }
+        : editorSnapshot
+          ? { ...resume.content, _canvasSnapshot: editorSnapshot }
+          : resume.content;
 
       await resumesApi.update(resume.id, { content: contentToUpdate });
       setResume({ ...resume, content: contentToUpdate });
       toast({ title: '保存成功', description: '简历内容已保存' });
     } catch (error) {
+      console.error('[ResumePage] 保存失败:', error);
       toast({ title: '保存失败', description: '请稍后重试', variant: 'destructive' });
     } finally {
       setIsSaving(false);

@@ -13,8 +13,8 @@ import type {
   ResumeContent,
   ResumeShape,
 } from '@/components/resume-canvas';
-import { AIEditorPanel, TldrawResumeEditor } from '@/components/resume-canvas';
-import type { TldrawResumeEditorRef } from '@/components/resume-canvas';
+import { AIEditorPanel } from '@/components/resume-canvas';
+import type { TldrawResumeEditorProps } from '@/components/resume-canvas';
 import { convertLegacyContentToCanvas } from '@/components/resume-canvas';
 import type { ColorTheme } from '@ai-job-assistant/shared';
 
@@ -93,8 +93,11 @@ export default function ResumeDetailPage() {
   // 选中的形状（用于 AI 编辑面板）
   const [selectedShapes, setSelectedShapes] = useState<ResumeShape[]>([]);
 
-  // 编辑器 ref（用于获取快照）
-  const editorRef = useRef<TldrawResumeEditorRef>(null);
+  // 使用 ref 存储最新的 resume，避免闭包问题
+  const resumeRef = useRef(resume);
+  useEffect(() => {
+    resumeRef.current = resume;
+  }, [resume]);
 
   // 编辑器快照（用于保存）
   const [editorSnapshot, setEditorSnapshot] = useState<string | null>(null);
@@ -103,6 +106,11 @@ export default function ResumeDetailPage() {
   const resumeContent = useMemo((): ResumeContent | null => {
     if (!resume?.content) return null;
     const content = resume.content as Record<string, unknown>;
+
+    console.log('[ResumePage] 转换 resumeContent', {
+      hasCanvasSnapshot: !!content._canvasSnapshot,
+      snapshotLength: (content._canvasSnapshot as string)?.length || 0,
+    });
 
     // 处理 summary
     let summaryText: string | undefined;
@@ -160,7 +168,8 @@ export default function ResumeDetailPage() {
       matchedSkills: content.matchedSkills as string[] | undefined,
       projects: projectsList,
       education: educationList,
-      // 保留 canvas 快照，      _canvasSnapshot: content._canvasSnapshot as string | undefined,
+      // 保留 canvas 快照
+      _canvasSnapshot: content._canvasSnapshot as string | undefined,
     };
   }, [resume]);
 
@@ -180,18 +189,35 @@ export default function ResumeDetailPage() {
   }, [resume?.content]);
 
   // 自动保存（有内容时启用）
+  // 监听 editorSnapshot 的变化，而不是 resumeContent
   const {
     isSaving: isAutoSaving,
     hasUnsavedChanges,
     save: autoSave,
   } = useAutoSave({
-    data: resumeContent,
-    onSave: async (content) => {
-      if (!resume) return;
-      await resumesApi.update(resume.id, { content: resume.content });
+    data: editorSnapshot,
+    onSave: async (snapshot) => {
+      const currentResume = resumeRef.current;
+      if (!currentResume || !snapshot) return;
+
+      console.log('[ResumePage] 自动保存快照', {
+        resumeId: currentResume.id,
+        snapshotLength: snapshot.length,
+      });
+
+      // 保存编辑器快照到 content 的 _canvasSnapshot 字段
+      const contentToUpdate = {
+        ...currentResume.content,
+        _canvasSnapshot: snapshot,
+      };
+      await resumesApi.update(currentResume.id, { content: contentToUpdate });
+      // 更新本地状态
+      setResume((prev) =>
+        prev ? { ...prev, content: contentToUpdate } : prev
+      );
     },
     debounceMs: 3000,
-    enabled: hasContent,
+    enabled: hasContent && !!editorSnapshot,
   });
 
   // 加载简历
@@ -357,21 +383,21 @@ export default function ResumeDetailPage() {
 
     setIsSaving(true);
     try {
-      // 使用 ref 获取编辑器当前快照
-      const currentSnapshot = editorRef.current?.getSnapshot?.() || null;
-
-      console.log('[ResumePage] 保存快照:', {
-        hasEditorRef: !!editorRef.current,
-        hasGetSnapshot: !!editorRef.current?.getSnapshot,
-        snapshotLength: currentSnapshot?.length || 0,
+      console.log('[ResumePage] 手动保存快照:', {
+        hasSnapshot: !!editorSnapshot,
+        snapshotLength: editorSnapshot?.length || 0,
       });
 
-      // 如果能获取到编辑器快照，保存它
-      const contentToUpdate = currentSnapshot
-        ? { ...resume.content, _canvasSnapshot: currentSnapshot }
-        : editorSnapshot
-          ? { ...resume.content, _canvasSnapshot: editorSnapshot }
-          : resume.content;
+      // 使用 editorSnapshot 状态来保存
+      if (!editorSnapshot) {
+        toast({ title: '没有可保存的内容', variant: 'destructive' });
+        return;
+      }
+
+      const contentToUpdate = {
+        ...resume.content,
+        _canvasSnapshot: editorSnapshot,
+      };
 
       await resumesApi.update(resume.id, { content: contentToUpdate });
       setResume({ ...resume, content: contentToUpdate });

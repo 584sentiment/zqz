@@ -18,7 +18,7 @@ import React, {
   forwardRef,
   useImperativeHandle,
 } from 'react';
-import { Tldraw, useEditor, getSnapshot, toRichText, createShapeId } from 'tldraw';
+import { Tldraw, useEditor, getSnapshot, loadSnapshot, toRichText, createShapeId } from 'tldraw';
 import 'tldraw/tldraw.css';
 import type {
   LayoutResume,
@@ -1661,18 +1661,12 @@ function EditorSetup({
   }, [editor, editorRef]);
 
   useEffect(() => {
-    // 检查内容是否变化
-    const contentKey = JSON.stringify(resumeContent);
-    if (contentKey === lastContentRef.current) return;
-
     if (editor && resumeContent) {
-      lastContentRef.current = contentKey;
-
       console.log('[TldrawResumeEditor] 开始渲染简历内容', {
         isLayout: isLayoutResume(resumeContent),
         hasEditor: !!editor,
         hasCanvasSnapshot: !!(resumeContent as any)._canvasSnapshot,
-        content: resumeContent,
+        snapshotLength: (resumeContent as any)._canvasSnapshot?.length || 0,
       });
 
       // 优先使用保存的 canvas 快照恢复编辑器状态
@@ -1680,45 +1674,55 @@ function EditorSetup({
       if (canvasSnapshot && typeof canvasSnapshot === 'string') {
         try {
           const snapshot = JSON.parse(canvasSnapshot);
-          editor.store.loadSnapshot(snapshot);
-          console.log('[TldrawResumeEditor] 从快照恢复成功，shapes 数量:', editor.getCurrentPageShapes().length);
+          console.log('[TldrawResumeEditor] 解析快照成功，准备加载', {
+            hasDocument: !!snapshot?.document,
+            hasSession: !!snapshot?.session,
+          });
+
+          // 清空现有内容
+          const allShapes = editor.getCurrentPageShapes();
+          if (allShapes.length > 0) {
+            editor.deleteShapes(allShapes.map((s) => s.id));
+          }
+
+          loadSnapshot(editor.store, snapshot);
+
+          // 等待一帧后检查结果
+          requestAnimationFrame(() => {
+            console.log('[TldrawResumeEditor] 从快照恢复完成，shapes 数量:', editor.getCurrentPageShapes().length);
+          });
+          return; // 成功加载快照后直接返回
         } catch (error) {
           console.error('[TldrawResumeEditor] 恢复快照失败，将重新渲染:', error);
           // 如果恢复失败，继续使用正常的渲染逻辑
-          renderContent();
         }
-      } else {
-        // 没有快照，使用正常的渲染逻辑
-        renderContent();
       }
 
-      function renderContent() {
-        // 清空现有内容
-        const allShapes = editor.getCurrentPageShapes();
-        console.log('[TldrawResumeEditor] 当前 shapes 数量:', allShapes.length);
-        if (allShapes.length > 0) {
-          editor.deleteShapes(allShapes.map((s) => s.id));
-        }
+      // 没有快照或加载失败，使用正常的渲染逻辑
+      const allShapes = editor.getCurrentPageShapes();
+      console.log('[TldrawResumeEditor] 当前 shapes 数量:', allShapes.length);
+      if (allShapes.length > 0) {
+        editor.deleteShapes(allShapes.map((s) => s.id));
+      }
 
-        // 根据内容格式渲染
-        if (isLayoutResume(resumeContent)) {
-          console.log('[TldrawResumeEditor] 使用 LayoutResume 格式渲染');
-          populateLayoutResume(editor, resumeContent, theme || 'modern', showMarginGuides || false);
-        } else {
-          console.log('[TldrawResumeEditor] 使用旧格式渲染');
-          populateLegacyResumeContent(
-            editor,
-            resumeContent,
-            theme || 'modern',
-            showMarginGuides || false
-          );
-        }
-
-        console.log(
-          '[TldrawResumeEditor] 渲染完成，shapes 数量:',
-          editor.getCurrentPageShapes().length
+      // 根据内容格式渲染
+      if (isLayoutResume(resumeContent)) {
+        console.log('[TldrawResumeEditor] 使用 LayoutResume 格式渲染');
+        populateLayoutResume(editor, resumeContent, theme || 'modern', showMarginGuides || false);
+      } else {
+        console.log('[TldrawResumeEditor] 使用旧格式渲染');
+        populateLegacyResumeContent(
+          editor,
+          resumeContent,
+          theme || 'modern',
+          showMarginGuides || false
         );
       }
+
+      console.log(
+        '[TldrawResumeEditor] 渲染完成，shapes 数量:',
+        editor.getCurrentPageShapes().length
+      );
 
       // 设置只读/编辑模式
       editor.updateInstanceState({ isReadonly: readOnly });

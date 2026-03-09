@@ -95,9 +95,6 @@ export default function ResumeDetailPage() {
   // 编辑器快照（用于保存）
   const [editorSnapshot, setEditorSnapshot] = useState<string | null>(null);
 
-  // 编辑器快照（用于保存）
-  const [editorSnapshot, setEditorSnapshot] = useState<string | null>(null);
-
   // 将 API 返回的内容转换为 ResumeContent 格式
   const resumeContent = useMemo((): ResumeContent | null => {
     if (!resume?.content) return null;
@@ -159,6 +156,7 @@ export default function ResumeDetailPage() {
       matchedSkills: content.matchedSkills as string[] | undefined,
       projects: projectsList,
       education: educationList,
+      // 保留 canvas 快照，      _canvasSnapshot: content._canvasSnapshot as string | undefined,
     };
   }, [resume]);
 

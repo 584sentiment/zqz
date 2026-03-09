@@ -82,6 +82,8 @@ export interface ResumeContentForEditor {
     period: string;
     gpa?: string;
   }>;
+  /** 编辑器快照（用于保存/恢复编辑器状态） */
+  _canvasSnapshot?: string;
 }
 
 /** 编辑器 Props */
@@ -1669,34 +1671,54 @@ function EditorSetup({
       console.log('[TldrawResumeEditor] 开始渲染简历内容', {
         isLayout: isLayoutResume(resumeContent),
         hasEditor: !!editor,
+        hasCanvasSnapshot: !!(resumeContent as any)._canvasSnapshot,
         content: resumeContent,
       });
 
-      // 清空现有内容
-      const allShapes = editor.getCurrentPageShapes();
-      console.log('[TldrawResumeEditor] 当前 shapes 数量:', allShapes.length);
-      if (allShapes.length > 0) {
-        editor.deleteShapes(allShapes.map((s) => s.id));
+      // 优先使用保存的 canvas 快照恢复编辑器状态
+      const canvasSnapshot = (resumeContent as any)._canvasSnapshot;
+      if (canvasSnapshot && typeof canvasSnapshot === 'string') {
+        try {
+          const snapshot = JSON.parse(canvasSnapshot);
+          editor.store.loadSnapshot(snapshot);
+          console.log('[TldrawResumeEditor] 从快照恢复成功，shapes 数量:', editor.getCurrentPageShapes().length);
+        } catch (error) {
+          console.error('[TldrawResumeEditor] 恢复快照失败，将重新渲染:', error);
+          // 如果恢复失败，继续使用正常的渲染逻辑
+          renderContent();
+        }
+      } else {
+        // 没有快照，使用正常的渲染逻辑
+        renderContent();
       }
 
-      // 根据内容格式渲染
-      if (isLayoutResume(resumeContent)) {
-        console.log('[TldrawResumeEditor] 使用 LayoutResume 格式渲染');
-        populateLayoutResume(editor, resumeContent, theme || 'modern', showMarginGuides || false);
-      } else {
-        console.log('[TldrawResumeEditor] 使用旧格式渲染');
-        populateLegacyResumeContent(
-          editor,
-          resumeContent,
-          theme || 'modern',
-          showMarginGuides || false
+      function renderContent() {
+        // 清空现有内容
+        const allShapes = editor.getCurrentPageShapes();
+        console.log('[TldrawResumeEditor] 当前 shapes 数量:', allShapes.length);
+        if (allShapes.length > 0) {
+          editor.deleteShapes(allShapes.map((s) => s.id));
+        }
+
+        // 根据内容格式渲染
+        if (isLayoutResume(resumeContent)) {
+          console.log('[TldrawResumeEditor] 使用 LayoutResume 格式渲染');
+          populateLayoutResume(editor, resumeContent, theme || 'modern', showMarginGuides || false);
+        } else {
+          console.log('[TldrawResumeEditor] 使用旧格式渲染');
+          populateLegacyResumeContent(
+            editor,
+            resumeContent,
+            theme || 'modern',
+            showMarginGuides || false
+          );
+        }
+
+        console.log(
+          '[TldrawResumeEditor] 渲染完成，shapes 数量:',
+          editor.getCurrentPageShapes().length
         );
       }
-
-      console.log(
-        '[TldrawResumeEditor] 渲染完成，shapes 数量:',
-        editor.getCurrentPageShapes().length
-      );
 
       // 设置只读/编辑模式
       editor.updateInstanceState({ isReadonly: readOnly });

@@ -281,6 +281,9 @@ export interface ResumeContent {
     aiModel: string;
     isAIGenerated: boolean;
   };
+
+  /** 编辑器快照（用于保存/恢复 tldraw 编辑器状态） */
+  _canvasSnapshot?: string;
 }
 
 /** 布局上下文 */

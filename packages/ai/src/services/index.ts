@@ -1,7 +1,7 @@
 // AI 服务封装
 
 import { getAIManager } from '../providers';
-import { promptTemplates, fillPromptTemplate, getPromptTemplate } from '../prompts';
+import { promptTemplates, getPromptTemplate } from '../prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { HumanMessage, SystemMessage, AIMessage, BaseMessage } from '@langchain/core/messages';
@@ -446,10 +446,10 @@ export class ResumeGenerationService {
       }
 
       const llm = manager.getProvider('deepseek');
-      const promptTemplate = promptTemplates.jobParsing;
-      const filledPrompt = fillPromptTemplate(promptTemplate, { jobDescription });
+      // 使用增强的简历生成模板
+      const promptTemplate = PromptTemplate.fromTemplate(promptTemplates.enhancedResumeGeneration);
 
-      const chain = PromptTemplate.fromTemplate(filledPrompt)
+      const chain = promptTemplate
         .pipe(llm)
         .pipe(new StringOutputParser());
 

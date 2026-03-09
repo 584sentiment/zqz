@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -11,8 +11,6 @@ import { Button } from '@/components/ui/button';
 import { useAutoSave } from '@/hooks/use-auto-save';
 import type {
   ResumeContent,
-  TldrawResumeEditorRef,
-  CanvasResume,
   ResumeShape,
 } from '@/components/resume-canvas';
 import { AIEditorPanel } from '@/components/resume-canvas';
@@ -87,7 +85,6 @@ export default function ResumeDetailPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // 编辑器相关
-  const editorRef = useRef<TldrawResumeEditorRef>(null);
   const [selectedTheme, setSelectedTheme] = useState<ColorTheme>('modern');
   const [showSidebar, setShowSidebar] = useState(true);
   const [sidebarTab, setSidebarTab] = useState<'style' | 'ai' | 'settings'>('style');
@@ -159,7 +156,22 @@ export default function ResumeDetailPage() {
     };
   }, [resume]);
 
-  // 自动保存
+  // 判断简历是否有内容
+  const hasContent = useMemo(() => {
+    if (!resume?.content) return false;
+    const content = resume.content as Record<string, unknown>;
+    // 检查是否有实质性内容
+    return !!(
+      content.name ||
+      content.summary ||
+      (content.skills && (Array.isArray(content.skills) ? content.skills.length > 0 : (content.skills as { list?: unknown[] })?.list?.length)) ||
+      (content.experience && (Array.isArray(content.experience) ? content.experience.length > 0 : (content.experience as { list?: unknown[] })?.list?.length)) ||
+      (content.education && (Array.isArray(content.education) ? content.education.length > 0 : (content.education as { list?: unknown[] })?.list?.length)) ||
+      (content.projects && (Array.isArray(content.projects) ? content.projects.length > 0 : (content.projects as { list?: unknown[] })?.list?.length))
+    );
+  }, [resume?.content]);
+
+  // 自动保存（有内容时启用）
   const {
     isSaving: isAutoSaving,
     hasUnsavedChanges,
@@ -171,7 +183,7 @@ export default function ResumeDetailPage() {
       await resumesApi.update(resume.id, { content: resume.content });
     },
     debounceMs: 3000,
-    enabled: resume?.status === 'completed',
+    enabled: hasContent,
   });
 
   // 加载简历
@@ -414,8 +426,8 @@ export default function ResumeDetailPage() {
                     : '草稿'}
             </span>
 
-            {/* 自动保存状态 */}
-            {resume.status === 'completed' && (
+            {/* 自动保存状态（有内容时显示） */}
+            {hasContent && (
               <div
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
                   isAutoSaving
@@ -436,8 +448,8 @@ export default function ResumeDetailPage() {
               </div>
             )}
 
-            {/* 草稿/生成中/失败状态 - 生成按钮 */}
-            {resume.status !== 'completed' && (
+            {/* 无内容时显示 AI 生成按钮 */}
+            {!hasContent && resume.status !== 'generating' && (
               <Button onClick={handleGenerate} disabled={isGenerating} size="sm">
                 {isGenerating ? (
                   <>
@@ -453,8 +465,8 @@ export default function ResumeDetailPage() {
               </Button>
             )}
 
-            {/* 完成状态 - 操作按钮 */}
-            {resume.status === 'completed' && (
+            {/* 有内容时显示操作按钮 */}
+            {hasContent && (
               <>
                 {/* 匹配度 */}
                 {resume.matchScore && (
@@ -527,17 +539,16 @@ export default function ResumeDetailPage() {
           {/* 画布编辑器 */}
           <div className="flex-1 relative">
             <TldrawResumeEditor
-              ref={editorRef}
               resumeContent={resumeContent}
               theme={selectedTheme}
               onChange={handleEditorChange}
-              readOnly={resume.status !== 'completed'}
+              readOnly={!hasContent}
               showMarginGuides={false}
             />
           </div>
 
-          {/* 右侧边栏 */}
-          {resume.status === 'completed' && showSidebar && (
+          {/* 右侧边栏（有内容时显示） */}
+          {hasContent && showSidebar && (
             <div className="w-72 bg-white border-l border-gray-200 flex flex-col">
               {/* 标签切换 */}
               <div className="flex border-b border-gray-200">

@@ -9,7 +9,7 @@ AI 求职辅助平台 - 基于 AI 技术的智能求职辅助系统，提供岗�
 ## 技术栈
 
 - **前端**: Next.js 14 + React 18 + TypeScript + TailwindCSS + shadcn/ui + Zustand + TanStack Query
-  - 画布编辑: Konva + react-konva
+  - 简历画布: tldraw
   - 富文本: TipTap
 - **后端**: NestJS + TypeScript + Prisma ORM + Passport JWT + Socket.io
 - **数据库**: PostgreSQL + Redis (ioredis)
@@ -36,6 +36,9 @@ npm run test -w apps/api          # 后端单元测试
 npm run test:e2e -w apps/api      # 后端 E2E 测试
 npm run test -w apps/web          # 前端单元测试 (Vitest)
 npm run test:e2e -w apps/web      # 前端 E2E 测试 (Playwright)
+# 运行单个测试文件：
+npx jest src/modules/auth/auth.service.spec.ts -w apps/api
+npx vitest run src/lib/api/resumes.test.ts -w apps/web
 
 # 数据库
 npm run db:generate      # 生成 Prisma 客户端
@@ -56,9 +59,9 @@ npm run db:studio        # 打开 Prisma Studio
 │   └── web/                 # Next.js 14 前端 (App Router)
 │       └── src/
 │           ├── app/         # 页面路由
-│           ├── components/  # React 组件
-│           ├── lib/         # 工具库
-│           └── stores/      # Zustand 状态管理
+│           ├── components/  # React 组件 (ui/, resume-canvas/, resume-editor/, auth/, layout/)
+│           ├── lib/         # 工具库 (api/, utils/, ai-canvas-agent/)
+│           └── stores/      # Zustand 状态管理 (auth.ts)
 ├── packages/
 │   ├── database/            # Prisma ORM 层
 │   │   └── prisma/schema.prisma
@@ -178,6 +181,20 @@ modules/<name>/
 - **前端单元测试**: Vitest (`npm run test -w apps/web`)
 - **前端 E2E 测试**: Playwright (`npm run test:e2e -w apps/web`)，测试文件位于 `apps/web/e2e/`
 - **后端单元测试**: Jest (`npm run test -w apps/api`)
+
+### 前端 API 客户端
+使用 `apiClient` 进行 API 调用，自动处理 JWT 认证和 Token 刷新：
+```typescript
+import { apiClient } from '@/lib/api/client';
+// GET 请求
+const response = await apiClient.get('/resumes');
+// POST 请求
+const result = await apiClient.post('/resumes', { title: '新简历' });
+```
+
+### 简历画布编辑器
+简历编辑功能使用 tldraw 实现，核心组件位于 `apps/web/src/components/resume-canvas/`。
+导出功能使用 tldraw 的 `toImage` API，支持 PNG/JPG/PDF 格式。
 
 ## 设计文档
 

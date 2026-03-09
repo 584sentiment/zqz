@@ -3,7 +3,63 @@
  * 用于 API 数据格式和编辑器 SectionData 格式之间的转换
  */
 
-import type { SectionData } from '@/components/resume-editor/types/editor.types';
+import type { JSONContent } from '@tiptap/react';
+
+/** 富文本内容 (TipTap JSON) */
+export type RichTextContent = JSONContent;
+
+/** 编辑器区块数据 */
+export interface SectionData {
+  // 头部信息
+  header?: {
+    name: string;
+    title?: string;
+    phone?: string;
+    email?: string;
+    location?: string;
+    website?: string;
+    linkedin?: string;
+  };
+
+  // 摘要
+  summary?: string | RichTextContent;
+
+  // 工作经历
+  experience?: Array<{
+    id: string;
+    company: string;
+    position: string;
+    period: string;
+    location?: string;
+    description?: string | RichTextContent;
+    highlights?: string[];
+  }>;
+
+  // 教育背景
+  education?: Array<{
+    id: string;
+    school: string;
+    major: string;
+    degree: string;
+    period: string;
+    gpa?: string;
+    honors?: string[];
+  }>;
+
+  // 技能
+  skills?: string[];
+
+  // 项目经历
+  projects?: Array<{
+    id: string;
+    name: string;
+    role?: string;
+    period?: string;
+    description?: string | RichTextContent;
+    techStack?: string[];
+    highlights?: string[];
+  }>;
+}
 
 /** API 返回的简历内容格式 */
 export interface ApiResumeContent {

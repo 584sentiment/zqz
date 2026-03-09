@@ -3,11 +3,23 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ['@ai-job-assistant/shared', '@ai-job-assistant/database'],
+  transpilePackages: [
+    '@ai-job-assistant/shared',
+    '@ai-job-assistant/database',
+    // tldraw 相关包 - 解决重复加载问题
+    'tldraw',
+    '@tldraw/editor',
+    '@tldraw/store',
+    '@tldraw/tlschema',
+    '@tldraw/utils',
+    '@tldraw/state',
+    '@tldraw/state-react',
+    '@tldraw/validate',
+  ],
   experimental: {
     typedRoutes: false,
   },
-  // 增加 Webpack 内存限制，解决 tldraw 编译时 Jest worker 崩溃问题
+  // Webpack 配置
   webpack: (config, { isServer }) => {
     if (!isServer) {
       // 客户端编译时增加内存限制
@@ -15,6 +27,20 @@ const nextConfig = {
         level: 'error',
       };
     }
+
+    // 解决 tldraw 重复加载问题 - 强制使用同一个实例
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      // 确保所有 @tldraw/* 包使用同一个实例（在 monorepo 根目录）
+      '@tldraw/editor': path.resolve(__dirname, '../../node_modules/@tldraw/editor'),
+      '@tldraw/store': path.resolve(__dirname, '../../node_modules/@tldraw/store'),
+      '@tldraw/tlschema': path.resolve(__dirname, '../../node_modules/@tldraw/tlschema'),
+      '@tldraw/utils': path.resolve(__dirname, '../../node_modules/@tldraw/utils'),
+      '@tldraw/state': path.resolve(__dirname, '../../node_modules/@tldraw/state'),
+      '@tldraw/state-react': path.resolve(__dirname, '../../node_modules/@tldraw/state-react'),
+      '@tldraw/validate': path.resolve(__dirname, '../../node_modules/@tldraw/validate'),
+    };
+
     return config;
   },
   env: {

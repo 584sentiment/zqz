@@ -1960,7 +1960,8 @@ export const TldrawResumeEditor = forwardRef<TldrawResumeEditorRef, TldrawResume
         }}
       >
         <Tldraw
-          persistenceKey="resume-editor"
+          // 不使用 persistenceKey，避免 IndexedDB 缓存导致不同简历数据混乱
+          // persistenceKey="resume-editor"
           components={{
             ActionsMenu: null,
             ContextMenu: null,

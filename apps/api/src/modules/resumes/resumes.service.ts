@@ -6,6 +6,8 @@ import {
   ResumeGenerationService,
   AIServiceError,
   getResumeSuggestionService,
+  identifyJobType,
+  JOB_TYPE_DEFINITIONS,
   type ResumeSuggestion,
   type SectionOptimizeResult,
   type JobKeywordExtraction,
@@ -1126,6 +1128,20 @@ export class ResumesService {
     requirements?: unknown;
   }): string {
     const parts: string[] = [];
+
+    // 识别岗位类型并添加到描述开头
+    const title = job.title || '';
+    const description = job.description || '';
+    const jobType = identifyJobType(title, description);
+    const jobTypeDef = JOB_TYPE_DEFINITIONS[jobType];
+
+    parts.push(`【岗位类型识别结果】`);
+    parts.push(`类型: ${jobTypeDef.name}`);
+    parts.push(`相关技能方向: ${jobTypeDef.requiredSkills.join(', ')}`);
+    if (jobTypeDef.forbiddenSkills.length > 0) {
+      parts.push(`不相关技能（请勿添加）: ${jobTypeDef.forbiddenSkills.join(', ')}`);
+    }
+    parts.push('');
 
     if (job.title) {
       parts.push(`职位名称: ${job.title}`);

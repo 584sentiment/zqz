@@ -1,5 +1,14 @@
 // Prompt 模板管理
-import { promptTemplates as enhancedPromptTemplates } from './enhanced-resume-generation';
+import {
+  promptTemplates as enhancedPromptTemplates,
+  identifyJobType,
+  validateSkillsForJobType,
+  JOB_TYPE_DEFINITIONS,
+  type JobType,
+} from './enhanced-resume-generation';
+
+// 导出岗位类型相关功能
+export { identifyJobType, validateSkillsForJobType, JOB_TYPE_DEFINITIONS, type JobType };
 
 export type PromptTemplates = {
   // 岗位解析提示词

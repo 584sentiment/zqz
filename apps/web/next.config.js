@@ -7,6 +7,16 @@ const nextConfig = {
   experimental: {
     typedRoutes: false,
   },
+  // 增加 Webpack 内存限制，解决 tldraw 编译时 Jest worker 崩溃问题
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // 客户端编译时增加内存限制
+      config.infrastructureLogging = {
+        level: 'error',
+      };
+    }
+    return config;
+  },
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1',
   },

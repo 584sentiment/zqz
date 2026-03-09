@@ -92,6 +92,12 @@ export default function ResumeDetailPage() {
   // 选中的形状（用于 AI 编辑面板）
   const [selectedShapes, setSelectedShapes] = useState<ResumeShape[]>([]);
 
+  // 编辑器快照（用于保存）
+  const [editorSnapshot, setEditorSnapshot] = useState<string | null>(null);
+
+  // 编辑器快照（用于保存）
+  const [editorSnapshot, setEditorSnapshot] = useState<string | null>(null);
+
   // 将 API 返回的内容转换为 ResumeContent 格式
   const resumeContent = useMemo((): ResumeContent | null => {
     if (!resume?.content) return null;
@@ -343,6 +349,27 @@ export default function ResumeDetailPage() {
     }
   };
 
+  // 手动保存简历内容
+  const handleManualSave = async () => {
+    if (!resume) return;
+
+    setIsSaving(true);
+    try {
+      // 如果有编辑器快照，将快照保存到 content 中
+      const contentToUpdate = editorSnapshot
+        ? { ...resume.content, _canvasSnapshot: editorSnapshot }
+        : resume.content;
+
+      await resumesApi.update(resume.id, { content: contentToUpdate });
+      setResume({ ...resume, content: contentToUpdate });
+      toast({ title: '保存成功', description: '简历内容已保存' });
+    } catch (error) {
+      toast({ title: '保存失败', description: '请稍后重试', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // 获取选中内容的文本
   const getSelectedText = useCallback(() => {
     // 从选中的形状中提取文本
@@ -364,8 +391,7 @@ export default function ResumeDetailPage() {
 
   // 处理编辑器快照变化
   const handleEditorChange = useCallback((snapshot: string) => {
-    // 可以在这里实现将快照保存到数据库
-    console.log('Editor snapshot changed');
+    setEditorSnapshot(snapshot);
   }, []);
 
   // 加载中状态
@@ -426,26 +452,43 @@ export default function ResumeDetailPage() {
                     : '草稿'}
             </span>
 
-            {/* 自动保存状态（有内容时显示） */}
+            {/* 保存按钮(有内容时显示) */}
             {hasContent && (
-              <div
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
-                  isAutoSaving
-                    ? 'bg-blue-50 text-blue-700'
-                    : hasUnsavedChanges
-                      ? 'bg-yellow-50 text-yellow-700'
-                      : 'bg-green-50 text-green-700'
-                }`}
-              >
-                {isAutoSaving ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : hasUnsavedChanges ? (
-                  <CloudOff className="w-3 h-3" />
-                ) : (
-                  <Cloud className="w-3 h-3" />
-                )}
-                <span>{isAutoSaving ? '保存中' : hasUnsavedChanges ? '未保存' : '已保存'}</span>
-              </div>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleManualSave}
+                  disabled={isSaving || isAutoSaving}
+                >
+                  {isSaving || isAutoSaving ? (
+                    <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4 mr-1.5" />
+                  )}
+                  {isSaving ? '保存中...' : '保存'}
+                </Button>
+
+                {/* 保存状态指示 */}
+                <div
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+                    isAutoSaving
+                      ? 'bg-blue-50 text-blue-700'
+                      : hasUnsavedChanges
+                        ? 'bg-yellow-50 text-yellow-700'
+                        : 'bg-green-50 text-green-700'
+                  }`}
+                >
+                  {isAutoSaving ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : hasUnsavedChanges ? (
+                    <CloudOff className="w-3 h-3" />
+                  ) : (
+                    <Cloud className="w-3 h-3" />
+                  )}
+                  <span>{isAutoSaving ? '保存中' : hasUnsavedChanges ? '未保存' : '已保存'}</span>
+                </div>
+              </>
             )}
 
             {/* 无内容时显示 AI 生成按钮 */}
